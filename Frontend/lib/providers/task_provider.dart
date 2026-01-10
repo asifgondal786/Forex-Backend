@@ -1,17 +1,28 @@
+import '../core/models/task_step.dart';
 import 'package:flutter/foundation.dart';
 import '../core/models/task.dart';
 import '../core/models/live_update.dart';
 import '../services/api_service.dart';
+import '../services/firebase_service.dart';
 
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService;
+  final FirebaseService? _firebaseService;
   
   List<Task> _tasks = [];
   List<LiveUpdate> _liveUpdates = [];
   bool _isLoading = false;
   String? _error;
+  bool _useFirebase = false;
 
-  TaskProvider({required ApiService apiService}) : _apiService = apiService;
+  // Constructor compatible with your existing main.dart
+  TaskProvider({
+    required ApiService apiService,
+    FirebaseService? firebaseService,
+    bool useFirebase = false,
+  })  : _apiService = apiService,
+        _firebaseService = firebaseService,
+        _useFirebase = useFirebase;
 
   // Getters
   List<Task> get tasks => _tasks;
@@ -23,6 +34,13 @@ class TaskProvider with ChangeNotifier {
   String? get error => _error;
   int get activeTaskCount => activeTasks.length;
 
+  // Enable Firebase mode
+  void enableFirebase(FirebaseService firebaseService) {
+    _firebaseService = firebaseService;
+    _useFirebase = true;
+    fetchTasks(); // Reload tasks from Firebase
+  }
+
   // Get task by ID
   Task? getTaskById(String id) {
     try {
@@ -32,14 +50,20 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  // Fetch all tasks
+  // Fetch all tasks (works with both API and Firebase)
   Future<void> fetchTasks() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _tasks = await _apiService.getTasks();
+      if (_useFirebase && _firebaseService != null) {
+        // Use Firebase
+        _tasks = await _firebaseService!.getUserTasks();
+      } else {
+        // Use API
+        _tasks = await _apiService.getTasks();
+      }
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -53,7 +77,13 @@ class TaskProvider with ChangeNotifier {
   // Fetch single task
   Future<void> fetchTask(String taskId) async {
     try {
-      final task = await _apiService.getTask(taskId);
+      Task task;
+      if (_useFirebase && _firebaseService != null) {
+        task = (await _firebaseService!.getTask(taskId))!;
+      } else {
+        task = await _apiService.getTask(taskId);
+      }
+      
       final index = _tasks.indexWhere((t) => t.id == taskId);
       if (index != -1) {
         _tasks[index] = task;
@@ -68,22 +98,51 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  // Create new task
+  // Create new task (works with both API and Firebase)
   Future<Task?> createTask({
+    String? id,
     required String title,
     required String description,
     required TaskPriority priority,
+    List<String>? steps,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final newTask = await _apiService.createTask(
-        title: title,
-        description: description,
-        priority: priority,
-      );
+      Task newTask;
+      
+      if (_useFirebase && _firebaseService != null) {
+        // Create task object for Firebase
+        final taskToCreate = Task(
+          id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          title: title,
+          description: description,
+          priority: priority,
+          status: task_model.TaskStatus.pending,
+          steps: steps?.map((s) => task_model.TaskStep(
+          description: s,
+          isCompleted: false,
+          )).toList() ?? [],
+          currentStep: 0,
+          totalSteps: steps?.length ?? 0,
+          createdAt: DateTime.now(),
+          startTime: null,
+          endTime: null,
+        );
+        
+        final taskId = await _firebaseService!.createTask(taskToCreate);
+        newTask = taskToCreate.copyWith(id: taskId);
+      } else {
+        // Use API
+        newTask = await _apiService.createTask(
+          title: title,
+          description: description,
+          priority: priority,
+        );
+      }
+      
       _tasks.insert(0, newTask);
       _error = null;
       _isLoading = false;
@@ -101,8 +160,16 @@ class TaskProvider with ChangeNotifier {
   // Stop task
   Future<void> stopTask(String taskId) async {
     try {
-      final updatedTask = await _apiService.stopTask(taskId);
-      _updateTask(updatedTask);
+      if (_useFirebase && _firebaseService != null) {
+        await _firebaseService!.updateTask(taskId, {
+          'status': TaskStatus.completed.toString().split('.').last,
+          'endTime': DateTime.now().toIso8601String(),
+        });
+        await fetchTask(taskId);
+      } else {
+        final updatedTask = await _apiService.stopTask(taskId);
+        _updateTask(updatedTask);
+      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error stopping task: $e');
@@ -113,8 +180,15 @@ class TaskProvider with ChangeNotifier {
   // Pause task
   Future<void> pauseTask(String taskId) async {
     try {
-      final updatedTask = await _apiService.pauseTask(taskId);
-      _updateTask(updatedTask);
+      if (_useFirebase && _firebaseService != null) {
+        await _firebaseService!.updateTask(taskId, {
+          'status': TaskStatus.pending.toString().split('.').last,
+        });
+        await fetchTask(taskId);
+      } else {
+        final updatedTask = await _apiService.pauseTask(taskId);
+        _updateTask(updatedTask);
+      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error pausing task: $e');
@@ -125,8 +199,16 @@ class TaskProvider with ChangeNotifier {
   // Resume task
   Future<void> resumeTask(String taskId) async {
     try {
-      final updatedTask = await _apiService.resumeTask(taskId);
-      _updateTask(updatedTask);
+      if (_useFirebase && _firebaseService != null) {
+        await _firebaseService!.updateTask(taskId, {
+          'status': TaskStatus.running.toString().split('.').last,
+          'startTime': DateTime.now().toIso8601String(),
+        });
+        await fetchTask(taskId);
+      } else {
+        final updatedTask = await _apiService.resumeTask(taskId);
+        _updateTask(updatedTask);
+      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error resuming task: $e');
@@ -137,7 +219,11 @@ class TaskProvider with ChangeNotifier {
   // Delete task
   Future<void> deleteTask(String taskId) async {
     try {
-      await _apiService.deleteTask(taskId);
+      if (_useFirebase && _firebaseService != null) {
+        await _firebaseService!.deleteTask(taskId);
+      } else {
+        await _apiService.deleteTask(taskId);
+      }
       _tasks.removeWhere((task) => task.id == taskId);
       notifyListeners();
     } catch (e) {
@@ -159,6 +245,12 @@ class TaskProvider with ChangeNotifier {
   // Add live update
   void addLiveUpdate(LiveUpdate update) {
     _liveUpdates.insert(0, update);
+    
+    // Also save to Firebase if enabled
+    if (_useFirebase && _firebaseService != null) {
+      _firebaseService!.addLiveUpdate(update.taskId, update.message);
+    }
+    
     // Keep only last 50 updates
     if (_liveUpdates.length > 50) {
       _liveUpdates = _liveUpdates.take(50).toList();

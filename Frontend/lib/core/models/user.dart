@@ -5,7 +5,9 @@ class User {
   final String? avatarUrl;
   final UserPlan plan;
   final DateTime createdAt;
-
+  final String currentPlan;
+  final int tasksCompleted;
+  
   User({
     required this.id,
     required this.name,
@@ -15,7 +17,7 @@ class User {
     required this.createdAt,
   });
 
-  String get initials {
+  String get plan => currentPlan; {
     final parts = name.split(' ');
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();

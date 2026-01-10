@@ -1,3 +1,4 @@
+import '../features/ai_chat/ai_chat_screen.dart';
 import 'package:flutter/material.dart';
 import '../features/dashboard/dashboard_screen.dart';
 
@@ -10,6 +11,7 @@ class AppRoutes {
     '/task-history': (_) => const Scaffold(
           body: Center(child: Text('Task History Screen')),
         ),
+        '/ai-chat': (context) => const AiChatScreen(),
     '/settings': (_) => const Scaffold(
           body: Center(child: Text('Settings Screen')),
         ),

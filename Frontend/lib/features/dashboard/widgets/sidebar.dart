@@ -17,8 +17,20 @@ class Sidebar extends StatelessWidget {
             child: Row(
               children: [
                 Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/logo.png',  // FIXED: Correct path
                   height: 36,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback if logo doesn't exist
+                    return Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGreen,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.currency_exchange, color: Colors.white),
+                    );
+                  },
                 ),
                 const SizedBox(width: 12),
                 const Text(
@@ -36,27 +48,11 @@ class Sidebar extends StatelessWidget {
           const SizedBox(height: 24),
           
           // Navigation Items
-          _NavItem(
-            icon: Icons.dashboard,
-            label: 'Dashboard',
-            isActive: true,
-            onTap: () => Navigator.pushNamed(context, '/'),
-          ),
-          _NavItem(
-            icon: Icons.add_circle_outline,
-            label: 'Task Creation',
-            onTap: () => Navigator.pushNamed(context, '/create-task'),
-          ),
-          _NavItem(
-            icon: Icons.history,
-            label: 'Task History',
-            onTap: () => Navigator.pushNamed(context, '/task-history'),
-          ),
-          _NavItem(
-            icon: Icons.settings,
-            label: 'Settings',
-            onTap: () => Navigator.pushNamed(context, '/settings'),
-          ),
+          _buildMenuItem(context, Icons.dashboard, 'Dashboard', '/'),
+          _buildMenuItem(context, Icons.add_circle_outline, 'Task Creation', '/create-task'),
+          _buildMenuItem(context, Icons.history, 'Task History', '/task-history'),
+          _buildMenuItem(context, Icons.psychology, 'AI Assistant', '/ai-chat'),
+          _buildMenuItem(context, Icons.settings, 'Settings', '/settings'),
           
           const Spacer(),
           
@@ -136,23 +132,12 @@ class Sidebar extends StatelessWidget {
       ),
     );
   }
-}
 
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.isActive = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  // Helper method to build menu items
+  Widget _buildMenuItem(BuildContext context, IconData icon, String label, String route) {
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+    final isActive = currentRoute == route;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -171,7 +156,7 @@ class _NavItem extends StatelessWidget {
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
-        onTap: onTap,
+        onTap: () => Navigator.pushNamed(context, route),
       ),
     );
   }
