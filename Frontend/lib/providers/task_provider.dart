@@ -7,7 +7,7 @@ import '../services/firebase_service.dart';
 
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService;
-  final FirebaseService? _firebaseService;
+  FirebaseService? _firebaseService;
   
   List<Task> _tasks = [];
   List<LiveUpdate> _liveUpdates = [];
@@ -57,9 +57,10 @@ class TaskProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_useFirebase && _firebaseService != null) {
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
         // Use Firebase
-        _tasks = await _firebaseService!.getUserTasks();
+        _tasks = await service.getUserTasks();
       } else {
         // Use API
         _tasks = await _apiService.getTasks();
@@ -78,8 +79,9 @@ class TaskProvider with ChangeNotifier {
   Future<void> fetchTask(String taskId) async {
     try {
       Task task;
-      if (_useFirebase && _firebaseService != null) {
-        task = (await _firebaseService!.getTask(taskId))!;
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
+        task = await service.getTask(taskId);
       } else {
         task = await _apiService.getTask(taskId);
       }
@@ -113,26 +115,36 @@ class TaskProvider with ChangeNotifier {
     try {
       Task newTask;
       
-      if (_useFirebase && _firebaseService != null) {
+      final List<TaskStep> taskSteps = steps?.asMap().entries.map((entry) {
+            int idx = entry.key;
+            String val = entry.value;
+            return TaskStep(
+              id: '${id ?? DateTime.now().millisecondsSinceEpoch}_$idx',
+              name: 'Step ${idx + 1}',
+              description: val,
+              status: StepStatus.pending,
+              order: idx,
+            );
+          }).toList() ?? [];
+
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
         // Create task object for Firebase
         final taskToCreate = Task(
           id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
           title: title,
           description: description,
           priority: priority,
-          status: task_model.TaskStatus.pending,
-          steps: steps?.map((s) => task_model.TaskStep(
-          description: s,
-          isCompleted: false,
-          )).toList() ?? [],
+          status: TaskStatus.pending,
+          steps: taskSteps,
           currentStep: 0,
-          totalSteps: steps?.length ?? 0,
+          totalSteps: taskSteps.length,
           createdAt: DateTime.now(),
           startTime: null,
           endTime: null,
         );
         
-        final taskId = await _firebaseService!.createTask(taskToCreate);
+        final taskId = await service.createTask(taskToCreate);
         newTask = taskToCreate.copyWith(id: taskId);
       } else {
         // Use API
@@ -160,8 +172,9 @@ class TaskProvider with ChangeNotifier {
   // Stop task
   Future<void> stopTask(String taskId) async {
     try {
-      if (_useFirebase && _firebaseService != null) {
-        await _firebaseService!.updateTask(taskId, {
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
+        await service.updateTask(taskId, {
           'status': TaskStatus.completed.toString().split('.').last,
           'endTime': DateTime.now().toIso8601String(),
         });
@@ -180,8 +193,9 @@ class TaskProvider with ChangeNotifier {
   // Pause task
   Future<void> pauseTask(String taskId) async {
     try {
-      if (_useFirebase && _firebaseService != null) {
-        await _firebaseService!.updateTask(taskId, {
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
+        await service.updateTask(taskId, {
           'status': TaskStatus.pending.toString().split('.').last,
         });
         await fetchTask(taskId);
@@ -199,8 +213,9 @@ class TaskProvider with ChangeNotifier {
   // Resume task
   Future<void> resumeTask(String taskId) async {
     try {
-      if (_useFirebase && _firebaseService != null) {
-        await _firebaseService!.updateTask(taskId, {
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
+        await service.updateTask(taskId, {
           'status': TaskStatus.running.toString().split('.').last,
           'startTime': DateTime.now().toIso8601String(),
         });
@@ -219,8 +234,9 @@ class TaskProvider with ChangeNotifier {
   // Delete task
   Future<void> deleteTask(String taskId) async {
     try {
-      if (_useFirebase && _firebaseService != null) {
-        await _firebaseService!.deleteTask(taskId);
+      final service = _firebaseService;
+      if (_useFirebase && service != null) {
+        await service.deleteTask(taskId);
       } else {
         await _apiService.deleteTask(taskId);
       }
@@ -245,11 +261,6 @@ class TaskProvider with ChangeNotifier {
   // Add live update
   void addLiveUpdate(LiveUpdate update) {
     _liveUpdates.insert(0, update);
-    
-    // Also save to Firebase if enabled
-    if (_useFirebase && _firebaseService != null) {
-      _firebaseService!.addLiveUpdate(update.taskId, update.message);
-    }
     
     // Keep only last 50 updates
     if (_liveUpdates.length > 50) {

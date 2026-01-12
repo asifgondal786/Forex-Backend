@@ -1,3 +1,22 @@
+// User plan enum with display names
+enum UserPlan { 
+  free, 
+  premium, 
+  enterprise;
+
+  String get displayName {
+    switch (this) {
+      case UserPlan.free:
+        return 'Free Plan';
+      case UserPlan.premium:
+        return 'Premium Plan';
+      case UserPlan.enterprise:
+        return 'Enterprise Plan';
+    }
+  }
+}
+
+// User model class
 class User {
   final String id;
   final String name;
@@ -5,25 +24,15 @@ class User {
   final String? avatarUrl;
   final UserPlan plan;
   final DateTime createdAt;
-  final String currentPlan;
-  final int tasksCompleted;
-  
+
   User({
     required this.id,
     required this.name,
     required this.email,
     this.avatarUrl,
-    required this.plan,
+    this.plan = UserPlan.free,
     required this.createdAt,
   });
-
-  String get plan => currentPlan; {
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -32,7 +41,7 @@ class User {
       email: json['email'] as String,
       avatarUrl: json['avatar_url'] as String?,
       plan: UserPlan.values.firstWhere(
-        (e) => e.name == json['plan'],
+        (e) => e.toString().split('.').last == json['plan'],
         orElse: () => UserPlan.free,
       ),
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -45,9 +54,20 @@ class User {
       'name': name,
       'email': email,
       'avatar_url': avatarUrl,
-      'plan': plan.name,
+      'plan': plan.toString().split('.').last,
       'created_at': createdAt.toIso8601String(),
     };
+  }
+
+  // Get user initials for avatar
+  String get initials {
+    final nameParts = name.split(' ');
+    if (nameParts.length >= 2) {
+      return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+    } else if (name.isNotEmpty) {
+      return name[0].toUpperCase();
+    }
+    return 'U';
   }
 
   User copyWith({
@@ -66,24 +86,5 @@ class User {
       plan: plan ?? this.plan,
       createdAt: createdAt ?? this.createdAt,
     );
-  }
-}
-
-enum UserPlan {
-  free,
-  pro,
-  enterprise,
-}
-
-extension UserPlanExtension on UserPlan {
-  String get displayName {
-    switch (this) {
-      case UserPlan.free:
-        return 'Free Plan';
-      case UserPlan.pro:
-        return 'Pro Plan';
-      case UserPlan.enterprise:
-        return 'Enterprise Plan';
-    }
   }
 }

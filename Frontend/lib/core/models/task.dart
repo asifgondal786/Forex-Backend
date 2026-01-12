@@ -1,12 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'task_step.dart';
 
 class Task {
+  final String? userId;
   final String id;
   final String title;
   final String description;
   final TaskStatus status;
   final TaskPriority priority;
-  final DateTime startTime;
+  final DateTime? createdAt;
+  final DateTime? startTime;
   final DateTime? endTime;
   final int currentStep;
   final int totalSteps;
@@ -16,12 +19,14 @@ class Task {
   final int? resultFileSize;
 
   Task({
+    this.userId,
     required this.id,
     required this.title,
     required this.description,
     required this.status,
     required this.priority,
-    required this.startTime,
+    this.createdAt,
+    this.startTime,
     this.endTime,
     required this.currentStep,
     required this.totalSteps,
@@ -31,15 +36,94 @@ class Task {
     this.resultFileSize,
   });
 
-  Map<String, dynamic> toJson() {
+  double get progress => totalSteps > 0 ? currentStep / totalSteps : 0.0;
+
+  bool get isCompleted => status == TaskStatus.completed;
+  bool get isRunning => status == TaskStatus.running;
+  bool get isPending => status == TaskStatus.pending;
+
+  factory Task.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic date) {
+      if (date == null) return null;
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.tryParse(date);
+      return null;
+    }
+
+    return Task(
+      id: json['id'] as String? ?? '',
+      userId: json['userId'] as String?,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      status: TaskStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => TaskStatus.pending,
+      ),
+      priority: TaskPriority.values.firstWhere(
+        (e) => e.name == json['priority'],
+        orElse: () => TaskPriority.medium,
+      ),
+      createdAt: parseDate(json['createdAt']),
+      startTime: parseDate(json['startTime']),
+      endTime: parseDate(json['endTime']),
+      currentStep: json['currentStep'] as int? ?? 0,
+      totalSteps: json['totalSteps'] as int? ?? 0,
+      steps: (json['steps'] as List<dynamic>?)
+              ?.map((step) => TaskStep.fromJson(step as Map<String, dynamic>))
+              .toList() ??
+          [],
+      resultFileUrl: json['resultFileUrl'] as String?,
+      resultFileName: json['resultFileName'] as String?,
+      resultFileSize: json['resultFileSize'] as int?,
+    );
+  }
+
+  factory Task.fromFirestore(Map<String, dynamic> data, String documentId) {
+    DateTime? parseDate(dynamic date) {
+      if (date == null) return null;
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.tryParse(date);
+      return null;
+    }
+
+    return Task(
+      id: documentId,
+      userId: data['userId'] as String?,
+      title: data['title'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      status: TaskStatus.values.firstWhere(
+        (e) => e.name == data['status'],
+        orElse: () => TaskStatus.pending,
+      ),
+      priority: TaskPriority.values.firstWhere(
+        (e) => e.name == data['priority'],
+        orElse: () => TaskPriority.medium,
+      ),
+      createdAt: parseDate(data['createdAt']),
+      startTime: parseDate(data['startTime']),
+      endTime: parseDate(data['endTime']),
+      currentStep: data['currentStep'] as int? ?? 0,
+      totalSteps: data['totalSteps'] as int? ?? 0,
+      steps: (data['steps'] as List<dynamic>?)
+              ?.map((step) => TaskStep.fromJson(step as Map<String, dynamic>))
+              .toList() ??
+          [],
+      resultFileUrl: data['resultFileUrl'] as String?,
+      resultFileName: data['resultFileName'] as String?,
+      resultFileSize: data['resultFileSize'] as int?,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
+      'userId': userId,
       'title': title,
       'description': description,
-      'status': status.toString().split('.').last,
-      'priority': priority.toString().split('.').last,
-      'startTime': startTime,
-      'endTime': endTime,
+      'status': status.name,
+      'priority': priority.name,
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
+      'startTime': startTime != null ? Timestamp.fromDate(startTime!) : null,
+      'endTime': endTime != null ? Timestamp.fromDate(endTime!) : null,
       'currentStep': currentStep,
       'totalSteps': totalSteps,
       'steps': steps.map((step) => step.toJson()).toList(),
@@ -49,315 +133,14 @@ class Task {
     };
   }
 
-  factory Task.fromJson(Map<String, dynamic> json) {
-    final steps = (json['steps'] as List<dynamic>)
-        .map((step) => TaskStep.fromJson(step))
-        .toList();
-
-    return Task(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      status: TaskStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == json['status'],
-        orElse: () => TaskStatus.pending,
-      ),
-      priority: TaskPriority.values.firstWhere(
-        (e) => e.toString().split('.').last == json['priority'],
-        orElse: () => TaskPriority.medium,
-      ),
-      startTime: DateTime.parse(json['startTime'] as String),
-      endTime: json['endTime'] != null ? DateTime.parse(json['endTime'] as String) : null,
-      currentStep: json['currentStep'] as int? ?? 0,
-      totalSteps: json['totalSteps'] as int? ?? 0,
-      steps: steps,
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../core/models/task.dart' as task_model;
-import '../core/models/user.dart' as app_user;
-
-class FirebaseService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
-
-  // Collections
-  static const String tasksCollection = 'tasks';
-  static const String usersCollection = 'users';
-  static const String updatesCollection = 'live_updates';
-
-  // ==================== AUTH ====================
-
-  Future<User?> signInAnonymously() async {
-    try {
-      final userCredential = await _auth.signInAnonymously();
-      return userCredential.user;
-    } catch (e) {
-      throw Exception('Anonymous sign-in failed: $e');
-    }
-  }
-
-  Future<User?> signInWithEmail(String email, String password) async {
-    try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return userCredential.user;
-    } catch (e) {
-      throw Exception('Sign-in failed: $e');
-    }
-  }
-
-  Future<User?> signUpWithEmail(String email, String password, String name) async {
-    try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
-      if (userCredential.user != null) {
-        await createUserProfile(userCredential.user!.uid, name, email);
-      }
-      
-      return userCredential.user;
-    } catch (e) {
-      throw Exception('Sign-up failed: $e');
-    }
-  }
-
-  Future<void> signOut() async {
-    await _auth.signOut();
-  }
-
-  User? get currentUser => _auth.currentUser;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
-
-  // ==================== USER PROFILE ====================
-
-  Future<void> createUserProfile(String uid, String name, String email) async {
-    try {
-      final userProfile = app_user.User(
-        id: uid,
-        name: name,
-        email: email,
-        currentPlan: 'Free',
-        tasksCompleted: 0,
-        createdAt: DateTime.now(),
-      );
-
-      await _firestore
-          .collection(usersCollection)
-          .doc(uid)
-          .set(userProfile.toJson());
-    } catch (e) {
-      throw Exception('Failed to create user profile: $e');
-    }
-  }
-
-  Future<app_user.User?> getUserProfile(String uid) async {
-    try {
-      final doc = await _firestore.collection(usersCollection).doc(uid).get();
-      if (doc.exists) {
-        return app_user.User.fromJson(doc.data()!);
-      }
-      return null;
-    } catch (e) {
-      throw Exception('Failed to get user profile: $e');
-    }
-  }
-
-  Future<void> updateUserProfile(String uid, Map<String, dynamic> updates) async {
-    try {
-      await _firestore.collection(usersCollection).doc(uid).update(updates);
-    } catch (e) {
-      throw Exception('Failed to update user profile: $e');
-    }
-  }
-
-  // ==================== TASKS ====================
-
-  Future<String> createTask(Task task) async {
-    try {
-      final uid = currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
-
-      final taskData = task.toJson();
-      taskData['userId'] = uid;
-      taskData['createdAt'] = FieldValue.serverTimestamp();
-
-      final docRef = await _firestore.collection(tasksCollection).add(taskData);
-      return docRef.id;
-    } catch (e) {
-      throw Exception('Failed to create task: $e');
-    }
-  }
-
-  Future<void> updateTask(String taskId, Map<String, dynamic> updates) async {
-    try {
-      updates['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore.collection(tasksCollection).doc(taskId).update(updates);
-    } catch (e) {
-      throw Exception('Failed to update task: $e');
-    }
-  }
-
-  Future<void> deleteTask(String taskId) async {
-    try {
-      await _firestore.collection(tasksCollection).doc(taskId).delete();
-    } catch (e) {
-      throw Exception('Failed to delete task: $e');
-    }
-  }
-
-  Future<Task?> getTask(String taskId) async {
-    try {
-      final doc = await _firestore.collection(tasksCollection).doc(taskId).get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        data['id'] = doc.id;
-        return Task.fromJson(data);
-      }
-      return null;
-    } catch (e) {
-      throw Exception('Failed to get task: $e');
-    }
-  }
-
-  Stream<List<Task>> getUserTasksStream() {
-    final uid = currentUser?.uid;
-    if (uid == null) return Stream.value([]);
-
-    return _firestore
-        .collection(tasksCollection)
-        .where('userId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return Task.fromJson(data);
-      }).toList();
-    });
-  }
-
-  Future<List<Task>> getUserTasks({TaskStatus? status}) async {
-    try {
-      final uid = currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
-
-      Query query = _firestore
-          .collection(tasksCollection)
-          .where('userId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true);
-
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.toString().split('.').last);
-      }
-
-      final snapshot = await query.get();
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id;
-        return Task.fromJson(data);
-      }).toList();
-    } catch (e) {
-      throw Exception('Failed to get tasks: $e');
-    }
-  }
-
-  // ==================== LIVE UPDATES ====================
-
-  Future<void> addLiveUpdate(String taskId, String message) async {
-    try {
-      await _firestore
-          .collection(tasksCollection)
-          .doc(taskId)
-          .collection(updatesCollection)
-          .add({
-        'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Failed to add live update: $e');
-    }
-  }
-
-  Stream<List<Map<String, dynamic>>> getLiveUpdatesStream(String taskId) {
-    return _firestore
-        .collection(tasksCollection)
-        .doc(taskId)
-        .collection(updatesCollection)
-        .orderBy('timestamp', descending: true)
-        .limit(50)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) => doc.data()).toList();
-    });
-  }
-}
-  });
-
-  double get progress => totalSteps > 0 ? currentStep / totalSteps : 0.0;
-
-  bool get isCompleted => status == TaskStatus.completed;
-  bool get isRunning => status == TaskStatus.running;
-  bool get isPending => status == TaskStatus.pending;
-
-  factory Task.fromJson(Map<String, dynamic> json) {
-    return Task(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      status: TaskStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => TaskStatus.pending,
-      ),
-      priority: TaskPriority.values.firstWhere(
-        (e) => e.name == json['priority'],
-        orElse: () => TaskPriority.medium,
-      ),
-      startTime: DateTime.parse(json['start_time'] as String),
-      endTime: json['end_time'] != null 
-          ? DateTime.parse(json['end_time'] as String)
-          : null,
-      currentStep: json['current_step'] as int,
-      totalSteps: json['total_steps'] as int,
-      steps: (json['steps'] as List<dynamic>)
-          .map((step) => TaskStep.fromJson(step as Map<String, dynamic>))
-          .toList(),
-      resultFileUrl: json['result_file_url'] as String?,
-      resultFileName: json['result_file_name'] as String?,
-      resultFileSize: json['result_file_size'] as int?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'status': status.name,
-      'priority': priority.name,
-      'start_time': startTime.toIso8601String(),
-      'end_time': endTime?.toIso8601String(),
-      'current_step': currentStep,
-      'total_steps': totalSteps,
-      'steps': steps.map((step) => step.toJson()).toList(),
-      'result_file_url': resultFileUrl,
-      'result_file_name': resultFileName,
-      'result_file_size': resultFileSize,
-    };
-  }
-
   Task copyWith({
+    String? userId,
     String? id,
     String? title,
     String? description,
     TaskStatus? status,
     TaskPriority? priority,
+    DateTime? createdAt,
     DateTime? startTime,
     DateTime? endTime,
     int? currentStep,
@@ -368,11 +151,13 @@ class FirebaseService {
     int? resultFileSize,
   }) {
     return Task(
+      userId: userId ?? this.userId,
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       status: status ?? this.status,
       priority: priority ?? this.priority,
+      createdAt: createdAt ?? this.createdAt,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       currentStep: currentStep ?? this.currentStep,

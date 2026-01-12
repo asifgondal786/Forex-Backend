@@ -1,226 +1,238 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../core/models/task.dart' as task_model;
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_storage/firebase_storage.dart' as storage;
+import 'package:flutter/foundation.dart';
 import '../core/models/user.dart' as app_user;
+import '../core/models/task.dart' as task_model;
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  final storage.FirebaseStorage _storage = storage.FirebaseStorage.instance;
 
-  // Collections
-  static const String tasksCollection = 'tasks';
-  static const String usersCollection = 'users';
-  static const String updatesCollection = 'live_updates';
+  // Get current Firebase Auth user
+  firebase_auth.User? get currentFirebaseUser => _auth.currentUser;
 
-  // ==================== AUTH ====================
+  // Get current app user
+  Future<app_user.User?> getCurrentUser() async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) return null;
 
-  Future<User?> signInAnonymously() async {
     try {
-      final userCredential = await _auth.signInAnonymously();
-      return userCredential.user;
-    } catch (e) {
-      throw Exception('Anonymous sign-in failed: $e');
-    }
-  }
-
-  Future<User?> signInWithEmail(String email, String password) async {
-    try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return userCredential.user;
-    } catch (e) {
-      throw Exception('Sign-in failed: $e');
-    }
-  }
-
-  Future<User?> signUpWithEmail(String email, String password, String name) async {
-    try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
-      if (userCredential.user != null) {
-        await createUserProfile(userCredential.user!.uid, name, email);
-      }
-      
-      return userCredential.user;
-    } catch (e) {
-      throw Exception('Sign-up failed: $e');
-    }
-  }
-
-  Future<void> signOut() async {
-    await _auth.signOut();
-  }
-
-  User? get currentUser => _auth.currentUser;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
-
-  // ==================== USER PROFILE ====================
-
-  Future<void> createUserProfile(String uid, String name, String email) async {
-    try {
-      final userProfile = app_user.User(
-        id: uid,
-        name: name,
-        email: email,
-        currentPlan: 'Free',
-        tasksCompleted: 0,
-        createdAt: DateTime.now(),
-      );
-
-      await _firestore
-          .collection(usersCollection)
-          .doc(uid)
-          .set(userProfile.toJson());
-    } catch (e) {
-      throw Exception('Failed to create user profile: $e');
-    }
-  }
-
-  Future<app_user.User?> getUserProfile(String uid) async {
-    try {
-      final doc = await _firestore.collection(usersCollection).doc(uid).get();
+      final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
       if (doc.exists) {
-        return app_user.User.fromJson(doc.data()!);
+        return app_user.User.fromJson({
+          'id': doc.id,
+          ...doc.data() as Map<String, dynamic>,
+        });
       }
       return null;
     } catch (e) {
-      throw Exception('Failed to get user profile: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting current user: $e');
+      }
+      return null;
     }
   }
 
-  Future<void> updateUserProfile(String uid, Map<String, dynamic> updates) async {
+  // Update user profile
+  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection(usersCollection).doc(uid).update(updates);
+      await _firestore.collection('users').doc(userId).update(data);
     } catch (e) {
-      throw Exception('Failed to update user profile: $e');
+      if (kDebugMode) {
+        debugPrint('Error updating user profile: $e');
+      }
+      throw Exception('Failed to update profile');
     }
   }
 
-  // ==================== TASKS ====================
-
-  Future<String> createTask(Task task) async {
+  // Create user document
+  Future<void> createUserDocument(app_user.User user) async {
     try {
-      final uid = currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
+      await _firestore.collection('users').doc(user.id).set(user.toJson());
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error creating user document: $e');
+      }
+      throw Exception('Failed to create user');
+    }
+  }
 
-      final taskData = task.toJson();
-      taskData['userId'] = uid;
-      taskData['createdAt'] = FieldValue.serverTimestamp();
+  // Get user by ID
+  Future<app_user.User?> getUserById(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        return app_user.User.fromJson({
+          'id': doc.id,
+          ...doc.data() as Map<String, dynamic>,
+        });
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting user: $e');
+      }
+      return null;
+    }
+  }
 
-      final docRef = await _firestore.collection(tasksCollection).add(taskData);
+  // Sign in with email and password
+  Future<firebase_auth.User?> signInWithEmail(String email, String password) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential.user;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error signing in: $e');
+      }
+      return null;
+    }
+  }
+
+  // Sign up with email and password
+  Future<firebase_auth.User?> signUpWithEmail(String email, String password) async {
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential.user;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error signing up: $e');
+      }
+      return null;
+    }
+  }
+
+  // Sign out
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error signing out: $e');
+      }
+      throw Exception('Failed to sign out');
+    }
+  }
+
+  // Upload file to Firebase Storage
+  Future<String?> uploadFile(String path, List<int> data) async {
+    try {
+      final ref = _storage.ref().child(path);
+      await ref.putData(Uint8List.fromList(data));
+      final url = await ref.getDownloadURL();
+      return url;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error uploading file: $e');
+      }
+      return null;
+    }
+  }
+
+  // Delete file from Firebase Storage
+  Future<void> deleteFile(String path) async {
+    try {
+      final ref = _storage.ref().child(path);
+      await ref.delete();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error deleting file: $e');
+      }
+      throw Exception('Failed to delete file');
+    }
+  }
+
+  // --- Task Methods ---
+
+  /// Fetches all tasks for a specific user.
+  Future<List<task_model.Task>> getUserTasks() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        return []; // Not logged in, return empty list
+      }
+      final snapshot = await _firestore
+          .collection('tasks')
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs.map((doc) => task_model.Task.fromFirestore(doc.data(), doc.id)).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting user tasks: $e');
+      }
+      throw Exception('Failed to fetch tasks.');
+    }
+  }
+
+  /// Fetches a single task by its ID.
+  Future<task_model.Task> getTask(String taskId) async {
+    try {
+      final doc = await _firestore.collection('tasks').doc(taskId).get();
+      if (doc.exists) {
+        return task_model.Task.fromFirestore(doc.data()!, doc.id);
+      }
+      throw Exception('Task not found');
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting task: $e');
+      }
+      throw Exception('Failed to fetch task.');
+    }
+  }
+
+  /// Creates a new task in Firestore and returns its ID.
+  Future<String> createTask(task_model.Task task) async {
+    try {
+      final docRef = await _firestore.collection('tasks').add(task.toFirestore());
       return docRef.id;
     } catch (e) {
-      throw Exception('Failed to create task: $e');
+      if (kDebugMode) {
+        debugPrint('Error creating task: $e');
+      }
+      throw Exception('Failed to create task.');
     }
   }
 
-  Future<void> updateTask(String taskId, Map<String, dynamic> updates) async {
+  /// Updates an existing task in Firestore.
+  Future<void> updateTask(String taskId, Map<String, dynamic> data) async {
     try {
-      updates['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore.collection(tasksCollection).doc(taskId).update(updates);
+      await _firestore.collection('tasks').doc(taskId).update(data);
     } catch (e) {
-      throw Exception('Failed to update task: $e');
+      if (kDebugMode) {
+        debugPrint('Error updating task: $e');
+      }
+      throw Exception('Failed to update task.');
     }
   }
 
+  /// Deletes a task from Firestore.
   Future<void> deleteTask(String taskId) async {
     try {
-      await _firestore.collection(tasksCollection).doc(taskId).delete();
+      await _firestore.collection('tasks').doc(taskId).delete();
     } catch (e) {
-      throw Exception('Failed to delete task: $e');
-    }
-  }
-
-  Future<Task?> getTask(String taskId) async {
-    try {
-      final doc = await _firestore.collection(tasksCollection).doc(taskId).get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        data['id'] = doc.id;
-        return Task.fromJson(data);
+      if (kDebugMode) {
+        debugPrint('Error deleting task: $e');
       }
-      return null;
-    } catch (e) {
-      throw Exception('Failed to get task: $e');
+      throw Exception('Failed to delete task.');
     }
   }
 
-  Stream<List<Task>> getUserTasksStream() {
-    final uid = currentUser?.uid;
-    if (uid == null) return Stream.value([]);
-
-    return _firestore
-        .collection(tasksCollection)
-        .where('userId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return Task.fromJson(data);
-      }).toList();
-    });
-  }
-
-  Future<List<Task>> getUserTasks({TaskStatus? status}) async {
-    try {
-      final uid = currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
-
-      Query query = _firestore
-          .collection(tasksCollection)
-          .where('userId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true);
-
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.toString().split('.').last);
+  /// Provides a stream for real-time updates on a single task.
+  Stream<task_model.Task> listenToTask(String taskId) {
+    return _firestore.collection('tasks').doc(taskId).snapshots().map((snapshot) {
+      if (snapshot.exists) {
+        return task_model.Task.fromFirestore(snapshot.data()!, snapshot.id);
       }
-
-      final snapshot = await query.get();
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id;
-        return Task.fromJson(data);
-      }).toList();
-    } catch (e) {
-      throw Exception('Failed to get tasks: $e');
-    }
-  }
-
-  // ==================== LIVE UPDATES ====================
-
-  Future<void> addLiveUpdate(String taskId, String message) async {
-    try {
-      await _firestore
-          .collection(tasksCollection)
-          .doc(taskId)
-          .collection(updatesCollection)
-          .add({
-        'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Failed to add live update: $e');
-    }
-  }
-
-  Stream<List<Map<String, dynamic>>> getLiveUpdatesStream(String taskId) {
-    return _firestore
-        .collection(tasksCollection)
-        .doc(taskId)
-        .collection(updatesCollection)
-        .orderBy('timestamp', descending: true)
-        .limit(50)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) => doc.data()).toList();
+      throw Exception('Task not found for live update.');
     });
   }
 }

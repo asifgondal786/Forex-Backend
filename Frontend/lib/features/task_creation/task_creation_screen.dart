@@ -26,64 +26,72 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
 
   Future<void> _getAiSuggestion() async {
     if (_titleController.text.trim().isEmpty) {
-      CustomSnackbar.warning(context, 'Please enter a task title first');
+      if (mounted) {
+        CustomSnackbar.warning(context, 'Please enter a task title first');
+      }
       return;
     }
 
     setState(() => _isAiEnhancing = true);
 
     try {
-      final suggestion = await _geminiService.generateTaskSuggestion(
-        _titleController.text.trim(),
-      );
-      
-      setState(() {
-        _aiSuggestion = suggestion;
-        if (suggestion['description'] != null) {
-          _descriptionController.text = suggestion['description'];
-        }
-        if (suggestion['priority'] != null) {
-          final priority = suggestion['priority'].toLowerCase();
-          if (priority == 'high') _selectedPriority = TaskPriority.high;
-          else if (priority == 'low') _selectedPriority = TaskPriority.low;
-          else _selectedPriority = TaskPriority.medium;
-        }
-      });
+      final suggestion =
+          await _geminiService.generateTaskSuggestion(_titleController.text.trim());
 
-      CustomSnackbar.success(context, 'AI enhanced your task!');
+      if (mounted) {
+        setState(() {
+          _aiSuggestion = suggestion;
+          if (suggestion['description'] != null) {
+            _descriptionController.text = suggestion['description'];
+          }
+          if (suggestion['priority'] != null) {
+            final priority = suggestion['priority'].toLowerCase();
+            if (priority == 'high') {
+              _selectedPriority = TaskPriority.high;
+            } else if (priority == 'low') {
+              _selectedPriority = TaskPriority.low;
+            } else {
+              _selectedPriority = TaskPriority.medium;
+            }
+          }
+        });
+        CustomSnackbar.success(context, 'AI enhanced your task!');
+      }
     } catch (e) {
-      CustomSnackbar.error(context, 'AI enhancement failed: $e');
+      if (mounted) {
+        CustomSnackbar.error(context, 'AI enhancement failed: $e');
+      }
     } finally {
-      setState(() => _isAiEnhancing = false);
+      if (mounted) {
+        setState(() => _isAiEnhancing = false);
+      }
     }
   }
 
   Future<void> _createTask() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      final task = Task(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+      final taskProvider = context.read<TaskProvider>();
+      await taskProvider.createTask(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         priority: _selectedPriority,
-        status: TaskStatus.pending,
-        steps: _aiSuggestion?['steps']?.cast<String>() ?? [],
-        createdAt: DateTime.now(),
-        startTime: null,
-        endTime: null,
+        steps: _aiSuggestion?['steps']?.cast<String>(),
       );
-
-      await context.read<TaskProvider>().createTask(task);
 
       if (mounted) {
         CustomSnackbar.success(context, 'Task created successfully!');
         Navigator.pop(context);
       }
     } catch (e) {
-      CustomSnackbar.error(context, 'Failed to create task: $e');
+      if (mounted) {
+        CustomSnackbar.error(context, 'Failed to create task: $e');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -93,7 +101,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -143,8 +151,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.2))),
+        color: Colors.white.withAlpha(26),
+        border: Border(bottom: BorderSide(color: Colors.white.withAlpha(51))),
       ),
       child: Row(
         children: [
@@ -193,20 +201,20 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: 'e.g., Analyze EUR/USD trend',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+            hintStyle: TextStyle(color: Colors.white.withAlpha(128)),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: Colors.white.withAlpha(26),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+              borderSide: BorderSide(color: Colors.white.withAlpha(51)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+              borderSide: BorderSide(color: Colors.white.withAlpha(51)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primaryGreen, width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryGreen, width: 2),
             ),
           ),
           validator: (value) {
@@ -239,7 +247,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          side: BorderSide(color: AppColors.primaryGreen),
+          side: const BorderSide(color: AppColors.primaryGreen),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
@@ -265,20 +273,20 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
           maxLines: 4,
           decoration: InputDecoration(
             hintText: 'Describe what this task should accomplish...',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+            hintStyle: TextStyle(color: Colors.white.withAlpha(128)),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
+            fillColor: Colors.white.withAlpha(26),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+              borderSide: BorderSide(color: Colors.white.withAlpha(51)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+              borderSide: BorderSide(color: Colors.white.withAlpha(51)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primaryGreen, width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryGreen, width: 2),
             ),
           ),
           validator: (value) {
@@ -329,10 +337,10 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? color : Colors.white.withOpacity(0.1),
+            color: isSelected ? color : Colors.white.withAlpha(26),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? color : Colors.white.withOpacity(0.2),
+              color: isSelected ? color : Colors.white.withAlpha(51),
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -353,14 +361,14 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primaryGreen.withOpacity(0.1),
+        color: AppColors.primaryGreen.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primaryGreen.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primaryGreen.withAlpha(77)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(Icons.lightbulb, color: AppColors.primaryGreen, size: 20),
               const SizedBox(width: 8),
@@ -419,7 +427,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ...examples.map((example) => Padding(
+        ...examples.map((example) => Padding( // This part cannot be const due to `_getAiSuggestion`
               padding: const EdgeInsets.only(bottom: 8),
               child: InkWell(
                 onTap: () {
@@ -429,19 +437,19 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withAlpha(13),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: Colors.white.withAlpha(26)),
                   ),
                   child: Row(
-                    children: [
+                    children: [ // This part cannot be const due to `example`
                       Icon(Icons.lightbulb_outline,
-                          color: Colors.white.withOpacity(0.5), size: 16),
+                          color: Colors.white.withAlpha(128), size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           example,
-                          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                          style: TextStyle(color: Colors.white.withAlpha(179)),
                         ),
                       ),
                     ],

@@ -22,8 +22,8 @@ class _DashboardContentState extends State<DashboardContent> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF3B82F6),
-            Color(0xFF5B8DEF),
+            AppColors.darkBlue,
+            AppColors.midBlue,
           ],
         ),
       ),
@@ -41,7 +41,7 @@ class _DashboardContentState extends State<DashboardContent> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
                       Text(
-                        'Welcome, Sohaib',
+                        'Welcome To Forex Companion',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -56,14 +56,6 @@ class _DashboardContentState extends State<DashboardContent> {
                           color: Colors.white70,
                         ),
                       ),
-                    ],
-                  ),
-                  // Tech Stack Badges
-                  Row(
-                    children: const [
-                      _TechBadge(text: 'Frontend (Flutter)', color: Colors.blue),
-                      SizedBox(width: 8),
-                      _TechBadge(text: 'Backend (Python ML)', color: Colors.teal),
                     ],
                   ),
                 ],

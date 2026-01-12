@@ -1,6 +1,7 @@
+import '../../core/utils/date_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
+// import 'package:intl/intl.dart';
 import '../../core/models/task.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/task_provider.dart';
@@ -15,23 +16,23 @@ class TaskHistoryScreen extends StatefulWidget {
 class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
   String _filterStatus = 'all'; // all, completed, running, pending
 
+  List<Task> _getFilteredTasks(TaskProvider provider) {
+    switch (_filterStatus) {
+      case 'running':
+        return provider.activeTasks;
+      case 'completed':
+        return provider.completedTasks;
+      case 'pending':
+        return provider.pendingTasks;
+      default:
+        return provider.tasks;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        title: const Text('Task History'),
-        backgroundColor: AppColors.sidebarDark,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<TaskProvider>().refreshTasks();
-            },
-          ),
-        ],
-      ),
+      backgroundColor: Colors.grey[900],
       body: Consumer<TaskProvider>(
         builder: (context, taskProvider, child) {
           if (taskProvider.isLoading && taskProvider.tasks.isEmpty) {
@@ -193,19 +194,6 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
       ),
     );
   }
-
-  List<Task> _getFilteredTasks(TaskProvider provider) {
-    switch (_filterStatus) {
-      case 'running':
-        return provider.activeTasks;
-      case 'completed':
-        return provider.completedTasks;
-      case 'pending':
-        return provider.pendingTasks;
-      default:
-        return provider.tasks;
-    }
-  }
 }
 
 class _FilterChip extends StatelessWidget {
@@ -231,7 +219,7 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? chipColor.withOpacity(0.2) : Colors.grey.shade100,
+          color: isSelected ? chipColor.withAlpha(51) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? chipColor : Colors.grey.shade300,
@@ -257,7 +245,7 @@ class _TaskHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMM dd, yyyy, hh:mm a');
+    // final dateFormat = DateFormat('MMM dd, yyyy, hh:mm a');
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -266,7 +254,7 @@ class _TaskHistoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -309,7 +297,9 @@ class _TaskHistoryCard extends StatelessWidget {
             children: [
               _InfoChip(
                 icon: Icons.calendar_today,
-                label: dateFormat.format(task.startTime),
+                label: task.createdAt != null
+                    ? DateFormatter.formatDate(task.createdAt!)
+                    : 'Unknown',
               ),
               const SizedBox(width: 12),
               _InfoChip(
@@ -532,7 +522,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withAlpha(51),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter/foundation.dart';
 import '../core/models/live_update.dart';
-import '../core/models/task.dart';
+import '../core/models/task.dart' as task_model;
 
 class WebSocketService {
   // TODO: Replace with your actual WebSocket URL
@@ -13,8 +13,10 @@ class WebSocketService {
   StreamSubscription? _subscription;
   
   final _updateController = StreamController<LiveUpdate>.broadcast();
-  final _taskUpdateController = StreamController<Task>.broadcast();
+  final _taskUpdateController = StreamController<task_model.Task>.broadcast();
   
+  String? _userId;
+  bool _manualDisconnect = false;
   bool _isConnected = false;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
@@ -23,16 +25,19 @@ class WebSocketService {
 
   // Getters
   Stream<LiveUpdate> get updateStream => _updateController.stream;
-  Stream<Task> get taskUpdateStream => _taskUpdateController.stream;
+  Stream<task_model.Task> get taskUpdateStream => _taskUpdateController.stream;
   bool get isConnected => _isConnected;
 
   // Connect to WebSocket
   Future<void> connect({String? userId}) async {
+    _userId = userId;
+    _manualDisconnect = false; // Reset flag on new connection attempt
     try {
-      final uri = Uri.parse(userId != null ? '$wsUrl?user_id=$userId' : wsUrl);
-      _channel = WebSocketChannel.connect(uri);
+      final uri = Uri.parse(_userId != null ? '$wsUrl?user_id=$_userId' : wsUrl);
+      final channel = WebSocketChannel.connect(uri);
+      _channel = channel;
       
-      _subscription = _channel!.stream.listen(
+      _subscription = channel.stream.listen(
         _onMessage,
         onError: _onError,
         onDone: _onDone,
@@ -62,7 +67,7 @@ class WebSocketService {
           break;
         
         case 'task_update':
-          final task = Task.fromJson(data['data']);
+          final task = task_model.Task.fromJson(data['data']);
           _taskUpdateController.add(task);
           break;
         
@@ -85,7 +90,9 @@ class WebSocketService {
   void _onDone() {
     debugPrint('WebSocket connection closed');
     _isConnected = false;
-    _scheduleReconnect();
+    if (!_manualDisconnect) {
+      _scheduleReconnect();
+    }
   }
 
   // Schedule reconnection
@@ -99,15 +106,16 @@ class WebSocketService {
     _reconnectTimer = Timer(reconnectDelay, () {
       _reconnectAttempts++;
       debugPrint('Reconnecting... Attempt $_reconnectAttempts');
-      connect();
+      connect(userId: _userId);
     });
   }
 
   // Send message
   void send(Map<String, dynamic> message) {
-    if (_isConnected && _channel != null) {
+    final channel = _channel;
+    if (_isConnected && channel != null) {
       try {
-        _channel!.sink.add(json.encode(message));
+        channel.sink.add(json.encode(message));
       } catch (e) {
         debugPrint('Error sending message: $e');
       }
@@ -134,6 +142,7 @@ class WebSocketService {
 
   // Disconnect and cleanup
   Future<void> disconnect() async {
+    _manualDisconnect = true;
     _reconnectTimer?.cancel();
     await _subscription?.cancel();
     await _channel?.sink.close();

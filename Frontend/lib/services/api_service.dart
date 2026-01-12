@@ -1,252 +1,113 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/models/task.dart';
-import '../core/models/task_step.dart';
 import '../core/models/user.dart';
 
 class ApiService {
-  // TODO: Replace with your actual backend URL
-  static const String baseUrl = 'http://localhost:8000/api';
-  
-  final http.Client _client;
+  // The base URL for your FastAPI backend.
+  // For local development, this is typically http://localhost:8000.
+  // If using an Android emulator, use http://10.0.2.2:8000 to connect to your host machine's localhost.
+  final String _baseUrl = 'http://localhost:8000';
 
-  ApiService({http.Client? client}) : _client = client ?? http.Client();
-
-  // Headers for API requests
+  // You might need to handle authentication tokens (e.g., JWT).
+  // For simplicity, this example assumes no auth. In a real app, you'd
+  // get a token from a login response and store it securely.
   Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
+        'Content-Type': 'application/json; charset=UTF-8',
+        // 'Authorization': 'Bearer YOUR_JWT_TOKEN',
+      };
 
-  // ==================== TASK ENDPOINTS ====================
+  // Helper to handle HTTP responses and errors
+  dynamic _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      // If the response body is empty, return null, otherwise decode JSON.
+      if (response.body.isEmpty) return null;
+      return json.decode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception(
+          'API Error: ${response.statusCode} - ${response.reasonPhrase}\nBody: ${response.body}');
+    }
+  }
 
-  /// Get all tasks
+  // --- User Methods ---
+  Future<User> getCurrentUser() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/users/me'),
+      headers: _headers,
+    );
+    final data = _handleResponse(response);
+    return User.fromJson(data);
+  }
+
+  Future<User> updateUser({String? name, String? email}) async {
+    final response = await http.put(
+      Uri.parse('$_baseUrl/api/users/me'),
+      headers: _headers,
+      body: json.encode({'name': name, 'email': email}),
+    );
+    final data = _handleResponse(response);
+    return User.fromJson(data);
+  }
+
+  // --- Task Methods ---
   Future<List<Task>> getTasks() async {
-    try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/tasks'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => Task.fromJson(json)).toList();
-      } else {
-        throw ApiException('Failed to load tasks: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error fetching tasks: $e');
-    }
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/tasks/'),
+      headers: _headers,
+    );
+    final List<dynamic> data = _handleResponse(response);
+    return data.map((json) => Task.fromJson(json)).toList();
   }
 
-  /// Get a single task by ID
   Future<Task> getTask(String taskId) async {
-    try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/tasks/$taskId'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        return Task.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to load task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error fetching task: $e');
-    }
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/tasks/$taskId'),
+      headers: _headers,
+    );
+    final data = _handleResponse(response);
+    return Task.fromJson(data);
   }
 
-  /// Create a new task
   Future<Task> createTask({
     required String title,
     required String description,
     required TaskPriority priority,
   }) async {
-    try {
-      final response = await _client.post(
-        Uri.parse('$baseUrl/tasks'),
-        headers: _headers,
-        body: json.encode({
-          'title': title,
-          'description': description,
-          'priority': priority.name,
-        }),
-      );
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return Task.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to create task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error creating task: $e');
-    }
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/tasks/'),
+      headers: _headers,
+      body: json.encode({
+        'title': title,
+        'description': description,
+        'priority': priority.name, // e.g., 'medium'
+      }),
+    );
+    final data = _handleResponse(response);
+    return Task.fromJson(data);
   }
 
-  /// Update task status
-  Future<Task> updateTaskStatus(String taskId, TaskStatus status) async {
-    try {
-      final response = await _client.patch(
-        Uri.parse('$baseUrl/tasks/$taskId/status'),
-        headers: _headers,
-        body: json.encode({'status': status.name}),
-      );
-
-      if (response.statusCode == 200) {
-        return Task.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to update task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error updating task: $e');
-    }
-  }
-
-  /// Delete a task
-  Future<void> deleteTask(String taskId) async {
-    try {
-      final response = await _client.delete(
-        Uri.parse('$baseUrl/tasks/$taskId'),
-        headers: _headers,
-      );
-
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        throw ApiException('Failed to delete task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error deleting task: $e');
-    }
-  }
-
-  /// Stop a running task
   Future<Task> stopTask(String taskId) async {
-    try {
-      final response = await _client.post(
-        Uri.parse('$baseUrl/tasks/$taskId/stop'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        return Task.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to stop task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error stopping task: $e');
-    }
+    final response = await http.put(
+      Uri.parse('$_baseUrl/api/tasks/$taskId/stop'),
+      headers: _headers,
+    );
+    final data = _handleResponse(response);
+    return Task.fromJson(data);
   }
 
-  /// Pause a running task
   Future<Task> pauseTask(String taskId) async {
-    try {
-      final response = await _client.post(
-        Uri.parse('$baseUrl/tasks/$taskId/pause'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        return Task.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to pause task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error pausing task: $e');
-    }
+    // Assuming a similar endpoint exists in your FastAPI backend
+    final response = await http.put(Uri.parse('$_baseUrl/api/tasks/$taskId/pause'), headers: _headers);
+    return Task.fromJson(_handleResponse(response));
   }
 
-  /// Resume a paused task
   Future<Task> resumeTask(String taskId) async {
-    try {
-      final response = await _client.post(
-        Uri.parse('$baseUrl/tasks/$taskId/resume'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        return Task.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to resume task: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error resuming task: $e');
-    }
+    // Assuming a similar endpoint exists in your FastAPI backend
+    final response = await http.put(Uri.parse('$_baseUrl/api/tasks/$taskId/resume'), headers: _headers);
+    return Task.fromJson(_handleResponse(response));
   }
 
-  // ==================== USER ENDPOINTS ====================
-
-  /// Get current user profile
-  Future<User> getCurrentUser() async {
-    try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/user/me'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        return User.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to load user: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error fetching user: $e');
-    }
+  Future<void> deleteTask(String taskId) async {
+    await http.delete(Uri.parse('$_baseUrl/api/tasks/$taskId'), headers: _headers);
   }
-
-  /// Update user profile
-  Future<User> updateUser({
-    String? name,
-    String? email,
-  }) async {
-    try {
-      final response = await _client.patch(
-        Uri.parse('$baseUrl/user/me'),
-        headers: _headers,
-        body: json.encode({
-          if (name != null) 'name': name,
-          if (email != null) 'email': email,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return User.fromJson(json.decode(response.body));
-      } else {
-        throw ApiException('Failed to update user: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error updating user: $e');
-    }
-  }
-
-  // ==================== FILE ENDPOINTS ====================
-
-  /// Download task result file
-  Future<List<int>> downloadTaskResult(String taskId) async {
-    try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/tasks/$taskId/download'),
-        headers: _headers,
-      );
-
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      } else {
-        throw ApiException('Failed to download file: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw ApiException('Error downloading file: $e');
-    }
-  }
-
-  void dispose() {
-    _client.close();
-  }
-}
-
-class ApiException implements Exception {
-  final String message;
-  ApiException(this.message);
-
-  @override
-  String toString() => message;
 }

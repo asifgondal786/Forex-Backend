@@ -71,7 +71,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -95,9 +95,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withAlpha(26),
         border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.2)),
+          bottom: BorderSide(color: Colors.white.withAlpha(51)),
         ),
       ),
       child: Row(
@@ -116,10 +116,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
             child: const Icon(Icons.psychology, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: const [
                 Text(
                   'Forex AI Assistant',
                   style: TextStyle(
@@ -141,7 +141,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primaryGreen,
               shape: BoxShape.circle,
             ),
@@ -182,11 +182,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
         decoration: BoxDecoration(
           color: message.isUser
               ? AppColors.primaryGreen
-              : Colors.white.withOpacity(0.15),
+              : Colors.white.withAlpha(38),
           borderRadius: BorderRadius.circular(16),
           border: message.isUser
               ? null
-              : Border.all(color: Colors.white.withOpacity(0.2)),
+              : Border.all(color: Colors.white.withAlpha(51)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +203,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             Text(
               _formatTime(message.timestamp),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withAlpha(153),
                 fontSize: 11,
               ),
             ),
@@ -220,7 +220,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withAlpha(38),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -231,7 +231,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(Colors.white.withOpacity(0.7)),
+                valueColor: AlwaysStoppedAnimation(Colors.white.withAlpha(179)),
               ),
             ),
             const SizedBox(width: 12),
@@ -249,9 +249,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withAlpha(26),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.2)),
+          top: BorderSide(color: Colors.white.withAlpha(51)),
         ),
       ),
       child: Row(
@@ -260,9 +260,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withAlpha(38),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                border: Border.all(color: Colors.white.withAlpha(51)),
               ),
               child: TextField(
                 controller: _messageController,
@@ -283,7 +283,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.primaryGreen, AppColors.primaryGreen.withOpacity(0.8)],
+                colors: [AppColors.primaryGreen, AppColors.primaryGreen.withAlpha(204)],
               ),
               borderRadius: BorderRadius.circular(24),
             ),
