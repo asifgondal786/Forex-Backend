@@ -1,0 +1,16 @@
+# Python / virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+*.log
+
+# Runtime / temp files
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage / test output
+coverage/
