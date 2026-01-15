@@ -1,16 +1,36 @@
-# Python / virtual environment
+# Virtual Environments
 .venv/
+venv/
+env/
+ENV/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Logs
-logs/
 *.log
 
-# Runtime / temp files
-*.pid
-*.seed
-*.pid.lock
+# OS
+.DS_Store
+Thumbs.db
 
-# Coverage / test output
-coverage/
+# Models (if storing locally)
+models/
+*.pkl
+*.h5
+*.pt
