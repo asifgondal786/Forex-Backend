@@ -40,10 +40,14 @@ class ApiService {
   }
 
   Future<User> updateUser({String? name, String? email}) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (email != null) body['email'] = email;
+
     final response = await http.put(
       Uri.parse('$_baseUrl/api/users/me'),
       headers: _headers,
-      body: json.encode({'name': name, 'email': email}),
+      body: json.encode(body),
     );
     final data = _handleResponse(response);
     return User.fromJson(data);
