@@ -3,8 +3,11 @@ FastAPI Application - Main Entry Point
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.api import routes, websocket
+# Add live updates routers
+from app.live_updates_routes import router as updates_router
+from app.example_usage import router as tasks_router
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,6 +30,8 @@ app.add_middleware(
 # Include routers
 app.include_router(routes.router)
 app.include_router(websocket.router)
+app.include_router(updates_router)
+app.include_router(tasks_router)
 
 
 @app.get("/")
