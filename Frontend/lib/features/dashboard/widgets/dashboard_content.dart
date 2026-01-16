@@ -16,6 +16,7 @@ class DashboardContent extends StatefulWidget {
 
 class _DashboardContentState extends State<DashboardContent> {
   int _selectedTab = 0;
+  String? _selectedTaskId;
 
   @override
   Widget build(BuildContext context) {
@@ -170,12 +171,13 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildActiveTasksTab() {
-    // Use a Consumer to listen to task data and rebuild the UI accordingly.
     return Consumer<TaskProvider>(
       builder: (context, taskProvider, child) {
         // Show a loading indicator while fetching tasks.
         if (taskProvider.isLoading && taskProvider.tasks.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
         }
 
         final activeTasks = taskProvider.activeTasks;
@@ -183,35 +185,70 @@ class _DashboardContentState extends State<DashboardContent> {
         // Show a message if there are no active tasks.
         if (activeTasks.isEmpty) {
           return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(48.0),
+              child: Text(
+                'No active tasks. Create one to get started!',
+                style: TextStyle(fontSize: 18, color: Colors.black54),
+              ),
+            ),
+          );
+        }
+
+        // Auto-select first task if none selected or selected task not in active list
+        if (_selectedTaskId == null || 
+            !activeTasks.any((t) => t.id == _selectedTaskId)) {
+          // Use post-frame callback to avoid setState during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && activeTasks.isNotEmpty) {
+              setState(() {
+                _selectedTaskId = activeTasks.first.id;
+              });
+            }
+          });
+          // Return loading while waiting for state update
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Get the selected task
+        final selectedTask = taskProvider.getTaskById(_selectedTaskId!);
+        
+        if (selectedTask == null) {
+          return const Center(
             child: Text(
-              'No active tasks. Create one to get started!',
+              'Task not found',
               style: TextStyle(fontSize: 18, color: Colors.black54),
             ),
           );
         }
 
-        // For this example, we'll display the first active task.
-        final Task activeTask = activeTasks.first;
-
+        // Main layout: Left (Task Card + History) and Right (Live Updates)
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Task Cards Section
+            // Left Column: Task Card + Task History
             Expanded(
               flex: 2,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TaskCard(task: activeTask),
+                  // Task Card
+                  TaskCard(task: selectedTask),
+                  
                   const SizedBox(height: 24),
+                  
+                  // Task History Table
                   const TaskHistoryTable(),
                 ],
               ),
             ),
+            
             const SizedBox(width: 24),
-            // Live Updates Panel now receives the active task's ID to fetch real-time updates.
+            
+            // Right Column: Live Updates Panel
             Expanded(
               flex: 1,
-              child: LiveUpdatesPanel(taskId: activeTask.id),
+              child: LiveUpdatesPanel(taskId: selectedTask.id),
             ),
           ],
         );

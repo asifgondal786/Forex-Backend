@@ -1,4 +1,3 @@
-// User plan enum with display names
 enum UserPlan { 
   free, 
   premium, 
@@ -16,7 +15,6 @@ enum UserPlan {
   }
 }
 
-// User model class
 class User {
   final String id;
   final String name;
@@ -63,7 +61,6 @@ class User {
     };
   }
 
-  // Get user initials for avatar
   String get initials {
     final nameParts = name.split(' ');
     if (nameParts.length >= 2) {

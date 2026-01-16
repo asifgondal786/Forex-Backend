@@ -152,6 +152,11 @@ class FirebaseService {
 
   // --- Task Methods ---
 
+  /// Fetches all tasks for the current user (alias for getUserTasks)
+  Future<List<task_model.Task>> getTasks() async {
+    return getUserTasks();
+  }
+
   /// Fetches all tasks for a specific user.
   Future<List<task_model.Task>> getUserTasks() async {
     try {
@@ -189,11 +194,37 @@ class FirebaseService {
     }
   }
 
-  /// Creates a new task in Firestore and returns its ID.
-  Future<String> createTask(task_model.Task task) async {
+  /// Creates a new task in Firestore and returns the Task object
+  Future<task_model.Task> createTask({
+    required String title,
+    required String description,
+    required task_model.TaskPriority priority,
+  }) async {
     try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Create task object
+      final task = task_model.Task(
+        id: '', // Will be set by Firestore
+        userId: userId,
+        title: title,
+        description: description,
+        status: task_model.TaskStatus.pending,
+        priority: priority,
+        createdAt: DateTime.now(),
+        currentStep: 0,
+        totalSteps: 0,
+        steps: [],
+      );
+
+      // Add to Firestore
       final docRef = await _firestore.collection('tasks').add(task.toFirestore());
-      return docRef.id;
+      
+      // Return task with the generated ID
+      return task.copyWith(id: docRef.id);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error creating task: $e');
@@ -202,13 +233,25 @@ class FirebaseService {
     }
   }
 
-  /// Updates an existing task in Firestore.
-  Future<void> updateTask(String taskId, Map<String, dynamic> data) async {
+  /// Updates an existing task in Firestore (accepts Task object)
+  Future<void> updateTask(String taskId, task_model.Task task) async {
+    try {
+      await _firestore.collection('tasks').doc(taskId).update(task.toFirestore());
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error updating task: $e');
+      }
+      throw Exception('Failed to update task.');
+    }
+  }
+
+  /// Updates task fields (accepts Map)
+  Future<void> updateTaskFields(String taskId, Map<String, dynamic> data) async {
     try {
       await _firestore.collection('tasks').doc(taskId).update(data);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error updating task: $e');
+        debugPrint('Error updating task fields: $e');
       }
       throw Exception('Failed to update task.');
     }

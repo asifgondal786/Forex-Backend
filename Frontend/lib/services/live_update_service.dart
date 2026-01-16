@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logging/logging.dart'; // Suggested: Add `logging: ^1.1.0` to pubspec.yaml
-import 'package:tajir/core/models/live_update.dart';
+import '../core/models/live_update.dart';
 
 // It's good practice to use a proper logger instead of print()
 final _log = Logger('LiveUpdateService');

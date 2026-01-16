@@ -9,9 +9,13 @@ import 'services/websocket_service.dart';
 import 'services/firebase_service.dart';
 import 'providers/task_provider.dart';
 import 'providers/user_provider.dart';
+import 'helpers/mock_data_helper.dart';
 
 // Toggle this to switch between Firebase and API mode
 const bool useFirebase = true;
+
+// Set to true for UI development without a backend. Overrides useFirebase.
+const bool useMockData = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,28 +46,42 @@ class ForexCompanionApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Initialize services
     final apiService = ApiService();
-    final websocketService = WebSocketService();
     final firebaseService = useFirebase ? FirebaseService() : null;
 
     return MultiProvider(
       providers: [
         // Services
         Provider<ApiService>.value(value: apiService),
-        Provider<WebSocketService>.value(value: websocketService),
         if (firebaseService != null)
           Provider<FirebaseService>.value(value: firebaseService),
         
         // Providers
         ChangeNotifierProvider(
-          create: (_) => TaskProvider(
-            apiService: apiService,
-            firebaseService: firebaseService,
-            useFirebase: useFirebase,
-          )..fetchTasks(),
+          create: (_) {
+            final provider = TaskProvider(
+              apiService: apiService,
+              firebaseService: firebaseService,
+              useFirebase: useFirebase && !useMockData,
+            );
+            if (useMockData) {
+              MockDataHelper.loadMockData(provider);
+            } else {
+              provider.fetchTasks();
+            }
+            return provider;
+          },
         ),
         ChangeNotifierProvider(
-          create: (_) => UserProvider(apiService: apiService)..fetchUser(),
-        ),
+          create: (_) {
+            final provider = UserProvider(apiService: apiService);
+            if (useMockData) {
+              provider.setUser(MockDataHelper.generateMockUser());
+            } else {
+              provider.fetchUser();
+            }
+            return provider;
+          },
+        ),       
       ],
       child: MaterialApp(
         title: 'Forex Companion',

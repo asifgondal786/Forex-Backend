@@ -1,4 +1,3 @@
-// This enum must match the possible 'type' strings from the WebSocket server.
 enum UpdateType {
   info,
   success,
@@ -26,24 +25,21 @@ class LiveUpdate {
     this.data,
   });
 
-  // Factory constructor to create a LiveUpdate from a JSON map.
   factory LiveUpdate.fromJson(Map<String, dynamic> json) {
-    // A helper function to safely parse the enum from a string.
     UpdateType parseType(String? typeStr) {
       if (typeStr == null) return UpdateType.info;
       return UpdateType.values.firstWhere(
         (e) => e.name == typeStr,
-        orElse: () => UpdateType.info, // Default to 'info' if unknown type.
+        orElse: () => UpdateType.info,
       );
     }
- 
+
     return LiveUpdate(
       id: json['id'] as String? ?? '',
       taskId: json['task_id'] as String? ?? '',
       message: json['message'] as String? ?? 'No message',
       type: parseType(json['type'] as String?),
-      // If timestamp is missing or invalid, use the current time.
-      timestamp: json.containsKey('timestamp') && json['timestamp'] != null
+      timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
           : DateTime.now(),
       progress: json['progress'] as double?,

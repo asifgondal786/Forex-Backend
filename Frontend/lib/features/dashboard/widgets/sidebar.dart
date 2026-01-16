@@ -5,22 +5,38 @@ import '../../../providers/user_provider.dart';
 import '../../../core/models/user.dart';
 import '../../../core/widgets/custom_snackbar.dart';
 
-class Sidebar extends StatelessWidget {
+class Sidebar extends StatefulWidget {
   final bool isCollapsed;
 
   const Sidebar({super.key, this.isCollapsed = false});
+
+  @override
+  State<Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<Sidebar> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
 
     return Container(
-      width: isCollapsed ? 80 : 280,
+      width: widget.isCollapsed ? 80 : 280,
       color: AppColors.sidebarDark,
       child: Scrollbar(
+        controller: _scrollController,
+        thumbVisibility: true,
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
+              controller: _scrollController,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: IntrinsicHeight(
@@ -29,14 +45,14 @@ class Sidebar extends StatelessWidget {
                       // Logo & App Name
                       Padding(
                         padding: EdgeInsets.symmetric(
-                          horizontal: isCollapsed ? 16.0 : 24.0,
+                          horizontal: widget.isCollapsed ? 16.0 : 24.0,
                           vertical: 24.0,
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Image.asset(
-                              'images/logo.png',
+                              'assets/images/logo.png',
                               height: 36,
                               errorBuilder: (context, error, stackTrace) {
                                 // Fallback if logo doesn't exist
@@ -51,7 +67,7 @@ class Sidebar extends StatelessWidget {
                                 );
                               },
                             ),
-                            if (!isCollapsed) ...[
+                            if (!widget.isCollapsed) ...[
                               const SizedBox(width: 12),
                               const Expanded(
                                 child: Text(
@@ -72,11 +88,11 @@ class Sidebar extends StatelessWidget {
                       const SizedBox(height: 24),
                       
                       // Navigation Items
-                      _buildMenuItem(context, Icons.dashboard, 'Dashboard', '/', isCollapsed),
-                      _buildMenuItem(context, Icons.add_circle_outline, 'Task Creation', '/create-task', isCollapsed),
-                      _buildMenuItem(context, Icons.history, 'Task History', '/task-history', isCollapsed),
-                      _buildMenuItem(context, Icons.psychology, 'AI Assistant', '/ai-chat', isCollapsed),
-                      _buildMenuItem(context, Icons.settings, 'Settings', '/settings', isCollapsed),
+                      _buildMenuItem(context, Icons.dashboard, 'Dashboard', '/', widget.isCollapsed),
+                      _buildMenuItem(context, Icons.add_circle_outline, 'Task Creation', '/create-task', widget.isCollapsed),
+                      _buildMenuItem(context, Icons.history, 'Task History', '/task-history', widget.isCollapsed),
+                      _buildMenuItem(context, Icons.psychology, 'AI Assistant', '/ai-chat', widget.isCollapsed),
+                      _buildMenuItem(context, Icons.settings, 'Settings', '/settings', widget.isCollapsed),
                       
                       const Spacer(),
                       
@@ -90,7 +106,7 @@ class Sidebar extends StatelessWidget {
                         ),
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
-                          child: isCollapsed
+                          child: widget.isCollapsed
                               ? _buildCollapsedProfile(context, user)
                               : _buildExpandedProfile(context, user),
                         ),

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:tajir/core/models/task.dart';
-import 'package:tajir/core/theme/app_colors.dart';
+import '../../../core/models/task.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../providers/task_provider.dart';
 
 class TaskCard extends StatelessWidget {
   final Task task;
 
-  const TaskCard({super.key, required this.task});
+  const TaskCard({
+    super.key,
+    required this.task,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +31,7 @@ class TaskCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header with title and status
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -34,183 +39,260 @@ class TaskCard extends StatelessWidget {
                 child: Text(
                   task.title,
                   style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-                  overflow: TextOverflow.ellipsis,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(task.status),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(_getStatusIcon(task.status), size: 16, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.status.name[0].toUpperCase() + task.status.name.substring(1),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildStatusBadge(task.status),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
-          // Task Details
+
+          // Task metadata
           Row(
             children: [
-              Text(
-                'Start: ${task.startTime != null ? DateFormat.yMMMd().add_jm().format(task.startTime!) : 'Not started'}',
-                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              _buildMetadataItem(
+                icon: Icons.access_time,
+                label: 'Start',
+                value: task.startTime != null
+                    ? DateFormat('MMM dd, yyyy, hh:mm a').format(task.startTime!)
+                    : 'Not started',
               ),
               const SizedBox(width: 24),
-              Row(
-                children: [
-                  const Text(
-                    'Priority: ',
-                    style: TextStyle(color: Colors.black54, fontSize: 14),
-                  ),
-                  Icon(Icons.circle, size: 12, color: _getPriorityColor(task.priority)),
-                  const SizedBox(width: 4),
-                  Text(
-                    task.priority.name[0].toUpperCase() + task.priority.name.substring(1),
-                    style: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+              _buildMetadataItem(
+                icon: Icons.flag,
+                label: 'Priority',
+                value: _getPriorityText(task.priority),
+                color: _getPriorityColor(task.priority),
               ),
             ],
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Progress Bar
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Progress: ${task.currentStep} / ${task.totalSteps}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const Icon(Icons.refresh, size: 18, color: Colors.black54),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: task.progress,
-                        minHeight: 8,
-                        backgroundColor: Colors.grey.shade200,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.primaryGreen,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          
+
           const SizedBox(height: 24),
-          
-          // Steps
+
+          // Progress section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: task.steps.take(3).map((step) {
-              return Expanded(
-                child: _StepItem(
-                  label: step.name,
-                  isCompleted: step.isCompleted,
+            children: [
+              Text(
+                'Progress: ${task.currentStep} / ${task.totalSteps}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
-              );
-            }).toList(),
+              ),
+              _buildProgressIcon(task.status),
+            ],
           ),
-          
-          const SizedBox(height: 24),
-          
-          // AI Generated Result
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
+
+          const SizedBox(height: 12),
+
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: task.progress,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                _getProgressColor(task.status),
+              ),
+              minHeight: 12,
             ),
-            child: Row(
-              children: [ // This part cannot be const due to `task`
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'AI-Generated Result:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+          ),
+
+          const SizedBox(height: 24),
+
+          // Task steps
+          if (task.steps.isNotEmpty) ...[
+            const Text(
+              'Steps',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...task.steps.map((step) => _buildStepItem(step)),
+          ],
+
+          const SizedBox(height: 24),
+
+          // Result file section
+          if (task.resultFileUrl != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.insert_drive_file, color: Colors.blue.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'AI-Generated Result:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black54,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        task.resultFileName ?? 'No result file yet.',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w500,
+                        Text(
+                          task.resultFileName ?? 'result.pdf',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                        if (task.resultFileSize != null)
+                          Text(
+                            '(${_formatFileSize(task.resultFileSize!)})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                if (task.resultFileUrl != null) ...[
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      // TODO: Download file
+                    },
                     child: const Text('Download'),
                   ),
-                  const SizedBox(width: 8),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      // TODO: View file
+                    },
                     child: const Text('View'),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Suggest Next Task button
+          if (task.isCompleted) ...[
+            OutlinedButton.icon(
+              onPressed: () {
+                // TODO: Implement suggest next task
+              },
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Suggest Next Task'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+
+          // Action buttons for running tasks
+          if (task.isRunning || task.isPending) ...[
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    context.read<TaskProvider>().stopTask(task.id);
+                  },
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Stop'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    context.read<TaskProvider>().pauseTask(task.id);
+                  },
+                  icon: const Icon(Icons.pause),
+                  label: const Text('Pause'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    // TODO: Implement refresh
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                ),
               ],
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Suggest Next Task
-          TextButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.lightbulb_outline, size: 18),
-            label: const Text('Suggest Next Task'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.blue,
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(TaskStatus status) {
+    Color bgColor;
+    Color textColor;
+    IconData icon;
+    String label;
+
+    switch (status) {
+      case TaskStatus.running:
+        bgColor = Colors.green.shade100;
+        textColor = Colors.green.shade700;
+        icon = Icons.play_circle;
+        label = 'Running';
+        break;
+      case TaskStatus.completed:
+        bgColor = Colors.blue.shade100;
+        textColor = Colors.blue.shade700;
+        icon = Icons.check_circle;
+        label = 'Completed';
+        break;
+      case TaskStatus.paused:
+        bgColor = Colors.orange.shade100;
+        textColor = Colors.orange.shade700;
+        icon = Icons.pause_circle;
+        label = 'Paused';
+        break;
+      case TaskStatus.failed:
+        bgColor = Colors.red.shade100;
+        textColor = Colors.red.shade700;
+        icon = Icons.error;
+        label = 'Failed';
+        break;
+      case TaskStatus.pending:
+      default:
+        bgColor = Colors.grey.shade100;
+        textColor = Colors.grey.shade700;
+        icon = Icons.schedule;
+        label = 'Pending';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
             ),
           ),
         ],
@@ -218,78 +300,119 @@ class TaskCard extends StatelessWidget {
     );
   }
 
+  Widget _buildMetadataItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressIcon(TaskStatus status) {
+    if (status == TaskStatus.running) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildStepItem(TaskStep step) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(
+            step.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+            color: step.isCompleted ? Colors.green : Colors.grey.shade400,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              step.name,
+              style: TextStyle(
+                fontSize: 14,
+                color: step.isCompleted ? Colors.black87 : Colors.grey.shade600,
+                decoration: step.isCompleted ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
+          if (step.isCompleted && step.completedAt != null)
+            Icon(Icons.info_outline, size: 16, color: Colors.grey.shade400),
+        ],
+      ),
+    );
+  }
+
+  Color _getProgressColor(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.running:
+        return AppColors.primaryGreen;
+      case TaskStatus.completed:
+        return Colors.blue;
+      case TaskStatus.paused:
+        return Colors.orange;
+      case TaskStatus.failed:
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getPriorityText(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.high:
+        return 'High';
+      case TaskPriority.medium:
+        return 'Medium';
+      case TaskPriority.low:
+        return 'Low';
+    }
+  }
+
   Color _getPriorityColor(TaskPriority priority) {
     switch (priority) {
       case TaskPriority.high:
-        return AppColors.priorityHigh;
+        return Colors.red;
       case TaskPriority.medium:
-        return AppColors.priorityMedium;
+        return Colors.orange;
       case TaskPriority.low:
-        return AppColors.priorityLow;
+        return Colors.green;
     }
   }
 
-  Color _getStatusColor(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.running:
-        return AppColors.statusRunning;
-      case TaskStatus.completed:
-        return AppColors.statusCompleted;
-      case TaskStatus.pending:
-        return AppColors.statusPending;
-      case TaskStatus.failed:
-        return AppColors.stopButton;
-      case TaskStatus.paused:
-        return AppColors.pauseButton;
-    }
-  }
-
-  IconData _getStatusIcon(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.running:
-        return Icons.play_arrow;
-      case TaskStatus.completed:
-        return Icons.check_circle;
-      case TaskStatus.pending:
-      case TaskStatus.paused:
-        return Icons.pause;
-      case TaskStatus.failed:
-        return Icons.error;
-    }
-  }
-}
-
-class _StepItem extends StatelessWidget {
-  final String label;
-  final bool isCompleted;
-
-  const _StepItem({
-    required this.label,
-    this.isCompleted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          isCompleted ? Icons.check_circle : Icons.circle_outlined,
-          color: isCompleted ? AppColors.primaryGreen : Colors.grey,
-          size: 20,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: isCompleted ? Colors.black87 : Colors.black54,
-              fontWeight: isCompleted ? FontWeight.w500 : FontWeight.normal,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ],
-    );
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }

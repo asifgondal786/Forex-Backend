@@ -6,8 +6,7 @@ import '../core/models/live_update.dart';
 import '../core/models/task.dart' as task_model;
 
 class WebSocketService {
-  // TODO: Replace with your actual WebSocket URL
-  static const String wsUrl = 'ws://localhost:8000/ws';
+  static const String wsUrl = 'ws://localhost:8080/ws';
   
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
