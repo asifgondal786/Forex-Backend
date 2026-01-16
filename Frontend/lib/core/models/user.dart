@@ -24,6 +24,7 @@ class User {
   final String? avatarUrl;
   final UserPlan plan;
   final DateTime createdAt;
+  final Map<String, dynamic>? preferences;
 
   User({
     required this.id,
@@ -32,6 +33,7 @@ class User {
     this.avatarUrl,
     this.plan = UserPlan.free,
     required this.createdAt,
+    this.preferences,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -41,10 +43,11 @@ class User {
       email: json['email'] as String,
       avatarUrl: json['avatar_url'] as String?,
       plan: UserPlan.values.firstWhere(
-        (e) => e.toString().split('.').last == json['plan'],
+        (e) => e.name == (json['plan'] as String?)?.toLowerCase(),
         orElse: () => UserPlan.free,
       ),
       createdAt: DateTime.parse(json['created_at'] as String),
+      preferences: json['preferences'] as Map<String, dynamic>?,
     );
   }
 
@@ -54,8 +57,9 @@ class User {
       'name': name,
       'email': email,
       'avatar_url': avatarUrl,
-      'plan': plan.toString().split('.').last,
+      'plan': plan.name,
       'created_at': createdAt.toIso8601String(),
+      'preferences': preferences,
     };
   }
 
@@ -77,6 +81,7 @@ class User {
     String? avatarUrl,
     UserPlan? plan,
     DateTime? createdAt,
+    Map<String, dynamic>? preferences,
   }) {
     return User(
       id: id ?? this.id,
@@ -85,6 +90,7 @@ class User {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       plan: plan ?? this.plan,
       createdAt: createdAt ?? this.createdAt,
+      preferences: preferences ?? this.preferences,
     );
   }
 }

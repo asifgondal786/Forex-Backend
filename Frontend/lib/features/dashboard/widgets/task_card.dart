@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import 'package:intl/intl.dart';
+import 'package:tajir/core/models/task.dart';
+import 'package:tajir/core/theme/app_colors.dart';
 
 class TaskCard extends StatelessWidget {
-  const TaskCard({super.key});
+  final Task task;
+
+  const TaskCard({super.key, required this.task});
 
   @override
   Widget build(BuildContext context) {
@@ -26,27 +30,30 @@ class TaskCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Forex Market Summary for Today',
-                style: TextStyle(
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
+                ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.statusRunning,
+                  color: _getStatusColor(task.status),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.play_arrow, size: 16, color: Colors.white),
-                    SizedBox(width: 4),
+                  children: [
+                    Icon(_getStatusIcon(task.status), size: 16, color: Colors.white),
+                    const SizedBox(width: 4),
                     Text(
-                      'Running',
-                      style: TextStyle(
+                      task.status.name[0].toUpperCase() + task.status.name.substring(1),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -63,22 +70,22 @@ class TaskCard extends StatelessWidget {
           // Task Details
           Row(
             children: [
-              const Text(
-                'Start: Apr 24, 2024, 12:00 PM',
-                style: TextStyle(color: Colors.black54, fontSize: 14),
+              Text(
+                'Start: ${task.startTime != null ? DateFormat.yMMMd().add_jm().format(task.startTime!) : 'Not started'}',
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
               ),
               const SizedBox(width: 24),
               Row(
-                children: const [
-                  Text(
+                children: [
+                  const Text(
                     'Priority: ',
                     style: TextStyle(color: Colors.black54, fontSize: 14),
                   ),
-                  Icon(Icons.circle, size: 12, color: AppColors.priorityMedium),
-                  SizedBox(width: 4),
+                  Icon(Icons.circle, size: 12, color: _getPriorityColor(task.priority)),
+                  const SizedBox(width: 4),
                   Text(
-                    'Medium',
-                    style: TextStyle(
+                    task.priority.name[0].toUpperCase() + task.priority.name.substring(1),
+                    style: const TextStyle(
                       color: Colors.black87,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -100,23 +107,23 @@ class TaskCard extends StatelessWidget {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
+                      children: [
                         Text(
-                          'Progress: 3 / 4',
-                          style: TextStyle(
+                          'Progress: ${task.currentStep} / ${task.totalSteps}',
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             color: Colors.black87,
                           ),
                         ),
-                        Icon(Icons.refresh, size: 18, color: Colors.black54),
+                        const Icon(Icons.refresh, size: 18, color: Colors.black54),
                       ],
                     ),
                     const SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
-                        value: 0.75,
+                        value: task.progress,
                         minHeight: 8,
                         backgroundColor: Colors.grey.shade200,
                         valueColor: const AlwaysStoppedAnimation<Color>(
@@ -134,25 +141,15 @@ class TaskCard extends StatelessWidget {
           
           // Steps
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _StepItem(
-                icon: Icons.check_circle,
-                label: 'Research Data',
-                isCompleted: true,
-              ),
-              _StepItem(
-                icon: Icons.check_circle,
-                label: 'Analyze Trends',
-                isCompleted: true,
-                hasInfo: true,
-              ),
-              _StepItem(
-                icon: Icons.check_circle,
-                label: 'Generate Summary',
-                isCompleted: true,
-              ),
-            ],
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: task.steps.take(3).map((step) {
+              return Expanded(
+                child: _StepItem(
+                  label: step.name,
+                  isCompleted: step.isCompleted,
+                ),
+              );
+            }).toList(),
           ),
           
           const SizedBox(height: 24),
@@ -165,39 +162,42 @@ class TaskCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
-              children: [
-                const Expanded(
+              children: [ // This part cannot be const due to `task`
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'AI-Generated Result:',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.black54,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'forex_market_summary_today.pdf (52 KB)',
-                        style: TextStyle(
+                        task.resultFileName ?? 'No result file yet.',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Colors.blue,
                           fontWeight: FontWeight.w500,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('Download'),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('View'),
-                ),
+                if (task.resultFileUrl != null) ...[
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text('Download'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text('View'),
+                  ),
+                ],
               ],
             ),
           ),
@@ -217,19 +217,55 @@ class TaskCard extends StatelessWidget {
       ),
     );
   }
+
+  Color _getPriorityColor(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.high:
+        return AppColors.priorityHigh;
+      case TaskPriority.medium:
+        return AppColors.priorityMedium;
+      case TaskPriority.low:
+        return AppColors.priorityLow;
+    }
+  }
+
+  Color _getStatusColor(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.running:
+        return AppColors.statusRunning;
+      case TaskStatus.completed:
+        return AppColors.statusCompleted;
+      case TaskStatus.pending:
+        return AppColors.statusPending;
+      case TaskStatus.failed:
+        return AppColors.stopButton;
+      case TaskStatus.paused:
+        return AppColors.pauseButton;
+    }
+  }
+
+  IconData _getStatusIcon(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.running:
+        return Icons.play_arrow;
+      case TaskStatus.completed:
+        return Icons.check_circle;
+      case TaskStatus.pending:
+      case TaskStatus.paused:
+        return Icons.pause;
+      case TaskStatus.failed:
+        return Icons.error;
+    }
+  }
 }
 
 class _StepItem extends StatelessWidget {
-  final IconData icon;
   final String label;
   final bool isCompleted;
-  final bool hasInfo;
 
   const _StepItem({
-    required this.icon,
     required this.label,
     this.isCompleted = false,
-    this.hasInfo = false,
   });
 
   @override
@@ -237,25 +273,20 @@ class _StepItem extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          icon,
+          isCompleted ? Icons.check_circle : Icons.circle_outlined,
           color: isCompleted ? AppColors.primaryGreen : Colors.grey,
-          size: 24,
+          size: 20,
         ),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: isCompleted ? Colors.black87 : Colors.black54,
-            fontWeight: isCompleted ? FontWeight.w500 : FontWeight.normal,
-          ),
-        ),
-        if (hasInfo) ...[
-          const SizedBox(width: 4),
-          Icon(
-            Icons.info_outline,
-            size: 16,
-            color: Colors.blue.shade300,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: isCompleted ? Colors.black87 : Colors.black54,
+              fontWeight: isCompleted ? FontWeight.w500 : FontWeight.normal,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ],

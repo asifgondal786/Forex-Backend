@@ -21,9 +21,14 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=[
+        "http://localhost",
+        # Add the specific port your Flutter web app runs on if it's consistent
+        # e.g., "http://localhost:53398"
+        "*" # Broad for local dev, but be specific in production
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -51,8 +56,10 @@ async def root():
 async def startup_event():
     """Run on application startup"""
     print("🚀 Forex Companion Backend Starting...")
-    print("📡 WebSocket endpoint: ws://localhost:8000/api/updates/ws/{task_id}")
-    print("📚 API docs: http://localhost:8000/docs")
+    print("---")
+    print("See Uvicorn logs for the running host and port.")
+    print("API docs will be available at '/docs' on that address.")
+    print("---")
 
 
 @app.on_event("shutdown")

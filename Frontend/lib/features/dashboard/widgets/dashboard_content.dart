@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../providers/task_provider.dart';
+import '../../../core/models/task.dart';
 import 'task_card.dart';
 import 'live_updates_panel.dart';
 import 'task_history_table.dart';
@@ -37,26 +40,28 @@ class _DashboardContentState extends State<DashboardContent> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Welcome To Forex Companion',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Welcome To Forex Companion',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Assign a task to AI and monitor its progress.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white70,
+                        SizedBox(height: 8),
+                        Text(
+                          'Assign a task to AI and monitor its progress.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -99,29 +104,32 @@ class _DashboardContentState extends State<DashboardContent> {
                     // Tabs
                     Padding(
                       padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          _TabButton(
-                            label: 'Active Tasks',
-                            isSelected: _selectedTab == 0,
-                            onTap: () => setState(() => _selectedTab = 0),
-                          ),
-                          _TabButton(
-                            label: 'Completed Tasks',
-                            isSelected: _selectedTab == 1,
-                            onTap: () => setState(() => _selectedTab = 1),
-                          ),
-                          _TabButton(
-                            label: 'Settings',
-                            isSelected: _selectedTab == 2,
-                            onTap: () => setState(() => _selectedTab = 2),
-                          ),
-                          _TabButton(
-                            label: 'Reports',
-                            isSelected: _selectedTab == 3,
-                            onTap: () => setState(() => _selectedTab = 3),
-                          ),
-                        ],
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _TabButton(
+                              label: 'Active Tasks',
+                              isSelected: _selectedTab == 0,
+                              onTap: () => setState(() => _selectedTab = 0),
+                            ),
+                            _TabButton(
+                              label: 'Completed Tasks',
+                              isSelected: _selectedTab == 1,
+                              onTap: () => setState(() => _selectedTab = 1),
+                            ),
+                            _TabButton(
+                              label: 'Settings',
+                              isSelected: _selectedTab == 2,
+                              onTap: () => setState(() => _selectedTab = 2),
+                            ),
+                            _TabButton(
+                              label: 'Reports',
+                              isSelected: _selectedTab == 3,
+                              onTap: () => setState(() => _selectedTab = 3),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     
@@ -162,56 +170,52 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildActiveTasksTab() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Task Cards Section
-        Expanded(
-          flex: 2,
-          child: Column(
-            children: const [
-              TaskCard(),
-              SizedBox(height: 24),
-              TaskHistoryTable(),
-            ],
-          ),
-        ),
-        
-        const SizedBox(width: 24),
-        
-        // Live Updates Panel
-        const Expanded(
-          flex: 1,
-          child: LiveUpdatesPanel(),
-        ),
-      ],
-    );
-  }
-}
+    // Use a Consumer to listen to task data and rebuild the UI accordingly.
+    return Consumer<TaskProvider>(
+      builder: (context, taskProvider, child) {
+        // Show a loading indicator while fetching tasks.
+        if (taskProvider.isLoading && taskProvider.tasks.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-class _TechBadge extends StatelessWidget {
-  final String text;
-  final Color color;
+        final activeTasks = taskProvider.activeTasks;
 
-  const _TechBadge({required this.text, required this.color});
+        // Show a message if there are no active tasks.
+        if (activeTasks.isEmpty) {
+          return const Center(
+            child: Text(
+              'No active tasks. Create one to get started!',
+              style: TextStyle(fontSize: 18, color: Colors.black54),
+            ),
+          );
+        }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+        // For this example, we'll display the first active task.
+        final Task activeTask = activeTasks.first;
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Task Cards Section
+            Expanded(
+              flex: 2,
+              child: Column(
+                children: [
+                  TaskCard(task: activeTask),
+                  const SizedBox(height: 24),
+                  const TaskHistoryTable(),
+                ],
+              ),
+            ),
+            const SizedBox(width: 24),
+            // Live Updates Panel now receives the active task's ID to fetch real-time updates.
+            Expanded(
+              flex: 1,
+              child: LiveUpdatesPanel(taskId: activeTask.id),
+            ),
+          ],
+        );
+      },
     );
   }
 }

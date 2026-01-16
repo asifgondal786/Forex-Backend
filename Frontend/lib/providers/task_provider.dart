@@ -115,17 +115,9 @@ class TaskProvider with ChangeNotifier {
     try {
       Task newTask;
       
-      final List<TaskStep> taskSteps = steps?.asMap().entries.map((entry) {
-            int idx = entry.key;
-            String val = entry.value;
-            return TaskStep(
-              id: '${id ?? DateTime.now().millisecondsSinceEpoch}_$idx',
-              name: 'Step ${idx + 1}',
-              description: val,
-              status: StepStatus.pending,
-              order: idx,
-            );
-          }).toList() ?? [];
+      final List<TaskStep> taskSteps = steps?.map((stepName) {
+        return TaskStep(name: stepName);
+      }).toList() ?? [];
 
       final service = _firebaseService;
       if (_useFirebase && service != null) {

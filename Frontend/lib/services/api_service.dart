@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../core/models/task.dart';
-import '../core/models/user.dart';
+import 'package:tajir/core/models/task.dart';
+import 'package:tajir/core/models/user.dart';
 
 class ApiService {
   // The base URL for your FastAPI backend.
   // For local development, this is typically http://localhost:8000.
   // If using an Android emulator, use http://10.0.2.2:8000 to connect to your host machine's localhost.
-  final String _baseUrl = 'http://localhost:8000';
+  final String _baseUrl = 'http://localhost:8080';
 
   // You might need to handle authentication tokens (e.g., JWT).
   // For simplicity, this example assumes no auth. In a real app, you'd

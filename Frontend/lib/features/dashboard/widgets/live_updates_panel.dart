@@ -1,263 +1,225 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import 'package:tajir/core/models/live_update.dart';
+import 'package:tajir/services/live_update_service.dart';
+import 'package:tajir/core/theme/app_colors.dart';
 
-class LiveUpdatesPanel extends StatelessWidget {
-  const LiveUpdatesPanel({super.key});
+// This widget is now stateful to manage the LiveUpdateService lifecycle.
+class LiveUpdatesPanel extends StatefulWidget {
+  final String taskId;
+
+  const LiveUpdatesPanel({
+    super.key,
+    required this.taskId,
+  });
+
+  @override
+  State<LiveUpdatesPanel> createState() => _LiveUpdatesPanelState();
+}
+
+class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
+  // The service is now part of the widget's state.
+  late final LiveUpdateService _liveUpdateService;
+  final List<LiveUpdate> _updates = [];
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the service and connect to the WebSocket.
+    _liveUpdateService = LiveUpdateService();
+    _liveUpdateService.connect(widget.taskId);
+
+    // Listen to the stream of updates.
+    _liveUpdateService.updates.listen((update) {
+      if (mounted) {
+        setState(() {
+          // Add new updates to the top of the list.
+          _updates.insert(0, update);
+        });
+        // Animate to the top of the list when a new message arrives.
+        _scrollToTop();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant LiveUpdatesPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the taskId changes (e.g., user selects a different task),
+    // reconnect the service to the new task.
+    if (widget.taskId != oldWidget.taskId) {
+      _liveUpdateService.connect(widget.taskId);
+      // Clear old updates when switching tasks.
+      setState(() {
+        _updates.clear();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // It's crucial to dispose of the service to close connections and timers.
+    _liveUpdateService.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.sidebarDark.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Live Updates',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.stop_circle, color: Colors.red),
-                    tooltip: 'Stop',
-                    iconSize: 24,
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.menu, color: Colors.black54),
-                    tooltip: 'Menu',
-                    iconSize: 24,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Updates List
-          _UpdateItem(
-            text: 'AI generated a market summary report detailing today\'s key Forex trends.',
-            isCompleted: true,
+          // Header with reactive connection status
+          StreamBuilder<ConnectionStatus>(
+            stream: _liveUpdateService.connectionStatus,
+            builder: (context, snapshot) {
+              final status = snapshot.data ?? ConnectionStatus.disconnected;
+              return _buildHeader(status);
+            },
           ),
           const SizedBox(height: 16),
-          _UpdateItem(
-            text: 'AI completed analysis of Forex market data and identified key trends.',
-            isCompleted: true,
-          ),
+          const Divider(color: Colors.white24),
           const SizedBox(height: 16),
-          _UpdateItem(
-            text: 'AI is analyzing Forex market data for today...',
-            isCompleted: false,
-            isInProgress: true,
-            progress: 0.65,
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Control Buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.stopButton,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+          // List of live updates
+          Expanded(
+            child: _updates.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Waiting for live updates...',
+                      style: TextStyle(color: Colors.white70),
                     ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    itemCount: _updates.length,
+                    itemBuilder: (context, index) {
+                      return _buildUpdateTile(_updates[index]);
+                    },
                   ),
-                  child: const Text(
-                    'Stop',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.pause),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.grey.shade200,
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.refresh),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.grey.shade200,
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
-          
-          // Task History Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Task History',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/task-history');
-                },
-                child: const Text('View All'),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _HistoryItem(
-            status: 'Completed',
-            date: 'Apr 23, 2024, 2:45 PM',
-          ),
-          const SizedBox(height: 12),
-          _HistoryItem(
-            status: 'Completed',
-            date: 'Apr 22, 2024, 3:12 PM',
           ),
         ],
       ),
     );
   }
-}
 
-class _UpdateItem extends StatelessWidget {
-  final String text;
-  final bool isCompleted;
-  final bool isInProgress;
-  final double? progress;
+  Widget _buildHeader(ConnectionStatus status) {
+    IconData icon;
+    Color color;
+    String text;
 
-  const _UpdateItem({
-    required this.text,
-    this.isCompleted = false,
-    this.isInProgress = false,
-    this.progress,
-  });
+    switch (status) {
+      case ConnectionStatus.connected:
+        icon = Icons.check_circle;
+        color = AppColors.primaryGreen;
+        text = 'Live';
+        break;
+      case ConnectionStatus.connecting:
+      case ConnectionStatus.reconnecting:
+        icon = Icons.sync;
+        color = Colors.orange;
+        text = 'Connecting';
+        break;
+      case ConnectionStatus.disconnected:
+        icon = Icons.error_outline;
+        color = AppColors.stopButton;
+        text = 'Disconnected';
+        break;
+    }
 
-  @override
-  Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          isCompleted ? Icons.check_circle : Icons.circle_outlined,
-          color: isCompleted ? AppColors.primaryGreen : Colors.grey,
-          size: 20,
+        const Text(
+          'Live Updates',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
             children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
               Text(
                 text,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
-                  height: 1.5,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              if (isInProgress && progress != null) ...[
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.primaryGreen,
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
       ],
     );
   }
-}
 
-class _HistoryItem extends StatelessWidget {
-  final String status;
-  final String date;
-
-  const _HistoryItem({
-    required this.status,
-    required this.date,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          Icons.check_circle,
-          color: AppColors.statusCompleted,
-          size: 18,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                status,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+  Widget _buildUpdateTile(LiveUpdate update) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(_getIconForType(update.type), color: Colors.white54, size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  update.message,
+                  style: const TextStyle(color: Colors.white, height: 1.4),
                 ),
-              ),
-              Text(
-                date,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
+                const SizedBox(height: 4),
+                Text(
+                  // A helper to format time nicely would be good here
+                  '${DateTime.now().difference(update.timestamp).inSeconds}s ago',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  IconData _getIconForType(UpdateType type) {
+    switch (type) {
+      case UpdateType.progress:
+        return Icons.hourglass_empty;
+      case UpdateType.success:
+        return Icons.check_circle_outline;
+      case UpdateType.error:
+        return Icons.error_outline;
+      case UpdateType.warning:
+        return Icons.warning_amber_outlined;
+      case UpdateType.info:
+      default:
+        return Icons.info_outline;
+    }
   }
 }
