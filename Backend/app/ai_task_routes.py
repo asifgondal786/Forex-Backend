@@ -42,12 +42,15 @@ class TaskResponse(BaseModel):
     description: str
     status: str
     priority: str
-    created_at: str
-    start_time: Optional[str]
-    current_step: int
-    total_steps: int
+    createdAt: str
+    startTime: Optional[str]
+    currentStep: int
+    totalSteps: int
     steps: List[Dict]
-    result_file_url: Optional[str]
+    resultFileUrl: Optional[str]
+    
+    class Config:
+        populate_by_name = True  # Allow snake_case or camelCase from JSON
 
 
 # ============================================================================
@@ -381,12 +384,12 @@ async def create_task(
         description=task.description,
         status="running",
         priority=task.priority,
-        created_at=datetime.now().isoformat(),
-        start_time=datetime.now().isoformat(),
-        current_step=0,
-        total_steps=len(steps),
+        createdAt=datetime.now().isoformat(),
+        startTime=datetime.now().isoformat(),
+        currentStep=0,
+        totalSteps=len(steps),
         steps=steps,
-        result_file_url=None
+        resultFileUrl=None
     )
     
     # Execute task in background based on type
@@ -421,6 +424,30 @@ async def stop_task(task_id: str):
     )
     
     return {"message": "Task stopped", "task_id": task_id}
+
+
+@router.post("/{task_id}/pause")
+async def pause_task(task_id: str):
+    """Pause a running task"""
+    await ws_manager.send_update(
+        task_id=task_id,
+        message="Task paused by user",
+        update_type="warning"
+    )
+    
+    return {"message": "Task paused", "task_id": task_id}
+
+
+@router.post("/{task_id}/resume")
+async def resume_task(task_id: str):
+    """Resume a paused task"""
+    await ws_manager.send_update(
+        task_id=task_id,
+        message="Task resumed by user",
+        update_type="info"
+    )
+    
+    return {"message": "Task resumed", "task_id": task_id}
 
 
 @router.get("/market/live-rates")

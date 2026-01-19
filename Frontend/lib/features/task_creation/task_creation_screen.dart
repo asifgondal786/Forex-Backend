@@ -4,7 +4,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/models/task.dart';
 import '../../providers/task_provider.dart';
 import '../../services/gemini_service.dart';
-import '../../core/widgets/custom_snackbar.dart';
 
 class TaskCreationScreen extends StatefulWidget {
   const TaskCreationScreen({super.key});
@@ -27,7 +26,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
   Future<void> _getAiSuggestion() async {
     if (_titleController.text.trim().isEmpty) {
       if (mounted) {
-        CustomSnackbar.warning(context, 'Please enter a task title first');
+        debugPrint('⚠️ Please enter a task title first');
       }
       return;
     }
@@ -55,11 +54,11 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             }
           }
         });
-        CustomSnackbar.success(context, 'AI enhanced your task!');
+        debugPrint('✅ AI enhanced your task!');
       }
     } catch (e) {
       if (mounted) {
-        CustomSnackbar.error(context, 'AI enhancement failed: $e');
+        debugPrint('❌ AI enhancement failed: $e');
       }
     } finally {
       if (mounted) {
@@ -81,16 +80,15 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         priority: _selectedPriority,
-        steps: _aiSuggestion?['steps']?.cast<String>(),
       );
 
       if (mounted) {
-        CustomSnackbar.success(context, 'Task created successfully!');
+        debugPrint('✅ Task created successfully!');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        CustomSnackbar.error(context, 'Failed to create task: $e');
+        debugPrint('❌ Failed to create task: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -100,6 +98,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -109,11 +108,11 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: SingleChildScrollView(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Padding(
                   padding: const EdgeInsets.all(24),
                   child: Form(
                     key: _formKey,
@@ -135,12 +134,13 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                         _buildExampleTasks(),
                         const SizedBox(height: 32),
                         _buildCreateButton(),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

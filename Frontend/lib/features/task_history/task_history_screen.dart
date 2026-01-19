@@ -22,8 +22,6 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
         return provider.activeTasks;
       case 'completed':
         return provider.completedTasks;
-      case 'pending':
-        return provider.pendingTasks;
       default:
         return provider.tasks;
     }

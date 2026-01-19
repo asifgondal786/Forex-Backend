@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/user_provider.dart';
+import '../../../providers/theme_provider.dart';
 import '../../../core/models/user.dart';
 import '../../../core/widgets/custom_snackbar.dart';
 
@@ -168,26 +169,35 @@ class _SidebarState extends State<Sidebar> {
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: Row(
-            children: [
-              const Icon(Icons.brightness_6_outlined, color: Colors.white54, size: 20),
-              const SizedBox(width: 12),
-              const Text(
-                'Dark Mode',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const Spacer(),
-              Switch(
-                value: true, // Assuming default is dark mode
-                onChanged: (value) {
-                  // TODO: Implement theme switching logic using a ThemeProvider
-                  CustomSnackbar.info(context, 'Theme switching not implemented yet.');
-                },
-                activeColor: AppColors.primaryGreen,
-                inactiveThumbColor: Colors.grey,
-                inactiveTrackColor: Colors.grey.withOpacity(0.5),
-              ),
-            ],
+          child: Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) {
+              return Row(
+                children: [
+                  Icon(
+                    themeProvider.isDarkMode
+                        ? Icons.brightness_2_outlined
+                        : Icons.brightness_7_outlined,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Dark Mode',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: themeProvider.isDarkMode,
+                    onChanged: (value) {
+                      themeProvider.toggleTheme();
+                    },
+                    activeColor: AppColors.primaryGreen,
+                    inactiveThumbColor: Colors.grey,
+                    inactiveTrackColor: Colors.grey.withOpacity(0.5),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         TextButton.icon(
