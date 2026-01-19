@@ -1,68 +1,84 @@
 """
-Forex Companion - FastAPI Application Main Entry Point
+Forex Companion - Complete FastAPI Application
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
-# --- Import Your API Routers ---
-from .live_updates_routes import router as updates_router
-from .example_usage import router as example_tasks_router # Renamed for clarity
-from .users import router as users_router # The new user router
+# Import routers
+from .users import router as users_router
+from .websocket_routes import router as websocket_router
+try:
+    from .ai_task_routes import router as ai_task_router
+    AI_ROUTES_AVAILABLE = True
+except ImportError:
+    AI_ROUTES_AVAILABLE = False
+    print("??  AI task routes not available")
 
-# Create FastAPI app
+from .enhanced_websocket_manager import ws_manager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events"""
+    print("=" * 60)
+    print("?? Forex Companion AI Backend Starting...")
+    print("=" * 60)
+    print("?? WebSocket: ws://localhost:8080/api/ws/{task_id}")
+    print("?? API Docs: http://localhost:8080/docs")
+    print(f"?? AI Engine: {'ACTIVE' if AI_ROUTES_AVAILABLE else 'DISABLED'}")
+    print("=" * 60)
+    
+    await ws_manager.start_forex_stream(interval=10)
+    
+    yield
+    
+    ws_manager.stop_forex_stream()
+    print("? Shutdown complete")
+
+
 app = FastAPI(
-    title="Forex Companion API",
-    description="Backend services for the Forex Companion application.",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    title="Forex Companion AI API",
+    description="AI-Powered Autonomous Forex Trading System",
+    version="2.0.0",
+    lifespan=lifespan
 )
 
-# CORS middleware
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        # Add the specific port your Flutter web app runs on if it's consistent
-        # e.g., "http://localhost:53398"
-        "*" # Broad for local dev, but be specific in production
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Include Your API Routers ---
-# This is where you register the endpoints from your other files.
+# Include routers
 app.include_router(users_router)
-app.include_router(updates_router)
-# Note: The tasks router from example_usage.py is for demonstration.
-# You will need to build a full task router for all frontend features.
-app.include_router(example_tasks_router)
+app.include_router(websocket_router)
+if AI_ROUTES_AVAILABLE:
+    app.include_router(ai_task_router)
 
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
     return {
-        "message": "Welcome to the Forex Companion API!",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "description": "This API provides services for user management, task processing, and live updates."
+        "message": "Forex Companion AI - Ready to Trade",
+        "version": "2.0.0",
+        "status": "online",
+        "ai_enabled": AI_ROUTES_AVAILABLE,
+        "endpoints": {
+            "docs": "/docs",
+            "websocket": "ws://localhost:8080/api/ws/{task_id}",
+            "create_task": "/api/tasks/create" if AI_ROUTES_AVAILABLE else "Not Available",
+        }
     }
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Run on application startup"""
-    print("🚀 Forex Companion Backend Starting...")
-    print("---")
-    print("See Uvicorn logs for the running host and port.")
-    print("API docs will be available at '/docs' on that address.")
-    print("---")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run on application shutdown"""
-    print("👋 Forex Companion Backend Shutting Down...")
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "ai_engine": "active" if AI_ROUTES_AVAILABLE else "disabled",
+        "connections": ws_manager.get_connection_count()
+    }

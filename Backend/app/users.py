@@ -24,13 +24,9 @@ mock_users = {
         "id": "user-123",
         "email": "demo@forexcompanion.com",
         "name": "Demo User",
-        "created_at": datetime.now(),
+        "created_at": "2026-01-17T00:00:00",
         "avatarUrl": "https://i.pravatar.cc/150",
-        "preferences": {
-            "theme": "dark",
-            "notifications": True,
-            "default_currency": "USD"
-        }
+        "preferences": {},
     }
 }
 

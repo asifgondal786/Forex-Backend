@@ -55,7 +55,7 @@ class _DashboardContentState extends State<DashboardContent> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Assign a task to AI and monitor its progress.',
+                          'Assign Task to AI and Monitor Its Progress.',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.white70,
