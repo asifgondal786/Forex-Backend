@@ -68,7 +68,7 @@ class ForexAIEngine:
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
         self.active_positions: Dict[str, Dict] = {}
-        self.user_preferences: Dict[str, any] = {}
+        self.user_preferences: Dict[str, Any] = {}
         
     async def initialize(self):
         """Initialize the AI engine"""
@@ -266,7 +266,7 @@ class ForexAIEngine:
         """
         try:
             if not GEMINI_AVAILABLE:
-                return self.generate_trading_signal(pair, market_condition, user_strategy)
+                return await self.generate_trading_signal(pair, market_condition, user_strategy)
                 
             model = genai.GenerativeModel("gemini-2.0-flash")
             
@@ -315,11 +315,10 @@ class ForexAIEngine:
             
             response = model.generate_content(prompt)
             
-            import json
             try:
                 signal_data = json.loads(response.text)
-            except:
-                return self.generate_trading_signal(pair, market_condition, user_strategy)
+            except Exception:
+                return await self.generate_trading_signal(pair, market_condition, user_strategy)
                 
             return TradingSignal(
                 pair=pair,
@@ -334,7 +333,7 @@ class ForexAIEngine:
             
         except Exception as e:
             print(f"Gemini signal generation failed: {e}")
-            return self.generate_trading_signal(pair, market_condition, user_strategy)
+            return await self.generate_trading_signal(pair, market_condition, user_strategy)
 
     async def generate_trading_signal(
         self,

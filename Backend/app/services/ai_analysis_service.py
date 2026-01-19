@@ -179,7 +179,6 @@ class AIAnalysisService:
             "risk": "moderate",
             "recommendation": "hold"
         }
-
     def is_healthy(self) -> bool:
         """Check if service is operational"""
         return True
