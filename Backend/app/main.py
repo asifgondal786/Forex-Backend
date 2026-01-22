@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 # Import routers
 from .users import router as users_router
 from .websocket_routes import router as websocket_router
+from .auth_routes import router as auth_router
+
 try:
     from .ai_task_routes import router as ai_task_router
     AI_ROUTES_AVAILABLE = True
@@ -62,6 +64,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(websocket_router)
 if AI_ROUTES_AVAILABLE:
