@@ -15,6 +15,13 @@ except ImportError:
     AI_ROUTES_AVAILABLE = False
     print("??  AI task routes not available")
 
+try:
+    from .advanced_features_routes import router as advanced_router
+    ADVANCED_FEATURES_AVAILABLE = True
+except ImportError:
+    ADVANCED_FEATURES_AVAILABLE = False
+    print("??  Advanced features routes not available")
+
 from .enhanced_websocket_manager import ws_manager
 
 
@@ -27,6 +34,7 @@ async def lifespan(app: FastAPI):
     print("?? WebSocket: ws://localhost:8080/api/ws/{task_id}")
     print("?? API Docs: http://localhost:8080/docs")
     print(f"?? AI Engine: {'ACTIVE' if AI_ROUTES_AVAILABLE else 'DISABLED'}")
+    print(f"?? Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
     print("=" * 60)
     
     await ws_manager.start_forex_stream(interval=10)
@@ -58,19 +66,33 @@ app.include_router(users_router)
 app.include_router(websocket_router)
 if AI_ROUTES_AVAILABLE:
     app.include_router(ai_task_router)
+if ADVANCED_FEATURES_AVAILABLE:
+    app.include_router(advanced_router)
 
 
 @app.get("/")
 async def root():
     return {
-        "message": "Forex Companion AI - Ready to Trade",
-        "version": "2.0.0",
+        "message": "Forex Companion AI - Autonomous Trading Copilot",
+        "version": "3.0.0",
         "status": "online",
         "ai_enabled": AI_ROUTES_AVAILABLE,
+        "advanced_features": ADVANCED_FEATURES_AVAILABLE,
         "endpoints": {
             "docs": "/docs",
             "websocket": "ws://localhost:8080/api/ws/{task_id}",
             "create_task": "/api/tasks/create" if AI_ROUTES_AVAILABLE else "Not Available",
+            "advanced_features": "/api/advanced/copilot/status/{user_id}" if ADVANCED_FEATURES_AVAILABLE else "Not Available",
+        },
+        "features": {
+            "autonomous_trading": ADVANCED_FEATURES_AVAILABLE,
+            "risk_management": ADVANCED_FEATURES_AVAILABLE,
+            "prediction_explainability": ADVANCED_FEATURES_AVAILABLE,
+            "execution_intelligence": ADVANCED_FEATURES_AVAILABLE,
+            "paper_trading": ADVANCED_FEATURES_AVAILABLE,
+            "natural_language_commands": ADVANCED_FEATURES_AVAILABLE,
+            "security_compliance": ADVANCED_FEATURES_AVAILABLE,
+            "multi_channel_notifications": ADVANCED_FEATURES_AVAILABLE,
         }
     }
 
