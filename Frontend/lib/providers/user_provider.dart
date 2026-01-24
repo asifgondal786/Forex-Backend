@@ -71,6 +71,11 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Logout (alias for clearUser)
+  void logout() {
+    clearUser();
+  }
+
   // Clear error
   void clearError() {
     _error = null;

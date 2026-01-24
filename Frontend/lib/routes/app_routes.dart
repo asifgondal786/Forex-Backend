@@ -4,10 +4,12 @@ import '../features/task_history/task_history_screen.dart';
 import '../features/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/dashboard/dashboard_screen_enhanced.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes = {
-    '/': (_) => const DashboardScreen(),
+    '/': (_) => const DashboardScreenEnhanced(),
+    '/dashboard': (_) => const DashboardScreen(),
     '/create-task': (_) => const TaskCreationScreen(),
     '/task-history': (_) => const TaskHistoryScreen(),
     '/ai-chat': (context) => const AiChatScreen(),

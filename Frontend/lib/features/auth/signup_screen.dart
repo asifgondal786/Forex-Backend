@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../models/user_model.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
-import '../../core/theme/app_colors.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -107,196 +106,268 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1419),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.darkBg,
-              AppColors.darkBg.withOpacity(0.95),
+              const Color(0xFF0F1419),
+              const Color(0xFF1A1F2E),
+              const Color(0xFF16213E),
             ],
           ),
         ),
         child: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.all(isMobile ? 20 : 32),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 20),
-                  
-                  // Back button
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[800]!),
-                      ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // Header
-                  const Text(
-                    'Create Account',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Join Forex Companion today',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // Error message
-                  if (_errorMessage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        border: Border.all(color: Colors.red.withOpacity(0.3)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
+                  // Logo & Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
+                          Text(
+                            '🚀 Create Account',
+                            style: TextStyle(
+                              fontSize: isMobile ? 24 : 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Join Forex Companion AI Trading',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[500],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                  
-                  // Full Name field
-                  _buildTextField(
-                    controller: _fullNameController,
-                    label: 'Full Name',
-                    hint: 'John Doe',
-                    icon: Icons.person,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Username field
-                  _buildTextField(
-                    controller: _usernameController,
-                    label: 'Username',
-                    hint: 'johndoe',
-                    icon: Icons.account_circle,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Email field
-                  _buildTextField(
-                    controller: _emailController,
-                    label: 'Email',
-                    hint: 'john@example.com',
-                    icon: Icons.email,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Password field
-                  _buildPasswordField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: 'At least 8 characters',
-                    obscure: _obscurePassword,
-                    onToggle: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Confirm Password field
-                  _buildPasswordField(
-                    controller: _confirmPasswordController,
-                    label: 'Confirm Password',
-                    hint: 'Re-enter password',
-                    obscure: _obscureConfirmPassword,
-                    onToggle: () {
-                      setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Signup button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleSignup,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                strokeWidth: 2,
+                    ],
+                  )
+                      .animate()
+                      .fadeIn(duration: const Duration(milliseconds: 600))
+                      .slideY(begin: -0.3),
+                  const SizedBox(height: 32),
+
+                  // Card Container
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: Colors.white.withOpacity(0.08),
+                        width: 1,
+                      ),
+                    ),
+                    color: Colors.white.withOpacity(0.05),
+                    child: Padding(
+                      padding: EdgeInsets.all(isMobile ? 24 : 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Error Message
+                          if (_errorMessage != null)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.15),
+                                border: Border.all(
+                                  color: Colors.red.withOpacity(0.4),
+                                ),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            )
-                          : const Text(
-                              'Create Account',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          if (_errorMessage != null) const SizedBox(height: 20),
+
+                          // Full Name Field
+                          _buildInputField(
+                            controller: _fullNameController,
+                            label: 'Full Name',
+                            hint: 'John Doe',
+                            icon: Icons.person_outline,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Username Field
+                          _buildInputField(
+                            controller: _usernameController,
+                            label: 'Username',
+                            hint: 'johndoe',
+                            icon: Icons.account_circle_outlined,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Email Field
+                          _buildInputField(
+                            controller: _emailController,
+                            label: 'Email Address',
+                            hint: 'your@email.com',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Field
+                          _buildPasswordField(
+                            controller: _passwordController,
+                            label: 'Password',
+                            hint: 'Minimum 8 characters',
+                            obscure: _obscurePassword,
+                            onToggle: () {
+                              setState(
+                                  () => _obscurePassword = !_obscurePassword);
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Confirm Password Field
+                          _buildPasswordField(
+                            controller: _confirmPasswordController,
+                            label: 'Confirm Password',
+                            hint: 'Re-enter your password',
+                            obscure: _obscureConfirmPassword,
+                            onToggle: () {
+                              setState(() =>
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword);
+                            },
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Signup Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 54,
+                            child: ElevatedButton(
+                              onPressed:
+                                  _isLoading ? null : _handleSignup,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    const Color(0xFF3B82F6),
+                                disabledBackgroundColor: const Color(0xFF3B82F6)
+                                    .withOpacity(0.5),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                shadowColor: const Color(0xFF3B82F6)
+                                    .withOpacity(0.4),
+                                elevation: _isLoading ? 0 : 8,
+                              ),
+                              child: _isLoading
+                                  ? SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white.withOpacity(0.8),
+                                        ),
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Create Account',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                            ),
+                          )
+                              .animate()
+                              .fadeIn(
+                                  duration:
+                                      const Duration(milliseconds: 600))
+                              .slideY(
+                                  begin: 0.3,
+                                  delay: const Duration(
+                                      milliseconds: 200)),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Login link
+                  )
+                      .animate()
+                      .fadeIn(duration: const Duration(milliseconds: 600))
+                      .slideY(begin: 0.3),
+                  const SizedBox(height: 32),
+
+                  // Footer
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Already have an account? ',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 13,
+                        ),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: const Text(
                           'Sign In',
                           style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3B82F6),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -305,8 +376,8 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-  
-  Widget _buildTextField({
+
+  Widget _buildInputField({
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -322,19 +393,27 @@ class _SignupScreenState extends State<SignupScreen> {
             color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: 12,
+            letterSpacing: 0.4,
           ),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+          ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[600]),
-            prefixIcon: Icon(icon, color: AppColors.primary),
+            hintStyle: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 13,
+            ),
+            prefixIcon: Icon(icon,
+                color: const Color(0xFF3B82F6), size: 20),
             filled: true,
-            fillColor: Colors.grey[900],
+            fillColor: Colors.white.withOpacity(0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -342,23 +421,27 @@ class _SignupScreenState extends State<SignupScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.grey[800]!,
+                color: Colors.white.withOpacity(0.1),
                 width: 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
-                color: AppColors.primary,
+                color: Color(0xFF3B82F6),
                 width: 2,
               ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
             ),
           ),
         ),
       ],
     );
   }
-  
+
   Widget _buildPasswordField({
     required TextEditingController controller,
     required String label,
@@ -375,26 +458,37 @@ class _SignupScreenState extends State<SignupScreen> {
             color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: 12,
+            letterSpacing: 0.4,
           ),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
           obscureText: obscure,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+          ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[600]),
-            prefixIcon: const Icon(Icons.lock, color: AppColors.primary),
+            hintStyle: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 13,
+            ),
+            prefixIcon: Icon(Icons.lock_outline,
+                color: const Color(0xFF3B82F6), size: 20),
             suffixIcon: IconButton(
               icon: Icon(
-                obscure ? Icons.visibility_off : Icons.visibility,
-                color: AppColors.primary,
+                obscure
+                    ? Icons.visibility_off
+                    : Icons.visibility,
+                color: const Color(0xFF3B82F6),
+                size: 18,
               ),
               onPressed: onToggle,
             ),
             filled: true,
-            fillColor: Colors.grey[900],
+            fillColor: Colors.white.withOpacity(0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -402,20 +496,23 @@ class _SignupScreenState extends State<SignupScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.grey[800]!,
+                color: Colors.white.withOpacity(0.1),
                 width: 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
-                color: AppColors.primary,
+                color: Color(0xFF3B82F6),
                 width: 2,
               ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
             ),
           ),
         ),
       ],
     );
   }
-}

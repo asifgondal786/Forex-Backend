@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/color_utils.dart';
 import '../../../providers/user_provider.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../core/models/user.dart';
-import '../../../core/widgets/custom_snackbar.dart';
 
 class Sidebar extends StatefulWidget {
   final bool isCollapsed;
@@ -52,66 +53,122 @@ class _SidebarState extends State<Sidebar> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset(
-                              'assets/images/logo.png',
+                            Container(
+                              width: 36,
                               height: 36,
-                              errorBuilder: (context, error, stackTrace) {
-                                // Fallback if logo doesn't exist
-                                return Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primaryGreen,
-                                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.primaryBlue,
+                                    AppColors.primaryGreen,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        AppColors.primaryBlue.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
                                   ),
-                                  child: const Icon(Icons.currency_exchange, color: Colors.white),
-                                );
-                              },
-                            ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.currency_exchange,
+                                color: Colors.white,
+                              ),
+                            )
+                                .animate()
+                                .scale(
+                                  begin: const Offset(0.8, 0.8),
+                                  duration: const Duration(milliseconds: 600),
+                                )
+                                .fadeIn(),
                             if (!widget.isCollapsed) ...[
                               const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
+                              Expanded(
+                                child: const Text(
                                   'Forex Companion',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
                                   ),
                                   overflow: TextOverflow.ellipsis,
-                                ),
+                                )
+                                    .animate()
+                                    .fadeIn(
+                                      duration:
+                                          const Duration(milliseconds: 600),
+                                    )
+                                    .slideX(
+                                      begin: -0.2,
+                                      end: 0,
+                                      duration:
+                                          const Duration(milliseconds: 600),
+                                    ),
                               ),
                             ],
                           ],
                         ),
                       ),
-                      
                       const SizedBox(height: 24),
-                      
                       // Navigation Items
-                      _buildMenuItem(context, Icons.dashboard, 'Dashboard', '/', widget.isCollapsed),
-                      _buildMenuItem(context, Icons.add_circle_outline, 'Task Creation', '/create-task', widget.isCollapsed),
-                      _buildMenuItem(context, Icons.history, 'Task History', '/task-history', widget.isCollapsed),
-                      _buildMenuItem(context, Icons.psychology, 'AI Assistant', '/ai-chat', widget.isCollapsed),
-                      _buildMenuItem(context, Icons.settings, 'Settings', '/settings', widget.isCollapsed),
-                      
+                      _buildMenuItem(context, Icons.dashboard, 'Dashboard',
+                          '/', widget.isCollapsed, 0),
+                      _buildMenuItem(context, Icons.add_circle_outline,
+                          'Task Creation', '/create-task', widget.isCollapsed, 1),
+                      _buildMenuItem(context, Icons.history, 'Task History',
+                          '/task-history', widget.isCollapsed, 2),
+                      _buildMenuItem(context, Icons.psychology,
+                          'AI Assistant', '/ai-chat', widget.isCollapsed, 3),
+                      _buildMenuItem(context, Icons.settings, 'Settings',
+                          '/settings', widget.isCollapsed, 4),
                       const Spacer(),
-                      
                       // User Profile Section
                       Container(
                         padding: const EdgeInsets.all(16),
                         margin: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white.withAlpha(13),
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.08),
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: animation,
+                                child: child,
+                              ),
+                            );
+                          },
                           child: widget.isCollapsed
                               ? _buildCollapsedProfile(context, user)
                               : _buildExpandedProfile(context, user),
                         ),
-                      ),
+                      )
+                          .animate()
+                          .fadeIn(
+                            duration: const Duration(milliseconds: 600),
+                          )
+                          .slideY(
+                            begin: 0.2,
+                            end: 0,
+                            duration: const Duration(milliseconds: 600),
+                          ),
                     ],
                   ),
                 ),
@@ -191,9 +248,10 @@ class _SidebarState extends State<Sidebar> {
                     onChanged: (value) {
                       themeProvider.toggleTheme();
                     },
-                    activeColor: AppColors.primaryGreen,
+                    activeThumbColor: AppColors.primaryGreen,
+                    activeTrackColor: AppColors.primaryGreen.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.grey,
-                    inactiveTrackColor: Colors.grey.withOpacity(0.5),
+                    inactiveTrackColor: Colors.grey.withValues(alpha: 0.5),
                   ),
                 ],
               );
@@ -241,49 +299,98 @@ class _SidebarState extends State<Sidebar> {
   }
 
   // Helper method to build menu items
-  Widget _buildMenuItem(BuildContext context, IconData icon, String label, String route, bool isCollapsed) {
+  Widget _buildMenuItem(BuildContext context, IconData icon, String label,
+      String route, bool isCollapsed, int delayIndex) {
     final currentRoute = ModalRoute.of(context)?.settings.name;
     final isActive = currentRoute == route;
-    
-    final menuItemContent = Row(
-      mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          color: isActive ? AppColors.primaryBlue : Colors.white54,
-        ),
-        if (!isCollapsed) ...[
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.white70,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: isActive ? AppColors.primaryBlue.withAlpha(51) : Colors.transparent,
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
-      ),
-      child: Tooltip(
-        message: isCollapsed ? label : '',
-        child: InkWell(
-          onTap: () => Navigator.pushNamed(context, route),
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            child: menuItemContent,
+      child: Material(
+        color: Colors.transparent,
+        child: Tooltip(
+          message: isCollapsed ? label : '',
+          child: InkWell(
+            onTap: () => Navigator.pushNamed(context, route),
+            borderRadius: const BorderRadius.all(Radius.circular(8)),
+            hoverColor: Colors.white.withOpacity(0.05),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? AppColors.primaryBlue.withOpacity(0.15)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isActive
+                      ? AppColors.primaryBlue.withOpacity(0.4)
+                      : Colors.transparent,
+                ),
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primaryBlue.withOpacity(0.2),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Row(
+                mainAxisAlignment:
+                    isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                children: [
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 300),
+                    style: TextStyle(
+                      color: isActive ? AppColors.primaryBlue : Colors.white54,
+                      fontSize: 20,
+                    ),
+                    child: Icon(icon),
+                  ),
+                  if (!isCollapsed) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style: TextStyle(
+                          color: isActive ? Colors.white : Colors.white70,
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 13,
+                          letterSpacing: 0.2,
+                        ),
+                        child: Text(label),
+                      ),
+                    ),
+                    if (isActive)
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBlue,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      )
+                          .animate()
+                          .scale(
+                            duration: const Duration(milliseconds: 300),
+                          )
+                          .fadeIn(),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: const Duration(milliseconds: 600))
+        .slideX(
+          begin: -0.2,
+          end: 0,
+          delay: Duration(milliseconds: delayIndex * 50),
+        );
   }
 }

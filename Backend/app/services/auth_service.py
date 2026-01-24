@@ -4,7 +4,7 @@ Handles JWT token generation, validation, and user authentication
 """
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-import jwt
+import jwt  # This should come from PyJWT package
 import secrets
 import hashlib
 from passlib.context import CryptContext
