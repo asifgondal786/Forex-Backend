@@ -29,8 +29,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Models (if storing locally)
-models/
-*.pkl
-*.h5
-*.pt
+
+
+.env
