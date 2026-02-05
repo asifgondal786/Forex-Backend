@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'routes/app_routes.dart';
-import 'core/theme/app_colors.dart';
 import 'core/config/firebase_config.dart';
 import 'services/api_service.dart';
 import 'services/websocket_service.dart';

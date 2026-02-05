@@ -125,11 +125,10 @@ class _MarketReplayState extends State<MarketReplay>
               ],
             ),
           ),
-          const Divider(
-            height: 1,
-            color: Color(0xFFFFFFFF),
-            opacity: 0.05,
-          ),
+            Divider(
+              height: 1,
+              color: const Color(0xFFFFFFFF).withOpacity(0.05),
+            ),
 
           // Scenario display
           FadeTransition(

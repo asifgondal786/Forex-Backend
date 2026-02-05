@@ -96,11 +96,10 @@ class _PerformanceScoreDashboardState extends State<PerformanceScoreDashboard>
               ],
             ),
           ),
-          const Divider(
-            height: 1,
-            color: Color(0xFFFFFFFF),
-            opacity: 0.05,
-          ),
+            Divider(
+              height: 1,
+              color: const Color(0xFFFFFFFF).withOpacity(0.05),
+            ),
 
           // Main scores
           Padding(
@@ -146,11 +145,10 @@ class _PerformanceScoreDashboardState extends State<PerformanceScoreDashboard>
             ),
           ),
 
-          const Divider(
-            height: 1,
-            color: Color(0xFFFFFFFF),
-            opacity: 0.05,
-          ),
+            Divider(
+              height: 1,
+              color: const Color(0xFFFFFFFF).withOpacity(0.05),
+            ),
 
           // Detailed breakdown
           Padding(

@@ -38,8 +38,8 @@ class _SentimentRadarState extends State<SentimentRadar>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTapped,
+      return GestureDetector(
+        onTap: widget.onTapped,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         padding: const EdgeInsets.all(16),

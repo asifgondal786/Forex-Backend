@@ -391,29 +391,35 @@ class _ExportReportWidgetState extends State<ExportReportWidget> {
     };
   }
 
-  void _exportAsPDF(Map<String, dynamic> data) {
-    const content = 'Trading Report\nExport in PDF format\n$data';
-    _downloadFile('trading_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
-        content);
-  }
+    void _exportAsPDF(Map<String, dynamic> data) {
+      final content = 'Trading Report\nExport in PDF format\n$data';
+      _downloadFile(
+        'trading_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        content,
+      );
+    }
 
-  void _exportAsCSV(Map<String, dynamic> data) {
+    void _exportAsCSV(Map<String, dynamic> data) {
     String content = 'Metric,Value\n';
     data.forEach((key, value) {
       content += '$key,$value\n';
     });
-    _downloadFile('trading_report_${DateTime.now().millisecondsSinceEpoch}.csv',
-        content);
-  }
+      _downloadFile(
+        'trading_report_${DateTime.now().millisecondsSinceEpoch}.csv',
+        content,
+      );
+    }
 
-  void _exportAsExcel(Map<String, dynamic> data) {
-    const content = 'Trading Report\nExport in Excel format';
-    _downloadFile('trading_report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
-        content);
-  }
+    void _exportAsExcel(Map<String, dynamic> data) {
+      const content = 'Trading Report\nExport in Excel format';
+      _downloadFile(
+        'trading_report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+        content,
+      );
+    }
 
-  void _exportAsJSON(Map<String, dynamic> data) {
-    final content = '''
+    void _exportAsJSON(Map<String, dynamic> data) {
+      final content = '''
 {
   "report": {
     "period": "${data['period']}",
@@ -427,11 +433,13 @@ class _ExportReportWidgetState extends State<ExportReportWidget> {
   }
 }
 ''';
-    _downloadFile('trading_report_${DateTime.now().millisecondsSinceEpoch}.json',
-        content);
-  }
+      _downloadFile(
+        'trading_report_${DateTime.now().millisecondsSinceEpoch}.json',
+        content,
+      );
+    }
 
-  void _downloadFile(String filename, String content) {
+  void _downloadFile(String filename, [String content = '']) {
     final bytes = Uint8List.fromList(content.codeUnits);
     final blob = html.Blob([bytes]);
     final url = html.Url.createObjectUrlFromBlob(blob);

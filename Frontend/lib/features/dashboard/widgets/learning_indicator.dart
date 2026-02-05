@@ -101,10 +101,9 @@ class _LearningIndicatorState extends State<LearningIndicator>
               ],
             ),
           ),
-          const Divider(
+          Divider(
             height: 1,
-            color: Color(0xFFFFFFFF),
-            opacity: 0.05,
+            color: const Color(0xFFFFFFFF).withOpacity(0.05),
           ),
           const SizedBox(height: 16),
 
@@ -470,7 +469,9 @@ class _LearningIndicatorState extends State<LearningIndicator>
             milestone.achieved ? '✅' : '🔒',
             style: TextStyle(
               fontSize: milestone.achieved ? 16 : 14,
-              opacity: milestone.achieved ? 1 : 0.5,
+              color: milestone.achieved
+                  ? Colors.white
+                  : Colors.white.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 4),

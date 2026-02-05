@@ -3,12 +3,11 @@ import '../features/task_creation/task_creation_screen.dart';
 import '../features/task_history/task_history_screen.dart';
 import '../features/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
-import '../features/dashboard/dashboard_screen.dart';
-import '../features/dashboard/dashboard_screen_enhanced.dart';
+import '../features/dashboard/screens/dashboard_screen.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes = {
-    '/': (_) => const DashboardScreenEnhanced(),
+    '/': (_) => const DashboardScreen(),
     '/dashboard': (_) => const DashboardScreen(),
     '/create-task': (_) => const TaskCreationScreen(),
     '/task-history': (_) => const TaskHistoryScreen(),
