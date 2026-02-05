@@ -8,6 +8,9 @@ from typing import Dict, List, Optional
 from enum import Enum
 import asyncio
 import json
+import os
+import smtplib
+from email.message import EmailMessage
 
 
 class NotificationChannel(Enum):
@@ -113,6 +116,15 @@ class EnhancedNotificationService:
         self.email_configured = False
         self.telegram_configured = False
         self.whatsapp_configured = False
+
+        # SMTP config (env-driven)
+        self.smtp_host = os.getenv("SMTP_HOST")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_user = os.getenv("SMTP_USER")
+        self.smtp_pass = os.getenv("SMTP_PASS")
+        self.smtp_from = os.getenv("SMTP_FROM", self.smtp_user or "")
+        self.smtp_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
+        self.email_configured = all([self.smtp_host, self.smtp_user, self.smtp_pass, self.smtp_from])
 
     def _initialize_templates(self):
         """Initialize standard notification templates"""
@@ -377,10 +389,27 @@ class EnhancedNotificationService:
         if not self.email_configured:
             print(f"[EMAIL] To: {notification.user_id} - {notification.title}")
             return
-        
-        # Production: Use SendGrid or similar
-        # email_client.send(to_email, subject=notification.title, body=notification.message)
-        print(f"[EMAIL] Sent to {notification.user_id}")
+
+        to_email = notification.user_id if "@" in notification.user_id else None
+        if not to_email:
+            print(f"[EMAIL] Skipped: user_id is not an email ({notification.user_id})")
+            return
+
+        def _send():
+            msg = EmailMessage()
+            msg["From"] = self.smtp_from
+            msg["To"] = to_email
+            msg["Subject"] = notification.title
+            msg.set_content(notification.message)
+
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
+                if self.smtp_tls:
+                    server.starttls()
+                server.login(self.smtp_user, self.smtp_pass)
+                server.send_message(msg)
+
+        await asyncio.to_thread(_send)
+        print(f"[EMAIL] Sent to {to_email}")
 
     async def _send_telegram(self, notification: Notification):
         """Send Telegram message"""

@@ -107,3 +107,12 @@ async def health():
         "ai_engine": "active" if AI_ROUTES_AVAILABLE else "disabled",
         "connections": ws_manager.get_connection_count()
     }
+
+
+@app.get("/api/health")
+async def api_health():
+    return {
+        "status": "healthy",
+        "ai_engine": "active" if AI_ROUTES_AVAILABLE else "disabled",
+        "connections": ws_manager.get_connection_count()
+    }
