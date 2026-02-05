@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -11,6 +12,8 @@ class ForexFeedWidget extends StatefulWidget {
 class _ForexFeedWidgetState extends State<ForexFeedWidget> {
   late PageController _pageController;
   int _currentPage = 0;
+  Timer? _timer;
+  bool _isInitialized = false;
 
   final List<ForexPair> _pairs = [
     ForexPair(
@@ -53,12 +56,40 @@ class _ForexFeedWidgetState extends State<ForexFeedWidget> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(viewportFraction: 0.45);
+    _pageController = PageController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      final isMobile = MediaQuery.of(context).size.width < 768;
+      _pageController =
+          PageController(viewportFraction: isMobile ? 0.45 : 0.3);
+      _timer?.cancel(); // Cancel any existing timer
+      _timer = Timer.periodic(const Duration(seconds: 50), (Timer timer) {
+        if (_currentPage < _pairs.length - 1) {
+          _currentPage++;
+        } else {
+          _currentPage = 0;
+        }
+
+        if (_pageController.hasClients) {
+          _pageController.animateToPage(
+            _currentPage,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeIn,
+          );
+        }
+      });
+      _isInitialized = true;
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -150,40 +181,22 @@ class _ForexFeedWidgetState extends State<ForexFeedWidget> {
           const SizedBox(height: 20),
 
           // Forex Cards Carousel
-          if (isMobile)
-            SizedBox(
-              height: 200,
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() => _currentPage = index);
-                },
-                itemCount: _pairs.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: _buildForexCard(_pairs[index], index),
-                  );
-                },
-              ),
-            )
-          else
-            SizedBox(
-              height: 180,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _pairs.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: SizedBox(
-                      width: 220,
-                      child: _buildForexCard(_pairs[index], index),
-                    ),
-                  );
-                },
-              ),
+          SizedBox(
+            height: isMobile ? 208 : 188,
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() => _currentPage = index);
+              },
+              itemCount: _pairs.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: _buildForexCard(_pairs[index], index),
+                );
+              },
             ),
+          ),
 
           if (isMobile) ...[
             const SizedBox(height: 12),

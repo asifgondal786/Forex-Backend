@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_background.dart';
 import '../../providers/user_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -63,329 +64,323 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: AppColors.sidebarDark,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Consumer<UserProvider>(
-        builder: (context, userProvider, child) {
-          final user = userProvider.user;
+      body: AppBackground(
+        child: Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final user = userProvider.user;
 
-          if (user == null) {
-            return const Center(
-              child: Text(
-                'No user data available',
-                style: TextStyle(color: Colors.white70),
-              ),
-            );
-          }
+            if (user == null) {
+              return const Center(
+                child: Text(
+                  'No user data available',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Profile Section
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'Profile Information',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (!_isEditing)
-                                TextButton.icon(
-                                  onPressed: () => setState(() => _isEditing = true),
-                                  icon: const Icon(Icons.edit, size: 18),
-                                  label: const Text('Edit'),
-                                ),
-                            ],
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Avatar
-                          Center(
-                            child: CircleAvatar(
-                              radius: 50,
-                              backgroundColor: AppColors.primaryBlue,
-                              child: Text(
-                                user.initials,
-                                style: const TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // Name Field
-                          TextField(
-                            controller: _nameController,
-                            enabled: _isEditing,
-                            decoration: InputDecoration(
-                              labelText: 'Name',
-                              prefixIcon: const Icon(Icons.person),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          // Email Field
-                          TextField(
-                            controller: _emailController,
-                            enabled: _isEditing,
-                            decoration: InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: const Icon(Icons.email),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          // Plan
-                          TextField(
-                            enabled: false,
-                            decoration: InputDecoration(
-                              labelText: 'Plan',
-                              prefixIcon: const Icon(Icons.star),
-                              hintText: user.plan.displayName,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                          
-                          if (_isEditing) ...[
-                            const SizedBox(height: 24),
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Section
+                      _buildSectionCard(
+                        title: 'Profile Information',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
                               children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () {
-                                      setState(() => _isEditing = false);
-                                      _nameController.text = user.name;
-                                      _emailController.text = user.email;
-                                    },
-                                    child: const Text('Cancel'),
+                                const Spacer(),
+                                if (!_isEditing)
+                                  TextButton.icon(
+                                    onPressed: () =>
+                                        setState(() => _isEditing = true),
+                                    icon: const Icon(Icons.edit, size: 18),
+                                    label: const Text('Edit'),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: userProvider.isLoading ? null : _saveProfile,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primaryGreen,
-                                    ),
-                                    child: userProvider.isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          )
-                                        : const Text('Save'),
-                                  ),
-                                ),
                               ],
                             ),
+
+                            const SizedBox(height: 8),
+
+                            // Avatar
+                            Center(
+                              child: CircleAvatar(
+                                radius: 50,
+                                backgroundColor: AppColors.primaryBlue,
+                                child: Text(
+                                  user.initials,
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 32),
+
+                            // Name Field
+                            _buildField(
+                              controller: _nameController,
+                              enabled: _isEditing,
+                              label: 'Name',
+                              icon: Icons.person,
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Email Field
+                            _buildField(
+                              controller: _emailController,
+                              enabled: _isEditing,
+                              label: 'Email',
+                              icon: Icons.email,
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Plan
+                            _buildField(
+                              controller: TextEditingController(
+                                text: user.plan.displayName,
+                              ),
+                              enabled: false,
+                              label: 'Plan',
+                              icon: Icons.star,
+                            ),
+
+                            if (_isEditing) ...[
+                              const SizedBox(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () {
+                                        setState(() => _isEditing = false);
+                                        _nameController.text = user.name;
+                                        _emailController.text = user.email;
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: userProvider.isLoading
+                                          ? null
+                                          : _saveProfile,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            AppColors.primaryGreen,
+                                      ),
+                                      child: userProvider.isLoading
+                                          ? const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Text('Save'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Preferences Section
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Preferences',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+
+                      const SizedBox(height: 24),
+
+                      // Preferences Section
+                      _buildSectionCard(
+                        title: 'Preferences',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SettingsTile(
+                              icon: Icons.notifications,
+                              title: 'Notifications',
+                              subtitle: 'Manage notification preferences',
+                              onTap: () {},
                             ),
-                          ),
-                          
-                          const SizedBox(height: 20),
-                          
-                          _SettingsTile(
-                            icon: Icons.notifications,
-                            title: 'Notifications',
-                            subtitle: 'Manage notification preferences',
-                            onTap: () {
-                              // TODO: Implement notifications settings
-                            },
-                          ),
-                          
-                          const Divider(height: 32),
-                          
-                          _SettingsTile(
-                            icon: Icons.language,
-                            title: 'Language',
-                            subtitle: 'English (US)',
-                            onTap: () {
-                              // TODO: Implement language settings
-                            },
-                          ),
-                          
-                          const Divider(height: 32),
-                          
-                          _SettingsTile(
-                            icon: Icons.dark_mode,
-                            title: 'Theme',
-                            subtitle: 'Dark mode',
-                            onTap: () {
-                              // TODO: Implement theme settings
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // About Section
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'About',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                            const Divider(height: 32, color: Colors.white24),
+                            _SettingsTile(
+                              icon: Icons.language,
+                              title: 'Language',
+                              subtitle: 'English (US)',
+                              onTap: () {},
                             ),
-                          ),
-                          
-                          const SizedBox(height: 20),
-                          
-                          _SettingsTile(
-                            icon: Icons.info,
-                            title: 'Version',
-                            subtitle: '1.0.0',
-                            onTap: null,
-                          ),
-                          
-                          const Divider(height: 32),
-                          
-                          _SettingsTile(
-                            icon: Icons.privacy_tip,
-                            title: 'Privacy Policy',
-                            subtitle: 'View our privacy policy',
-                            onTap: () {
-                              // TODO: Open privacy policy
-                            },
-                          ),
-                          
-                          const Divider(height: 32),
-                          
-                          _SettingsTile(
-                            icon: Icons.description,
-                            title: 'Terms of Service',
-                            subtitle: 'View terms of service',
-                            onTap: () {
-                              // TODO: Open terms of service
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Danger Zone
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.red.shade200),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Danger Zone',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
+                            const Divider(height: 32, color: Colors.white24),
+                            _SettingsTile(
+                              icon: Icons.dark_mode,
+                              title: 'Theme',
+                              subtitle: 'Dark mode',
+                              onTap: () {},
                             ),
-                          ),
-                          
-                          const SizedBox(height: 20),
-                          
-                          _SettingsTile(
-                            icon: Icons.logout,
-                            title: 'Log Out',
-                            subtitle: 'Sign out of your account',
-                            iconColor: Colors.red,
-                            onTap: () {
-                              _showLogoutDialog();
-                            },
-                          ),
-                          
-                          const Divider(height: 32),
-                          
-                          _SettingsTile(
-                            icon: Icons.delete_forever,
-                            title: 'Delete Account',
-                            subtitle: 'Permanently delete your account',
-                            iconColor: Colors.red,
-                            onTap: () {
-                              _showDeleteAccountDialog();
-                            },
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 24),
+
+                      // About Section
+                      _buildSectionCard(
+                        title: 'About',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SettingsTile(
+                              icon: Icons.info,
+                              title: 'Version',
+                              subtitle: '1.0.0',
+                              onTap: null,
+                            ),
+                            const Divider(height: 32, color: Colors.white24),
+                            _SettingsTile(
+                              icon: Icons.privacy_tip,
+                              title: 'Privacy Policy',
+                              subtitle: 'View our privacy policy',
+                              onTap: () {},
+                            ),
+                            const Divider(height: 32, color: Colors.white24),
+                            _SettingsTile(
+                              icon: Icons.description,
+                              title: 'Terms of Service',
+                              subtitle: 'View terms of service',
+                              onTap: () {},
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Danger Zone
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border:
+                              Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Danger Zone',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _SettingsTile(
+                              icon: Icons.logout,
+                              title: 'Log Out',
+                              subtitle: 'Sign out of your account',
+                              iconColor: Colors.redAccent,
+                              onTap: () {
+                                _showLogoutDialog();
+                              },
+                            ),
+                            const Divider(height: 32, color: Colors.white24),
+                            _SettingsTile(
+                              icon: Icons.delete_forever,
+                              title: 'Delete Account',
+                              subtitle: 'Permanently delete your account',
+                              iconColor: Colors.redAccent,
+                              onTap: () {
+                                _showDeleteAccountDialog();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField({
+    required TextEditingController controller,
+    required bool enabled,
+    required String label,
+    required IconData icon,
+  }) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        prefixIcon: Icon(icon, color: Colors.white70),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.08),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
+        ),
       ),
     );
   }
@@ -469,7 +464,7 @@ class _SettingsTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: (iconColor ?? AppColors.primaryBlue).withOpacity(0.1),
+                color: (iconColor ?? AppColors.primaryBlue).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -488,7 +483,7 @@ class _SettingsTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -496,7 +491,7 @@ class _SettingsTile extends StatelessWidget {
                     subtitle,
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Colors.black54,
+                      color: Colors.white70,
                     ),
                   ),
                 ],
@@ -505,7 +500,7 @@ class _SettingsTile extends StatelessWidget {
             if (onTap != null)
               const Icon(
                 Icons.chevron_right,
-                color: Colors.black26,
+                color: Colors.white38,
               ),
           ],
         ),

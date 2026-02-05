@@ -33,7 +33,7 @@ class LiveUpdateService {
   // Use --dart-define=WS_BASE_URL=ws://your.server.com for production
   static const String _baseUrl = String.fromEnvironment(
     'WS_BASE_URL',
-    defaultValue: 'ws://127.0.0.1:8000',
+    defaultValue: 'ws://127.0.0.1:8080',
   );
   final Duration _minReconnectDelay;
   final Duration _maxReconnectDelay;

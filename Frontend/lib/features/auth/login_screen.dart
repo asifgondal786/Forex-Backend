@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
+import '../../core/widgets/app_background.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -82,19 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1419),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF0F1419),
-              const Color(0xFF1A1F2E),
-              const Color(0xFF16213E),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -105,30 +95,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     // Logo Animation
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: isMobile ? 96 : 110,
+                      height: isMobile ? 96 : 110,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFF3B82F6),
-                            const Color(0xFF2563EB),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF3B82F6).withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
+                            blurRadius: 24,
+                            spreadRadius: 6,
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.trending_up,
-                        color: Colors.white,
-                        size: 40,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset(
+                          'assets/images/companion_logo.png',
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     )
                         .animate()

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
+import '../../core/widgets/app_background.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -109,19 +110,8 @@ class _SignupScreenState extends State<SignupScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1419),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF0F1419),
-              const Color(0xFF1A1F2E),
-              const Color(0xFF16213E),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
             child: Padding(

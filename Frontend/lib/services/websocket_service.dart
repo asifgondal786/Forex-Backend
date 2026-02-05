@@ -6,7 +6,7 @@ import '../core/models/live_update.dart';
 import '../core/models/task.dart' as task_model;
 
 class WebSocketService {
-  static const String wsUrl = 'ws://localhost:8080/ws';
+  static const String wsUrl = 'ws://localhost:8080/api/ws';
   
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
@@ -15,6 +15,7 @@ class WebSocketService {
   final _taskUpdateController = StreamController<task_model.Task>.broadcast();
   
   String? _userId;
+  String? _taskId;
   bool _manualDisconnect = false;
   bool _isConnected = false;
   Timer? _reconnectTimer;
@@ -28,11 +29,16 @@ class WebSocketService {
   bool get isConnected => _isConnected;
 
   // Connect to WebSocket
-  Future<void> connect({String? userId}) async {
+  Future<void> connect({String? userId, String? taskId}) async {
     _userId = userId;
+    _taskId = taskId;
     _manualDisconnect = false; // Reset flag on new connection attempt
     try {
-      final uri = Uri.parse(_userId != null ? '$wsUrl?user_id=$_userId' : wsUrl);
+      final uri = Uri.parse(
+        _taskId != null
+            ? '$wsUrl/$_taskId'
+            : (_userId != null ? '$wsUrl?user_id=$_userId' : wsUrl),
+      );
       final channel = WebSocketChannel.connect(uri);
       _channel = channel;
       
@@ -59,19 +65,18 @@ class WebSocketService {
       final data = json.decode(message as String);
       final type = data['type'] as String?;
 
-      switch (type) {
-        case 'live_update':
-          final update = LiveUpdate.fromJson(data['data']);
-          _updateController.add(update);
-          break;
-        
-        case 'task_update':
-          final task = task_model.Task.fromJson(data['data']);
-          _taskUpdateController.add(task);
-          break;
-        
-        default:
-          debugPrint('Unknown message type: $type');
+      if (type == 'live_update' && data['data'] is Map<String, dynamic>) {
+        final update = LiveUpdate.fromJson(data['data']);
+        _updateController.add(update);
+      } else if (type == 'task_update' && data['data'] is Map<String, dynamic>) {
+        final task = task_model.Task.fromJson(data['data']);
+        _taskUpdateController.add(task);
+      } else if (data.containsKey('task_id')) {
+        // Backend sends updates directly without wrapping
+        final update = LiveUpdate.fromJson(data);
+        _updateController.add(update);
+      } else {
+        debugPrint('Unknown message type: $type');
       }
     } catch (e) {
       debugPrint('Error parsing WebSocket message: $e');
@@ -125,18 +130,20 @@ class WebSocketService {
 
   // Subscribe to task updates
   void subscribeToTask(String taskId) {
-    send({
-      'type': 'subscribe',
-      'task_id': taskId,
-    });
+    _taskId = taskId;
+    if (_isConnected) {
+      disconnect().then((_) => connect(userId: _userId, taskId: taskId));
+    } else {
+      connect(userId: _userId, taskId: taskId);
+    }
   }
 
   // Unsubscribe from task updates
   void unsubscribeFromTask(String taskId) {
-    send({
-      'type': 'unsubscribe',
-      'task_id': taskId,
-    });
+    if (_taskId == taskId) {
+      _taskId = null;
+      disconnect().then((_) => connect(userId: _userId));
+    }
   }
 
   // Disconnect and cleanup

@@ -1,16 +1,34 @@
 # tajir_frontend
 
-A new Flutter project.
+Forex Companion Flutter client.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Run the app (local)
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+### Enable Gemini AI features
+Gemini is configured via a compile-time environment variable.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+For local dev:
+```bash
+flutter run --dart-define=GEMINI_API_KEY=YOUR_KEY
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Windows PowerShell helper:
+```powershell
+.\run_with_gemini.ps1 -ApiKey 'YOUR_KEY'
+# or:
+$env:GEMINI_API_KEY = 'YOUR_KEY'
+.\run_with_gemini.ps1
+```
+
+For web:
+```bash
+flutter run -d chrome --dart-define=GEMINI_API_KEY=YOUR_KEY
+```
+
+If `GEMINI_API_KEY` is not set, AI features are disabled and the app falls back to placeholders.

@@ -31,8 +31,8 @@ class EnhancedWebSocketManager:
         # Add to all connections
         self.all_connections.add(websocket)
 
-        print(f"✅ WebSocket connected for task: {task_id}")
-        print(f"📊 Total connections: {len(self.all_connections)}")
+        print(f"WebSocket connected for task: {task_id}")
+        print(f"Total connections: {len(self.all_connections)}")
 
         # Send welcome message
         await self.send_update(
@@ -53,8 +53,8 @@ class EnhancedWebSocketManager:
         # Remove from all connections
         self.all_connections.discard(websocket)
 
-        print(f"❌ WebSocket disconnected for task: {task_id}")
-        print(f"📊 Remaining connections: {len(self.all_connections)}")
+        print(f"WebSocket disconnected for task: {task_id}")
+        print(f"Remaining connections: {len(self.all_connections)}")
 
     async def send_update(
         self,
@@ -168,14 +168,14 @@ class EnhancedWebSocketManager:
 
         task = asyncio.create_task(forex_service.stream_live_data(stream_callback, interval))
         self.streaming_tasks["forex_stream"] = task
-        print(f"🚀 Started forex data stream (interval: {interval}s)")
+        print(f"Started forex data stream (interval: {interval}s)")
 
     def stop_forex_stream(self):
         """Stop the forex data stream"""
         if "forex_stream" in self.streaming_tasks:
             self.streaming_tasks["forex_stream"].cancel()
             del self.streaming_tasks["forex_stream"]
-            print("⏹️ Stopped forex data stream")
+            print("Stopped forex data stream")
 
 
 # Global manager instance

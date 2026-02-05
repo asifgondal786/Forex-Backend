@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 // import 'package:intl/intl.dart';
 import '../../core/models/task.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_background.dart';
 import '../../providers/task_provider.dart';
 
 class TaskHistoryScreen extends StatefulWidget {
@@ -30,165 +31,169 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
-      body: Consumer<TaskProvider>(
-        builder: (context, taskProvider, child) {
-          if (taskProvider.isLoading && taskProvider.tasks.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: Consumer<TaskProvider>(
+          builder: (context, taskProvider, child) {
+            if (taskProvider.isLoading && taskProvider.tasks.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final filteredTasks = _getFilteredTasks(taskProvider);
+            final filteredTasks = _getFilteredTasks(taskProvider);
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Task History',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${filteredTasks.length} tasks',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/create-task');
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('New Task'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryGreen,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Filters
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Filter:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          _FilterChip(
-                            label: 'All',
-                            isSelected: _filterStatus == 'all',
-                            onTap: () => setState(() => _filterStatus = 'all'),
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
-                            label: 'Running',
-                            isSelected: _filterStatus == 'running',
-                            color: AppColors.statusRunning,
-                            onTap: () => setState(() => _filterStatus = 'running'),
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
-                            label: 'Completed',
-                            isSelected: _filterStatus == 'completed',
-                            color: AppColors.statusCompleted,
-                            onTap: () => setState(() => _filterStatus = 'completed'),
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
-                            label: 'Pending',
-                            isSelected: _filterStatus == 'pending',
-                            color: AppColors.statusPending,
-                            onTap: () => setState(() => _filterStatus = 'pending'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Task List
-                    if (filteredTasks.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(48),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Center(
-                          child: Column(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Icons.inbox_outlined,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No tasks found',
+                              const Text(
+                                'Task History',
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 4),
                               Text(
-                                'Create your first task to get started',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade500,
+                                '${filteredTasks.length} tasks',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white70,
                                 ),
                               ),
                             ],
                           ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/create-task');
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('New Task'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Filters
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withOpacity(0.12)),
                         ),
-                      )
-                    else
-                      ...filteredTasks.map((task) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _TaskHistoryCard(task: task),
-                      )),
-                  ],
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            const Text(
+                              'Filter:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            _FilterChip(
+                              label: 'All',
+                              isSelected: _filterStatus == 'all',
+                              onTap: () => setState(() => _filterStatus = 'all'),
+                            ),
+                            _FilterChip(
+                              label: 'Running',
+                              isSelected: _filterStatus == 'running',
+                              color: AppColors.statusRunning,
+                              onTap: () => setState(() => _filterStatus = 'running'),
+                            ),
+                            _FilterChip(
+                              label: 'Completed',
+                              isSelected: _filterStatus == 'completed',
+                              color: AppColors.statusCompleted,
+                              onTap: () => setState(() => _filterStatus = 'completed'),
+                            ),
+                            _FilterChip(
+                              label: 'Pending',
+                              isSelected: _filterStatus == 'pending',
+                              color: AppColors.statusPending,
+                              onTap: () => setState(() => _filterStatus = 'pending'),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Task List
+                      if (filteredTasks.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(48),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(16),
+                            border:
+                                Border.all(color: Colors.white.withOpacity(0.1)),
+                          ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.inbox_outlined,
+                                  size: 64,
+                                  color: Colors.white.withOpacity(0.4),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'No tasks found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Create your first task to get started',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        ...filteredTasks.map((task) => Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _TaskHistoryCard(task: task),
+                            )),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -217,10 +222,12 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? chipColor.withAlpha(51) : Colors.grey.shade100,
+          color: isSelected
+              ? chipColor.withOpacity(0.25)
+              : Colors.white.withOpacity(0.06),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? chipColor : Colors.grey.shade300,
+            color: isSelected ? chipColor : Colors.white.withOpacity(0.2),
           ),
         ),
         child: Text(
@@ -228,7 +235,7 @@ class _FilterChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            color: isSelected ? chipColor : Colors.black54,
+            color: isSelected ? chipColor : Colors.white70,
           ),
         ),
       ),
@@ -248,11 +255,12 @@ class _TaskHistoryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(13),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -269,7 +277,7 @@ class _TaskHistoryCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -283,7 +291,7 @@ class _TaskHistoryCard extends StatelessWidget {
             task.description,
             style: const TextStyle(
               fontSize: 14,
-              color: Colors.black54,
+              color: Colors.white70,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -320,7 +328,7 @@ class _TaskHistoryCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: task.progress,
                 minHeight: 8,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: Colors.white.withOpacity(0.1),
                 valueColor: const AlwaysStoppedAnimation<Color>(
                   AppColors.primaryGreen,
                 ),
@@ -333,19 +341,21 @@ class _TaskHistoryCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.white.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.file_download, color: Colors.blue, size: 20),
+                  const Icon(Icons.file_download,
+                      color: Color(0xFF60A5FA), size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       task.resultFileName!,
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Colors.blue,
+                        color: Color(0xFF60A5FA),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -470,13 +480,13 @@ class _InfoChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: color ?? Colors.black54),
+        Icon(icon, size: 16, color: color ?? Colors.white70),
         const SizedBox(width: 4),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: color ?? Colors.black54,
+            color: color ?? Colors.white70,
           ),
         ),
       ],

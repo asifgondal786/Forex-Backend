@@ -219,73 +219,31 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
               ],
             );
           } else if (isTablet) {
-            // Tablet Layout
+            // Tablet Layout (cleaner, closer to reference)
             return Stack(
               children: [
-                Column(
+                Row(
                   children: [
-                    // Auth Header
-                    AuthHeader(
-                      isLoggedIn: isLoggedIn,
-                      userName: userName,
-                      userEmail: userProvider.user?.email,
-                      riskLevel: 'Moderate',
-                      onSignIn: _handleSignIn,
-                      onCreateAccount: _handleCreateAccount,
-                      onLogout: _handleLogout,
+                    Sidebar(
+                      isCollapsed: true,
                     ),
-                    // AI Status Banner
-                    if (isLoggedIn)
-                      AIStatusBanner(
-                        aiEnabled: _aiEnabled,
-                        aiMode: _aiMode,
-                        dataSourcesMonitored: 12,
-                        confidenceScore: _aiConfidence,
-                        onAITapped: () {
-                          // Open AI settings
-                        },
-                      ),
                     Expanded(
-                      child: Row(
-                        children: [
-                          Sidebar(
-                            isCollapsed: true,
-                          ),
-                          Expanded(
-                            child: DashboardContent(),
-                          ),
-                          if (selectedTaskId != null)
-                            Container(
-                              width: 280,
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  left: BorderSide(
-                                    color: Colors.white.withOpacity(0.1),
-                                  ),
-                                ),
-                              ),
-                              child: LiveUpdatesPanel(taskId: selectedTaskId),
-                            ),
-                        ],
-                      ),
+                      child: DashboardContent(),
                     ),
-                    // Trust Bar at bottom
-                    if (isLoggedIn)
-                      TrustBar(
-                        readOnlyMode: false,
-                        withdrawalEnabled: false,
-                        tradesWithinLimits: true,
-                        riskLevel: 'Moderate',
-                      ),
-                    // Trust Reinforcement Footer
-                    if (isLoggedIn)
-                      TrustReinforcementFooter(
-                        isAIActive: _aiEnabled,
-                        userEmail: userProvider.user?.email,
+                    if (selectedTaskId != null)
+                      Container(
+                        width: 280,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                        ),
+                        child: LiveUpdatesPanel(taskId: selectedTaskId),
                       ),
                   ],
                 ),
-                // Emergency Stop Button
                 if (isLoggedIn && _aiEnabled)
                   EmergencyStopButton(
                     onStop: _handleStopAI,
@@ -299,27 +257,6 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
               children: [
                 Column(
                   children: [
-                    // Auth Header
-                    AuthHeader(
-                      isLoggedIn: isLoggedIn,
-                      userName: userName,
-                      userEmail: userProvider.user?.email,
-                      riskLevel: 'Moderate',
-                      onSignIn: _handleSignIn,
-                      onCreateAccount: _handleCreateAccount,
-                      onLogout: _handleLogout,
-                    ),
-                    // AI Status Banner
-                    if (isLoggedIn)
-                      AIStatusBanner(
-                        aiEnabled: _aiEnabled,
-                        aiMode: _aiMode,
-                        dataSourcesMonitored: 12,
-                        confidenceScore: _aiConfidence,
-                        onAITapped: () {
-                          // Open AI settings
-                        },
-                      ),
                     Expanded(
                       child: Row(
                         children: [
@@ -347,20 +284,6 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
                         ],
                       ),
                     ),
-                    // Trust Bar at bottom
-                    if (isLoggedIn)
-                      TrustBar(
-                        readOnlyMode: false,
-                        withdrawalEnabled: false,
-                        tradesWithinLimits: true,
-                        riskLevel: 'Moderate',
-                      ),
-                    // Trust Reinforcement Footer
-                    if (isLoggedIn)
-                      TrustReinforcementFooter(
-                        isAIActive: _aiEnabled,
-                        userEmail: userProvider.user?.email,
-                      ),
                   ],
                 ),
                 // Emergency Stop Button

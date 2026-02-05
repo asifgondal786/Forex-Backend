@@ -79,6 +79,22 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
                   color: Colors.white,
                 ),
               ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'Global',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
               const Spacer(),
               StreamBuilder<bool>(
                 stream: _liveService.connectionStatus,

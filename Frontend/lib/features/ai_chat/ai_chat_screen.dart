@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/gemini_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_background.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -70,14 +71,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.darkBlue, AppColors.lightBlue],
-          ),
-        ),
+      body: AppBackground(
         child: SafeArea(
           child: Column(
             children: [

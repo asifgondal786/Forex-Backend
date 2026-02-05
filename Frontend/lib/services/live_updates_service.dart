@@ -10,7 +10,7 @@ class LiveUpdate {
   final double changePercent;
   final DateTime timestamp;
   final String trend; // "UP", "DOWN", "STABLE"
-  
+
   LiveUpdate({
     required this.pair,
     required this.price,
@@ -19,105 +19,112 @@ class LiveUpdate {
     required this.timestamp,
     required this.trend,
   });
-  
-  factory LiveUpdate.fromJson(Map<String, dynamic> json) {
-    return LiveUpdate(
-      pair: json['pair'] ?? 'N/A',
-      price: (json['price'] ?? 0).toDouble(),
-      change: (json['change'] ?? 0).toDouble(),
-      changePercent: (json['change_percent'] ?? 0).toDouble(),
-      timestamp: json['timestamp'] != null 
-          ? DateTime.parse(json['timestamp'].toString())
-          : DateTime.now(),
-      trend: json['trend'] ?? 'STABLE',
-    );
-  }
 }
 
 class LiveUpdatesService {
   static const String _wsBaseUrl = 'ws://127.0.0.1:8080';
-  
+
   WebSocketChannel? _channel;
   final _updatesController = StreamController<LiveUpdate>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
-  
+  final Map<String, double> _lastRates = {};
+
   Stream<LiveUpdate> get updates => _updatesController.stream;
   Stream<bool> get connectionStatus => _connectionController.stream;
-  
+
   bool get isConnected => _channel != null;
-  
-  /// Connect to live updates WebSocket
+
+  /// Connect to live updates WebSocket (global stream).
   Future<void> connect(String userId) async {
     try {
       if (_channel != null) {
         await disconnect();
       }
-      
-      final wsUrl = '$_wsBaseUrl/api/live-updates/$userId';
-      debugPrint('🔌 Connecting to: $wsUrl');
-      
+
+      final wsUrl = '$_wsBaseUrl/api/ws';
+      debugPrint('Connecting to: $wsUrl');
+
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       _connectionController.add(true);
-      debugPrint('✅ Live updates connected');
-      
+      debugPrint('Live updates connected');
+
       // Listen for messages
       _channel!.stream.listen(
         (message) {
           try {
-            final data = jsonDecode(message);
-            if (data is Map) {
-              final update = LiveUpdate.fromJson(data);
-              _updatesController.add(update);
+            if (message == 'pong') {
+              return;
+            }
+            final decoded = jsonDecode(message);
+            if (decoded is Map<String, dynamic>) {
+              final data = decoded['data'];
+              if (data is Map<String, dynamic>) {
+                final rates = data['rates'];
+                if (rates is Map<String, dynamic>) {
+                  _emitRateUpdates(rates);
+                }
+              }
             }
           } catch (e) {
-            debugPrint('⚠️ Parse error: $e');
+            debugPrint('Parse error: $e');
           }
         },
         onError: (error) {
-          debugPrint('❌ WebSocket error: $error');
+          debugPrint('WebSocket error: $error');
           _connectionController.add(false);
         },
         onDone: () {
-          debugPrint('⚠️ WebSocket closed');
+          debugPrint('WebSocket closed');
           _connectionController.add(false);
         },
       );
     } catch (e) {
-      debugPrint('❌ Connection error: $e');
+      debugPrint('Connection error: $e');
       _connectionController.add(false);
     }
   }
-  
-  /// Send subscription for specific pairs
+
+  /// Send subscription for specific pairs (client-side filter).
   void subscribeToPairs(List<String> pairs) {
-    if (_channel != null) {
-      try {
-        _channel!.sink.add(jsonEncode({
-          'action': 'subscribe',
-          'pairs': pairs,
-        }));
-        debugPrint('📡 Subscribed to: $pairs');
-      } catch (e) {
-        debugPrint('❌ Subscribe error: $e');
-      }
-    }
+    debugPrint('Subscribed to: $pairs');
   }
-  
-  /// Unsubscribe from pairs
+
+  /// Unsubscribe from pairs (client-side filter).
   void unsubscribeFromPairs(List<String> pairs) {
-    if (_channel != null) {
-      try {
-        _channel!.sink.add(jsonEncode({
-          'action': 'unsubscribe',
-          'pairs': pairs,
-        }));
-        debugPrint('📡 Unsubscribed from: $pairs');
-      } catch (e) {
-        debugPrint('❌ Unsubscribe error: $e');
-      }
-    }
+    debugPrint('Unsubscribed from: $pairs');
   }
-  
+
+  void _emitRateUpdates(Map<String, dynamic> rates) {
+    rates.forEach((pair, value) {
+      final price = (value as num?)?.toDouble() ?? 0.0;
+      final last = _lastRates[pair];
+      final change = last != null ? price - last : 0.0;
+      final changePercent = last != null && last != 0.0
+          ? (change / last) * 100
+          : 0.0;
+      final trend = change > 0
+          ? 'UP'
+          : change < 0
+              ? 'DOWN'
+              : 'STABLE';
+
+      _lastRates[pair] = price;
+
+      final update = LiveUpdate(
+        pair: pair,
+        price: price,
+        change: change,
+        changePercent: changePercent,
+        timestamp: DateTime.now(),
+        trend: trend,
+      );
+
+      if (!_updatesController.isClosed) {
+        _updatesController.add(update);
+      }
+    });
+  }
+
   /// Disconnect from WebSocket
   Future<void> disconnect() async {
     try {
@@ -125,13 +132,13 @@ class LiveUpdatesService {
         await _channel!.sink.close();
         _channel = null;
         _connectionController.add(false);
-        debugPrint('🔌 Disconnected from live updates');
+        debugPrint('Disconnected from live updates');
       }
     } catch (e) {
-      debugPrint('❌ Disconnect error: $e');
+      debugPrint('Disconnect error: $e');
     }
   }
-  
+
   /// Dispose resources
   void dispose() {
     disconnect();
