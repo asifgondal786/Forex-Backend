@@ -1,7 +1,5 @@
-import 'dialogs/create_task_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../providers/task_provider.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/dashboard_content.dart';
@@ -15,8 +13,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  bool _sidebarCollapsed = false;
-
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
@@ -27,7 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       drawer: isMobile
           ? Drawer(
               backgroundColor: const Color(0xFF1F2937),
-              child: Sidebar(
+              child: const Sidebar(
                 isCollapsed: false,
               ),
             )
@@ -67,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const Text(
-                          '🚀 Forex Companion',
+                          'Forex Companion',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -96,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   // Main Content
-                  DashboardContent(),
+                  const DashboardContent(),
                   // Live Panel at bottom
                   if (selectedTaskId != null)
                     LiveUpdatesPanel(taskId: selectedTaskId),
@@ -108,11 +104,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             return Row(
               children: [
                 // Collapsed Sidebar
-                Sidebar(
+                const Sidebar(
                   isCollapsed: true,
                 ),
                 // Main Content
-                Expanded(
+                const Expanded(
                   child: DashboardContent(),
                 ),
                 // Live Panel on right (if task selected)
@@ -135,10 +131,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             return Row(
               children: [
                 // Left Sidebar
-                Sidebar(),
+                const Sidebar(),
 
                 // Main Content Area (Expanded to fill)
-                Expanded(
+                const Expanded(
                   flex: 3,
                   child: DashboardContent(),
                 ),

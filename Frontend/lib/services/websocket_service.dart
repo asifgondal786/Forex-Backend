@@ -51,9 +51,13 @@ class WebSocketService {
       
       _isConnected = true;
       _reconnectAttempts = 0;
-      debugPrint('WebSocket connected');
+      if (kDebugMode) {
+        debugPrint('WebSocket connected');
+      }
     } catch (e) {
-      debugPrint('WebSocket connection error: $e');
+      if (kDebugMode) {
+        debugPrint('WebSocket connection error: $e');
+      }
       _isConnected = false;
       _scheduleReconnect();
     }
@@ -76,23 +80,31 @@ class WebSocketService {
         final update = LiveUpdate.fromJson(data);
         _updateController.add(update);
       } else {
-        debugPrint('Unknown message type: $type');
+        if (kDebugMode) {
+          debugPrint('Unknown message type: $type');
+        }
       }
     } catch (e) {
-      debugPrint('Error parsing WebSocket message: $e');
+      if (kDebugMode) {
+        debugPrint('Error parsing WebSocket message: $e');
+      }
     }
   }
 
   // Handle errors
   void _onError(dynamic error) {
-    debugPrint('WebSocket error: $error');
+    if (kDebugMode) {
+      debugPrint('WebSocket error: $error');
+    }
     _isConnected = false;
     _scheduleReconnect();
   }
 
   // Handle connection close
   void _onDone() {
-    debugPrint('WebSocket connection closed');
+    if (kDebugMode) {
+      debugPrint('WebSocket connection closed');
+    }
     _isConnected = false;
     if (!_manualDisconnect) {
       _scheduleReconnect();
@@ -102,14 +114,18 @@ class WebSocketService {
   // Schedule reconnection
   void _scheduleReconnect() {
     if (_reconnectAttempts >= maxReconnectAttempts) {
-      debugPrint('Max reconnect attempts reached');
+      if (kDebugMode) {
+        debugPrint('Max reconnect attempts reached');
+      }
       return;
     }
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(reconnectDelay, () {
       _reconnectAttempts++;
-      debugPrint('Reconnecting... Attempt $_reconnectAttempts');
+      if (kDebugMode) {
+        debugPrint('Reconnecting... Attempt $_reconnectAttempts');
+      }
       connect(userId: _userId);
     });
   }
@@ -121,10 +137,14 @@ class WebSocketService {
       try {
         channel.sink.add(json.encode(message));
       } catch (e) {
-        debugPrint('Error sending message: $e');
+        if (kDebugMode) {
+          debugPrint('Error sending message: $e');
+        }
       }
     } else {
-      debugPrint('Cannot send message: WebSocket not connected');
+      if (kDebugMode) {
+        debugPrint('Cannot send message: WebSocket not connected');
+      }
     }
   }
 
@@ -153,7 +173,9 @@ class WebSocketService {
     await _subscription?.cancel();
     await _channel?.sink.close();
     _isConnected = false;
-    debugPrint('WebSocket disconnected');
+    if (kDebugMode) {
+      debugPrint('WebSocket disconnected');
+    }
   }
 
   // Dispose

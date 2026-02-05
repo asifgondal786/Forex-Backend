@@ -7,6 +7,8 @@ class AppColors {
   static const Color lightBlue = AppTheme.accentTeal;
   static const Color primaryBlue = AppTheme.accentCyan;
   static const Color primaryGreen = AppTheme.successGreen;
+  static const Color successGreen = AppTheme.successGreen;
+  static const Color errorRed = AppTheme.errorRed;
   static const Color sidebarDark = AppTheme.primaryDark;
   static const Color statusRunning = AppTheme.successGreen;
   static const Color statusCompleted = AppTheme.accentCyan;

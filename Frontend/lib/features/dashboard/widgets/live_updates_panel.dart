@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../../core/models/live_update.dart';
 import '../../../services/live_update_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -85,9 +84,9 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
     return Container(
       constraints: const BoxConstraints(maxWidth: 400),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,13 +96,13 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Colors.white.withValues(alpha: 0.04),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
               border: Border(
-                bottom: BorderSide(color: Colors.grey.shade200),
+                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
               ),
             ),
             child: Row(
@@ -114,6 +113,7 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 Row(
@@ -123,6 +123,7 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
                     IconButton(
                       icon: const Icon(Icons.more_vert, size: 20),
                       onPressed: () {},
+                      color: AppColors.textSecondary,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
@@ -190,7 +191,7 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey.shade600,
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -205,14 +206,14 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
           Icon(
             Icons.notifications_none,
             size: 48,
-            color: Colors.grey.shade400,
+            color: AppColors.textMuted,
           ),
           const SizedBox(height: 16),
           Text(
             'No updates yet',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -221,7 +222,7 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade500,
+              color: AppColors.textMuted,
             ),
           ),
         ],
@@ -253,6 +254,7 @@ class _UpdateItem extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -260,7 +262,7 @@ class _UpdateItem extends StatelessWidget {
                   _formatTime(update.timestamp),
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 if (update.progress != null) ...[
@@ -314,7 +316,7 @@ class _UpdateItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: progress,
-            backgroundColor: Colors.grey.shade200,
+            backgroundColor: Colors.white.withValues(alpha: 0.08),
             valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
             minHeight: 6,
           ),
@@ -324,7 +326,7 @@ class _UpdateItem extends StatelessWidget {
           '${(progress * 100).toInt()}%',
           style: TextStyle(
             fontSize: 11,
-            color: Colors.grey.shade600,
+            color: AppColors.textSecondary,
           ),
         ),
       ],

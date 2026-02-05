@@ -12,12 +12,19 @@ class TaskStep {
   });
 
   factory TaskStep.fromJson(Map<String, dynamic> json) {
+    DateTime? parseStepDate(dynamic date) {
+      if (date == null) return null;
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.tryParse(date);
+      return null;
+    }
+
     return TaskStep(
       name: json['name'] as String? ?? '',
-      isCompleted: json['isCompleted'] as bool? ?? false,
-      completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'] as String)
-          : null,
+      isCompleted:
+          (json['isCompleted'] ?? json['is_completed']) as bool? ?? false,
+      completedAt:
+          parseStepDate(json['completedAt'] ?? json['completed_at']),
     );
   }
 
@@ -98,29 +105,16 @@ class Task {
   bool get isPending => status == TaskStatus.pending;
 
   factory Task.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDate(dynamic date) {
-      if (date == null) return null;
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.tryParse(date);
-      return null;
-    }
-
     return Task(
       id: json['id'] as String? ?? '',
       userId: json['userId'] as String?,
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      status: TaskStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => TaskStatus.pending,
-      ),
-      priority: TaskPriority.values.firstWhere(
-        (e) => e.name == json['priority'],
-        orElse: () => TaskPriority.medium,
-      ),
-      createdAt: parseDate(json['createdAt']),
-      startTime: parseDate(json['startTime']),
-      endTime: parseDate(json['endTime']),
+      status: _parseStatus(json['status']),
+      priority: _parsePriority(json['priority']),
+      createdAt: _parseDate(json['createdAt']),
+      startTime: _parseDate(json['startTime']),
+      endTime: _parseDate(json['endTime']),
       currentStep: json['currentStep'] as int? ?? 0,
       totalSteps: json['totalSteps'] as int? ?? 0,
       steps: (json['steps'] as List<dynamic>?)
@@ -134,29 +128,16 @@ class Task {
   }
 
   factory Task.fromFirestore(Map<String, dynamic> data, String documentId) {
-    DateTime? parseDate(dynamic date) {
-      if (date == null) return null;
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.tryParse(date);
-      return null;
-    }
-
     return Task(
       id: documentId,
       userId: data['userId'] as String?,
       title: data['title'] as String? ?? '',
       description: data['description'] as String? ?? '',
-      status: TaskStatus.values.firstWhere(
-        (e) => e.name == data['status'],
-        orElse: () => TaskStatus.pending,
-      ),
-      priority: TaskPriority.values.firstWhere(
-        (e) => e.name == data['priority'],
-        orElse: () => TaskPriority.medium,
-      ),
-      createdAt: parseDate(data['createdAt']),
-      startTime: parseDate(data['startTime']),
-      endTime: parseDate(data['endTime']),
+      status: _parseStatus(data['status']),
+      priority: _parsePriority(data['priority']),
+      createdAt: _parseDate(data['createdAt']),
+      startTime: _parseDate(data['startTime']),
+      endTime: _parseDate(data['endTime']),
       currentStep: data['currentStep'] as int? ?? 0,
       totalSteps: data['totalSteps'] as int? ?? 0,
       steps: (data['steps'] as List<dynamic>?)
@@ -243,4 +224,27 @@ class Task {
       resultFileSize: resultFileSize ?? this.resultFileSize,
     );
   }
+}
+
+DateTime? _parseDate(dynamic date) {
+  if (date == null) return null;
+  if (date is Timestamp) return date.toDate();
+  if (date is String) return DateTime.tryParse(date);
+  return null;
+}
+
+TaskStatus _parseStatus(dynamic value) {
+  final raw = value?.toString().toLowerCase();
+  for (final status in TaskStatus.values) {
+    if (status.name.toLowerCase() == raw) return status;
+  }
+  return TaskStatus.pending;
+}
+
+TaskPriority _parsePriority(dynamic value) {
+  final raw = value?.toString().toLowerCase();
+  for (final priority in TaskPriority.values) {
+    if (priority.name.toLowerCase() == raw) return priority;
+  }
+  return TaskPriority.medium;
 }

@@ -10,7 +10,6 @@ import 'task_history_table.dart';
 import 'forex_feed_widget.dart';
 import 'performance_analytics.dart';
 import 'news_sentiment_widget.dart';
-import 'intelligent_empty_state.dart';
 import 'ai_prediction_widget.dart';
 
 class DashboardContent extends StatefulWidget {
@@ -22,7 +21,6 @@ class DashboardContent extends StatefulWidget {
 
 class _DashboardContentState extends State<DashboardContent> {
   int _selectedTab = 0;
-  String? _selectedTaskId;
 
   @override
   Widget build(BuildContext context) {
@@ -39,10 +37,6 @@ class _DashboardContentState extends State<DashboardContent> {
 
               const SizedBox(height: 24),
 
-              // Stats Cards Row
-              if (!isMobile) _buildStatsRow(),
-              if (!isMobile) const SizedBox(height: 24),
-
               // Main Content Area with Tabs
               Padding(
                 padding: EdgeInsets.symmetric(
@@ -52,13 +46,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Tab Navigation
-                    _buildTabNavigation(isMobile),
-
-                    const SizedBox(height: 24),
-
-                    // Tab Content
-                    _buildTabContent(isMobile),
+                    _buildActiveTasksTab(isMobile),
                   ],
                 ),
               ),
@@ -78,7 +66,7 @@ class _DashboardContentState extends State<DashboardContent> {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             width: 1,
           ),
         ),
@@ -110,7 +98,7 @@ class _DashboardContentState extends State<DashboardContent> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 elevation: 8,
-                shadowColor: const Color(0xFF3B82F6).withOpacity(0.4),
+                shadowColor: const Color(0xFF3B82F6).withValues(alpha: 0.4),
               ),
             )
                 .animate()
@@ -130,9 +118,9 @@ class _DashboardContentState extends State<DashboardContent> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.12)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: const Icon(Icons.menu, color: Colors.white70, size: 18),
             ),
@@ -160,72 +148,40 @@ class _DashboardContentState extends State<DashboardContent> {
         ),
         Row(
           children: [
-            _buildTopStatusBar(),
-            const SizedBox(width: 12),
+            _buildUserPill(),
+            const SizedBox(width: 10),
+            _buildBalancePill(),
+            const SizedBox(width: 10),
+            _buildIconPill(
+              icon: Icons.power_settings_new,
+              onTap: () {},
+            ),
+            const SizedBox(width: 8),
             Consumer<ThemeProvider>(
               builder: (context, themeProvider, _) {
-                return Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
-                    ),
-                  ),
-                  child: IconButton(
-                    tooltip: themeProvider.isDarkMode
-                        ? 'Switch to Light'
-                        : 'Switch to Dark',
-                    icon: Icon(
-                      themeProvider.isDarkMode
-                          ? Icons.light_mode_outlined
-                          : Icons.dark_mode_outlined,
-                      color: Colors.white70,
-                    ),
-                    onPressed: () {
-                      themeProvider.toggleTheme();
-                    },
-                  ),
+                return _buildIconPill(
+                  icon: themeProvider.isDarkMode
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  onTap: themeProvider.toggleTheme,
                 );
               },
             ),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF3B82F6),
-                    Color(0xFF2563EB),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF3B82F6).withOpacity(0.3),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.notifications_active,
-                color: Colors.white,
-              ),
-            ),
+            const SizedBox(width: 8),
+            _buildNotificationPill(),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildTopStatusBar() {
+  Widget _buildUserPill() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
@@ -249,49 +205,123 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 'Available Online',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 10,
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0EA5E9).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              '\$5,843.21',
-              style: TextStyle(
-                color: Color(0xFF7DD3FC),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
+          const SizedBox(width: 8),
+          const Icon(
+            Icons.keyboard_arrow_down,
+            size: 16,
+            color: Colors.white54,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalancePill() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: const [
+          Icon(Icons.account_balance_wallet, color: Color(0xFF00FFC2), size: 18),
+          SizedBox(width: 8),
+          Text(
+            '\$5,843.21',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.power_settings_new, color: Colors.white54, size: 16),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIconPill({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Icon(icon, color: Colors.white70, size: 18),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationPill() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF3B82F6),
+            Color(0xFF2563EB),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.notifications_active,
+        color: Colors.white,
+        size: 18,
       ),
     );
   }
 
   Widget _buildHeroPanel(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.03),
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.03),
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: isMobile
           ? Column(
@@ -333,7 +363,7 @@ class _DashboardContentState extends State<DashboardContent> {
         Text(
           'Fully autonomous AI: "U Sleep, I Work for U"',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.75),
+            color: const Color(0xFF7DD3FC),
             fontSize: 14,
           ),
         ),
@@ -355,6 +385,7 @@ class _DashboardContentState extends State<DashboardContent> {
           value: '\$5,843.21',
           accent: const Color(0xFF10B981),
           wide: true,
+          showValueInHeader: true,
         ),
         const SizedBox(height: 10),
         _buildAccountSummaryCard(
@@ -370,11 +401,11 @@ class _DashboardContentState extends State<DashboardContent> {
 
   Widget _buildHeroChip(String label, IconData icon) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -385,7 +416,7 @@ class _DashboardContentState extends State<DashboardContent> {
             label,
             style: const TextStyle(
               color: Colors.white70,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -399,12 +430,12 @@ class _DashboardContentState extends State<DashboardContent> {
       width: 230,
       height: 230,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF60A5FA).withOpacity(0.2),
+            color: const Color(0xFF60A5FA).withValues(alpha: 0.2),
             blurRadius: 36,
             spreadRadius: 6,
           ),
@@ -427,7 +458,7 @@ class _DashboardContentState extends State<DashboardContent> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.9),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
@@ -449,9 +480,9 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -477,17 +508,23 @@ class _DashboardContentState extends State<DashboardContent> {
     required String value,
     required Color accent,
     bool wide = false,
+    bool showValueInHeader = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
       width: wide ? double.infinity : 220,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+        ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -496,13 +533,29 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (showValueInHeader)
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 6),
           Row(
@@ -519,7 +572,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 10,
                 ),
               ),
@@ -528,9 +581,9 @@ class _DashboardContentState extends State<DashboardContent> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: accent.withOpacity(0.15),
+                    color: accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: accent.withOpacity(0.3)),
+                    border: Border.all(color: accent.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     'Online',
@@ -543,15 +596,17 @@ class _DashboardContentState extends State<DashboardContent> {
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              color: accent,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+          if (!showValueInHeader) ...[
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                color: accent,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -561,12 +616,12 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -595,9 +650,9 @@ class _DashboardContentState extends State<DashboardContent> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                     ),
                     child: const Text(
                       '1H',
@@ -616,11 +671,16 @@ class _DashboardContentState extends State<DashboardContent> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.9),
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFEF4444).withValues(alpha: 0.9),
+                      const Color(0xFFDC2626).withValues(alpha: 0.9),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFEF4444).withOpacity(0.3),
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.35),
                       blurRadius: 10,
                     ),
                   ],
@@ -644,7 +704,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 '1.0923',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -653,7 +713,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 '+0.39%',
                 style: TextStyle(
-                  color: const Color(0xFF10B981).withOpacity(0.9),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.9),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -662,7 +722,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 '1.0933',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 10,
                 ),
               ),
@@ -681,7 +741,7 @@ class _DashboardContentState extends State<DashboardContent> {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(height: 140, child: _buildMarketChart()),
+          SizedBox(height: 170, child: _buildMarketChart()),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -748,9 +808,9 @@ class _DashboardContentState extends State<DashboardContent> {
       width: 150,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -766,7 +826,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 title,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -775,7 +835,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 value,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
+                  color: Colors.white.withValues(alpha: 0.4),
                   fontSize: 9,
                 ),
               ),
@@ -802,9 +862,9 @@ class _DashboardContentState extends State<DashboardContent> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.18),
+              color: color.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.35)),
+              border: Border.all(color: color.withValues(alpha: 0.35)),
             ),
             child: Text(
               badge,
@@ -824,14 +884,14 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.7),
+          color: Colors.white.withValues(alpha: 0.7),
           fontSize: 9,
           fontWeight: FontWeight.w600,
         ),
@@ -857,7 +917,7 @@ class _DashboardContentState extends State<DashboardContent> {
             color: color,
             belowBarData: BarAreaData(
               show: true,
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -873,9 +933,9 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -896,7 +956,7 @@ class _DashboardContentState extends State<DashboardContent> {
           drawVerticalLine: false,
           horizontalInterval: 1,
           getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             strokeWidth: 1,
           ),
         ),
@@ -923,8 +983,8 @@ class _DashboardContentState extends State<DashboardContent> {
               show: true,
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF10B981).withOpacity(0.2),
-                  const Color(0xFF3B82F6).withOpacity(0.05),
+                  const Color(0xFF10B981).withValues(alpha: 0.2),
+                  const Color(0xFF3B82F6).withValues(alpha: 0.05),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -942,19 +1002,19 @@ class _DashboardContentState extends State<DashboardContent> {
 
   Widget _buildCompanionStatus(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
             const Color(0xFF0B1220),
-            const Color(0xFF111827).withOpacity(0.8),
+            const Color(0xFF111827).withValues(alpha: 0.8),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -969,7 +1029,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.15),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -994,7 +1054,7 @@ class _DashboardContentState extends State<DashboardContent> {
                     Text(
                       'Monitoring charts, news, and learning signals in real time.',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 12,
                       ),
                     ),
@@ -1005,10 +1065,10 @@ class _DashboardContentState extends State<DashboardContent> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                   ),
                 ),
                 child: const Text(
@@ -1022,60 +1082,65 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _buildStatusMetric(
-                'Market Pulse',
-                'Stable',
-                const Color(0xFF60A5FA),
-                Icons.speed,
-              ),
-              _buildStatusMetric(
-                'News Impact',
-                'Monitoring',
-                const Color(0xFFF59E0B),
-                Icons.newspaper,
-              ),
-              _buildStatusMetric(
-                'Learning Feed',
-                'Syncing',
-                const Color(0xFF34D399),
-                Icons.school_outlined,
-              ),
-              _buildStatusMetric(
-                'Autonomy',
-                isMobile ? 'Guarded' : 'Guarded Mode',
-                const Color(0xFF818CF8),
-                Icons.shield_outlined,
-              ),
-            ],
+          const SizedBox(height: 16),
+          _buildStatusRow(
+            'Market Pulse',
+            'Stable',
+            const Color(0xFF60A5FA),
+            Icons.speed,
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            'News Impact',
+            'Monitoring',
+            const Color(0xFFF59E0B),
+            Icons.newspaper,
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            'Learning Feed',
+            'Syncing',
+            const Color(0xFF34D399),
+            Icons.school_outlined,
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            'Autonomy',
+            isMobile ? 'Guarded' : 'Guarded Mode',
+            const Color(0xFF818CF8),
+            Icons.shield_outlined,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusMetric(
+  Widget _buildStatusRow(
     String title,
     String value,
     Color color,
     IconData icon,
   ) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 160),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1083,7 +1148,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 11,
                   ),
                 ),
@@ -1160,18 +1225,18 @@ class _DashboardContentState extends State<DashboardContent> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              color.withOpacity(0.15),
-              color.withOpacity(0.05),
+              color.withValues(alpha: 0.15),
+              color.withValues(alpha: 0.05),
             ],
           ),
           border: Border.all(
-            color: color.withOpacity(0.3),
+            color: color.withValues(alpha: 0.3),
             width: 1,
           ),
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               blurRadius: 12,
               spreadRadius: 2,
             ),
@@ -1248,12 +1313,12 @@ class _DashboardContentState extends State<DashboardContent> {
           decoration: BoxDecoration(
             color: isSelected
                 ? const Color(0xFF3B82F6)
-                : Colors.white.withOpacity(0.05),
+                : Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSelected
                   ? const Color(0xFF3B82F6)
-                  : Colors.white.withOpacity(0.1),
+                  : Colors.white.withValues(alpha: 0.1),
               width: 1,
             ),
           ),
@@ -1410,15 +1475,15 @@ class _DashboardContentState extends State<DashboardContent> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.white.withOpacity(0.06),
-            Colors.white.withOpacity(0.02),
+            Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.02),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -1441,9 +1506,9 @@ class _DashboardContentState extends State<DashboardContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                 ),
                 child: const Text(
                   'Online',
@@ -1475,7 +1540,7 @@ class _DashboardContentState extends State<DashboardContent> {
                     Text(
                       'Total Assets  \$3,582.44',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -1502,15 +1567,15 @@ class _DashboardContentState extends State<DashboardContent> {
 
   Widget _buildConfidenceGauge() {
     return SizedBox(
-      width: 120,
-      height: 120,
+      width: 96,
+      height: 96,
       child: Stack(
         alignment: Alignment.center,
         children: [
           CircularProgressIndicator(
             value: 0.83,
-            strokeWidth: 10,
-            backgroundColor: Colors.white.withOpacity(0.08),
+            strokeWidth: 8,
+            backgroundColor: Colors.white.withValues(alpha: 0.08),
             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
           ),
           Column(
@@ -1520,7 +1585,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 '83%',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1529,7 +1594,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 'Confidence',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 10,
+                  fontSize: 9,
                 ),
               ),
             ],
@@ -1543,9 +1608,9 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -1564,15 +1629,15 @@ class _DashboardContentState extends State<DashboardContent> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.white.withOpacity(0.06),
-            Colors.white.withOpacity(0.02),
+            Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.02),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -1595,7 +1660,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Text(
                 'learning in 14h',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
               ),
@@ -1615,10 +1680,10 @@ class _DashboardContentState extends State<DashboardContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                   ),
                 ),
                 child: const Text(
@@ -1648,10 +1713,10 @@ class _DashboardContentState extends State<DashboardContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                   ),
                 ),
                 child: const Text(
@@ -1669,7 +1734,7 @@ class _DashboardContentState extends State<DashboardContent> {
           Text(
             'Selling \$ when USD/PKR hits 289 shortly. Confidence: 81%',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 11,
             ),
           ),
@@ -1678,9 +1743,9 @@ class _DashboardContentState extends State<DashboardContent> {
             children: [
               _buildTaskAction('View', const Color(0xFF3B82F6)),
               const SizedBox(width: 8),
-              _buildTaskAction('Pause', Colors.white.withOpacity(0.1)),
+              _buildTaskAction('Pause', Colors.white.withValues(alpha: 0.1)),
               const SizedBox(width: 8),
-              _buildTaskAction('Log', Colors.white.withOpacity(0.1)),
+              _buildTaskAction('Log', Colors.white.withValues(alpha: 0.1)),
             ],
           ),
         ],
@@ -1694,7 +1759,7 @@ class _DashboardContentState extends State<DashboardContent> {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Text(
         label,
@@ -1713,9 +1778,9 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1731,9 +1796,9 @@ class _DashboardContentState extends State<DashboardContent> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             ),
             child: const Text(
               'Estimated',
@@ -1752,9 +1817,9 @@ class _DashboardContentState extends State<DashboardContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -1769,8 +1834,15 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildTickerItem(String label, String change, Color color) {
+    final isPositive = !change.trim().startsWith('-');
     return Row(
       children: [
+        Icon(
+          isPositive ? Icons.trending_up : Icons.trending_down,
+          size: 14,
+          color: color,
+        ),
+        const SizedBox(width: 6),
         Text(
           label,
           style: const TextStyle(
@@ -1797,7 +1869,7 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Text(
         'Every action is logged.',
         style: TextStyle(
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           fontSize: 11,
         ),
       ),
@@ -1833,15 +1905,15 @@ class _DashboardContentState extends State<DashboardContent> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.white.withOpacity(0.06),
-            Colors.white.withOpacity(0.02),
+            Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.02),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -1856,7 +1928,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.2),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -1879,10 +1951,10 @@ class _DashboardContentState extends State<DashboardContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.35),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.35),
                   ),
                 ),
                 child: const Text(
@@ -1930,9 +2002,9 @@ class _DashboardContentState extends State<DashboardContent> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
@@ -1940,7 +2012,7 @@ class _DashboardContentState extends State<DashboardContent> {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 16),
@@ -1950,7 +2022,7 @@ class _DashboardContentState extends State<DashboardContent> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 12,
               ),
             ),
@@ -1958,9 +2030,9 @@ class _DashboardContentState extends State<DashboardContent> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.35)),
+              border: Border.all(color: color.withValues(alpha: 0.35)),
             ),
             child: Text(
               status,
@@ -1983,14 +2055,14 @@ class _DashboardContentState extends State<DashboardContent> {
         gradient: LinearGradient(
           colors: [
             const Color(0xFF0B1220),
-            const Color(0xFF1D4ED8).withOpacity(0.25),
+            const Color(0xFF1D4ED8).withValues(alpha: 0.25),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1D4ED8).withOpacity(0.25),
+            color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -2014,7 +2086,7 @@ class _DashboardContentState extends State<DashboardContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Text(
@@ -2030,7 +2102,7 @@ class _DashboardContentState extends State<DashboardContent> {
           const SizedBox(height: 8),
           Text(
             'Link your broker to unlock autonomous execution and real-time alerts.',
-            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Column(
@@ -2062,9 +2134,9 @@ class _DashboardContentState extends State<DashboardContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                 ),
                 child: const Text(
                   '+\$16.02',
@@ -2087,9 +2159,9 @@ class _DashboardContentState extends State<DashboardContent> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
@@ -2098,7 +2170,7 @@ class _DashboardContentState extends State<DashboardContent> {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
             ),
           ),
         ],

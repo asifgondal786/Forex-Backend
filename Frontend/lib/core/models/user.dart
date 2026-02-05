@@ -36,15 +36,12 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      email: json['email'] as String,
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String?,
-      plan: UserPlan.values.firstWhere(
-        (e) => e.name == (json['plan'] as String?)?.toLowerCase(),
-        orElse: () => UserPlan.free,
-      ),
-      createdAt: DateTime.parse(json['created_at'] as String),
+      plan: _parsePlan(json['plan']),
+      createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
       preferences: json['preferences'] as Map<String, dynamic>?,
     );
   }
@@ -62,7 +59,7 @@ class User {
   }
 
   String get initials {
-    final nameParts = name.split(' ');
+    final nameParts = name.trim().split(RegExp(r'\s+'));
     if (nameParts.length >= 2) {
       return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
     } else if (name.isNotEmpty) {
@@ -90,4 +87,18 @@ class User {
       preferences: preferences ?? this.preferences,
     );
   }
+}
+
+DateTime? _parseDate(dynamic value) {
+  if (value == null) return null;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
+UserPlan _parsePlan(dynamic value) {
+  final raw = value?.toString().toLowerCase();
+  for (final plan in UserPlan.values) {
+    if (plan.name.toLowerCase() == raw) return plan;
+  }
+  return UserPlan.free;
 }

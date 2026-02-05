@@ -83,7 +83,7 @@ class _StarFieldPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.white;
     for (final star in _stars) {
-      paint.color = Colors.white.withOpacity(star.opacity);
+      paint.color = Colors.white.withValues(alpha: star.opacity);
       canvas.drawCircle(
         Offset(star.x * size.width, star.y * size.height),
         star.radius,
@@ -130,8 +130,8 @@ class _GlowOrb extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
-            color.withOpacity(opacity),
-            color.withOpacity(0.0),
+            color.withValues(alpha: opacity),
+            color.withValues(alpha: 0.0),
           ],
         ),
       ),

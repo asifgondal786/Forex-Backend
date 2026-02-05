@@ -63,7 +63,9 @@ class TaskProvider with ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error fetching tasks: $e');
+      if (kDebugMode) {
+        debugPrint('Error fetching tasks: $e');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -98,7 +100,9 @@ class TaskProvider with ChangeNotifier {
       return newTask;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error creating task: $e');
+      if (kDebugMode) {
+        debugPrint('Error creating task: $e');
+      }
       notifyListeners();
       return null;
     }
@@ -120,7 +124,9 @@ class TaskProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error updating task status: $e');
+      if (kDebugMode) {
+        debugPrint('Error updating task status: $e');
+      }
       notifyListeners();
     }
   }
@@ -150,7 +156,9 @@ class TaskProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error stopping task: $e');
+      if (kDebugMode) {
+        debugPrint('Error stopping task: $e');
+      }
       notifyListeners();
     }
   }
@@ -177,7 +185,9 @@ class TaskProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error pausing task: $e');
+      if (kDebugMode) {
+        debugPrint('Error pausing task: $e');
+      }
       notifyListeners();
     }
   }
@@ -204,7 +214,9 @@ class TaskProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error resuming task: $e');
+      if (kDebugMode) {
+        debugPrint('Error resuming task: $e');
+      }
       notifyListeners();
     }
   }
@@ -222,7 +234,9 @@ class TaskProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error deleting task: $e');
+      if (kDebugMode) {
+        debugPrint('Error deleting task: $e');
+      }
       notifyListeners();
     }
   }
@@ -232,11 +246,10 @@ class TaskProvider with ChangeNotifier {
     final index = _tasks.indexWhere((t) => t.id == updatedTask.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
-      notifyListeners();
     } else {
       _tasks.insert(0, updatedTask);
-      notifyListeners();
     }
+    notifyListeners();
   }
 
   // Clear error

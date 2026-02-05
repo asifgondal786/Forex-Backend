@@ -17,6 +17,7 @@ class ApiException implements Exception {
 class ApiService {
   // Backend URL - matches your backend port
   static const String baseUrl = 'http://127.0.0.1:8080';
+  static const Duration _timeout = Duration(seconds: 10);
   
   final http.Client _client = http.Client();
 
@@ -25,8 +26,10 @@ class ApiService {
       };
 
   dynamic _handleResponse(http.Response response) {
-    debugPrint('Response status: ${response.statusCode}');
-    debugPrint('Response body: ${response.body}');
+    if (kDebugMode) {
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+    }
     
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return {};
@@ -46,7 +49,7 @@ class ApiService {
       final response = await _client.get(
         Uri.parse('$baseUrl/api/users/me'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       final data = _handleResponse(response);
       return User.fromJson(data);
     } catch (e) {
@@ -65,7 +68,7 @@ class ApiService {
         Uri.parse('$baseUrl/api/users/me'),
         headers: _headers,
         body: json.encode(body),
-      );
+      ).timeout(_timeout);
       final data = _handleResponse(response);
       return User.fromJson(data);
     } catch (e) {
@@ -80,7 +83,7 @@ class ApiService {
       final response = await _client.get(
         Uri.parse('$baseUrl/api/tasks/'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
 
       final data = _handleResponse(response);
       
@@ -104,7 +107,7 @@ class ApiService {
       final response = await _client.get(
         Uri.parse('$baseUrl/api/tasks/$taskId'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       final data = _handleResponse(response);
       return Task.fromJson(data);
     } catch (e) {
@@ -127,16 +130,20 @@ class ApiService {
         'include_forecast': true,
       };
 
-      debugPrint('Creating task: $body');
+      if (kDebugMode) {
+        debugPrint('Creating task: $body');
+      }
 
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/create'),
         headers: _headers,
         body: json.encode(body),
-      );
+      ).timeout(_timeout);
 
       final data = _handleResponse(response);
-      debugPrint('Task created successfully: $data');
+      if (kDebugMode) {
+        debugPrint('Task created successfully: $data');
+      }
       
       return Task.fromJson(data);
     } catch (e) {
@@ -150,7 +157,7 @@ class ApiService {
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/$taskId/stop'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       final data = _handleResponse(response);
       return Task.fromJson(data);
     } catch (e) {
@@ -163,7 +170,7 @@ class ApiService {
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/$taskId/pause'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       return Task.fromJson(_handleResponse(response));
     } catch (e) {
       throw ApiException('Error pausing task: $e');
@@ -175,7 +182,7 @@ class ApiService {
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/$taskId/resume'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       return Task.fromJson(_handleResponse(response));
     } catch (e) {
       throw ApiException('Error resuming task: $e');
@@ -184,10 +191,11 @@ class ApiService {
 
   Future<void> deleteTask(String taskId) async {
     try {
-      await _client.delete(
+      final response = await _client.delete(
         Uri.parse('$baseUrl/api/tasks/$taskId'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
+      _handleResponse(response);
     } catch (e) {
       throw ApiException('Error deleting task: $e');
     }

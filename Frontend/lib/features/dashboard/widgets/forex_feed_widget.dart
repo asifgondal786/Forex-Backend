@@ -1,415 +1,137 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/theme/app_colors.dart';
 
-class ForexFeedWidget extends StatefulWidget {
+class ForexFeedWidget extends StatelessWidget {
   const ForexFeedWidget({super.key});
 
   @override
-  State<ForexFeedWidget> createState() => _ForexFeedWidgetState();
-}
-
-class _ForexFeedWidgetState extends State<ForexFeedWidget> {
-  late PageController _pageController;
-  int _currentPage = 0;
-  Timer? _timer;
-  bool _isInitialized = false;
-
-  final List<ForexPair> _pairs = [
-    ForexPair(
-      pair: 'EUR/USD',
-      price: 1.0950,
-      change: 0.0045,
-      changePercent: 0.41,
-      trend: 'UP',
-    ),
-    ForexPair(
-      pair: 'GBP/USD',
-      price: 1.2745,
-      change: -0.0025,
-      changePercent: -0.20,
-      trend: 'DOWN',
-    ),
-    ForexPair(
-      pair: 'USD/JPY',
-      price: 149.85,
-      change: 0.15,
-      changePercent: 0.10,
-      trend: 'UP',
-    ),
-    ForexPair(
-      pair: 'AUD/USD',
-      price: 0.6580,
-      change: -0.0012,
-      changePercent: -0.18,
-      trend: 'DOWN',
-    ),
-    ForexPair(
-      pair: 'USD/CAD',
-      price: 1.3425,
-      change: 0.0032,
-      changePercent: 0.24,
-      trend: 'UP',
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialized) {
-      final isMobile = MediaQuery.of(context).size.width < 768;
-      _pageController =
-          PageController(viewportFraction: isMobile ? 0.45 : 0.3);
-      _timer?.cancel(); // Cancel any existing timer
-      _timer = Timer.periodic(const Duration(seconds: 50), (Timer timer) {
-        if (_currentPage < _pairs.length - 1) {
-          _currentPage++;
-        } else {
-          _currentPage = 0;
-        }
-
-        if (_pageController.hasClients) {
-          _pageController.animateToPage(
-            _currentPage,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeIn,
-          );
-        }
-      });
-      _isInitialized = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-          width: 1,
-        ),
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.05),
-            Colors.white.withOpacity(0.02),
-          ],
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '📈 Live Forex Rates',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Real-time market data',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
+              const Text(
+                'Live Forex Feed',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  color: AppColors.statusRunning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: AppColors.statusRunning.withValues(alpha: 0.35),
                   ),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Live',
-                      style: TextStyle(
-                        color: Color(0xFF10B981),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: const Text(
+                  'Live',
+                  style: TextStyle(
+                    color: AppColors.statusRunning,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          // Forex Cards Carousel
-          SizedBox(
-            height: isMobile ? 208 : 188,
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() => _currentPage = index);
-              },
-              itemCount: _pairs.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: _buildForexCard(_pairs[index], index),
-                );
-              },
-            ),
-          ),
-
-          if (isMobile) ...[
-            const SizedBox(height: 12),
-            // Page Indicators
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _pairs.length,
-                (index) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: _currentPage == index ? 24 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _currentPage == index
-                        ? const Color(0xFF3B82F6)
-                        : Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          const SizedBox(height: 12),
+          _buildRow('EUR/USD', '1.0933', '+0.39%', AppColors.statusRunning),
+          const SizedBox(height: 10),
+          _buildRow('GBP/USD', '1.2781', '-0.15%', AppColors.errorRed),
+          const SizedBox(height: 10),
+          _buildRow('USD/JPY', '147.82', '+1.31%', AppColors.statusRunning),
+          const SizedBox(height: 10),
+          _buildRow('USD/PKR', '289.00', '+0.08%', AppColors.statusRunning),
         ],
       ),
     );
   }
 
-  Widget _buildForexCard(ForexPair pair, int index) {
-    final isPositive = pair.changePercent >= 0;
-    final trendColor =
-        isPositive ? const Color(0xFF10B981) : const Color(0xFFEF4444);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            trendColor.withOpacity(0.15),
-            trendColor.withOpacity(0.05),
+  Widget _buildRow(String pair, String price, String change, Color color) {
+    final isPositive = !change.trim().startsWith('-');
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              pair,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
-        border: Border.all(
-          color: trendColor.withOpacity(0.3),
-          width: 1.5,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: trendColor.withOpacity(0.1),
-            blurRadius: 12,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
+          children: [
+            Text(
+              price,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    pair.pair,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                  Icon(
+                    isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                    size: 12,
+                    color: color,
                   ),
-                  const SizedBox(height: 2),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: trendColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      pair.trend == 'UP' ? '▲ Bullish' : '▼ Bearish',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: trendColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Icon(
-                isPositive ? Icons.trending_up : Icons.trending_down,
-                color: trendColor,
-                size: 24,
-              ),
-            ],
-          ),
-
-          // Price
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${pair.price.toStringAsFixed(4)}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
+                  const SizedBox(width: 2),
                   Text(
-                    '${isPositive ? '+' : ''}${pair.changePercent.toStringAsFixed(2)}%',
+                    change,
                     style: TextStyle(
-                      fontSize: 14,
+                      color: color,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: trendColor,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${isPositive ? '+' : ''}${pair.change.toStringAsFixed(4)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[400],
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-
-          // Footer
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Trade Now',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: trendColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: trendColor.withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  'Details',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: trendColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(duration: const Duration(milliseconds: 600))
-        .slideX(
-          begin: 0.2,
-          delay: Duration(milliseconds: index * 100),
-        );
+            ),
+          ],
+        ),
+      ],
+    );
   }
-}
-
-class ForexPair {
-  final String pair;
-  final double price;
-  final double change;
-  final double changePercent;
-  final String trend;
-
-  ForexPair({
-    required this.pair,
-    required this.price,
-    required this.change,
-    required this.changePercent,
-    required this.trend,
-  });
 }

@@ -18,11 +18,11 @@ class TaskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -41,6 +41,7 @@ class TaskCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -81,6 +82,7 @@ class TaskCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
                 ),
               ),
               _buildProgressIcon(task.status),
@@ -111,6 +113,7 @@ class TaskCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
@@ -124,13 +127,13 @@ class TaskCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.insert_drive_file, color: Colors.blue.shade700),
+                  const Icon(Icons.insert_drive_file, color: AppColors.textSecondary),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -141,7 +144,7 @@ class TaskCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black54,
+                            color: AppColors.textMuted,
                           ),
                         ),
                         Text(
@@ -149,6 +152,7 @@ class TaskCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         if (task.resultFileSize != null)
@@ -156,7 +160,7 @@ class TaskCard extends StatelessWidget {
                             '(${_formatFileSize(task.resultFileSize!)})',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade600,
+                              color: Colors.white.withValues(alpha: 0.6),
                             ),
                           ),
                       ],
@@ -317,7 +321,7 @@ class TaskCard extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: AppColors.textMuted,
               ),
             ),
             Text(
@@ -325,7 +329,7 @@ class TaskCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: color,
+                color: color ?? AppColors.textPrimary,
               ),
             ),
           ],
@@ -361,7 +365,9 @@ class TaskCard extends StatelessWidget {
               step.name,
               style: TextStyle(
                 fontSize: 14,
-                color: step.isCompleted ? Colors.black87 : Colors.grey.shade600,
+                color: step.isCompleted
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
                 decoration: step.isCompleted ? TextDecoration.lineThrough : null,
               ),
             ),

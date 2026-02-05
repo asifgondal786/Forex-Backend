@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/theme/app_colors.dart';
 
 class PerformanceAnalytics extends StatefulWidget {
   const PerformanceAnalytics({super.key});
@@ -20,7 +21,7 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         border: Border.all(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           width: 1,
         ),
         borderRadius: BorderRadius.circular(16),
@@ -28,8 +29,8 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.05),
-            Colors.white.withOpacity(0.02),
+            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.02),
           ],
         ),
       ),
@@ -37,31 +38,21 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '📊 Performance Analytics',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Trading performance metrics & statistics',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          const Text(
+            'Performance Analytics',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Trading performance metrics and statistics',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -83,11 +74,11 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
                       decoration: BoxDecoration(
                         color: _selectedPeriod == index
                             ? const Color(0xFF3B82F6)
-                            : Colors.white.withOpacity(0.05),
+                            : Colors.white.withValues(alpha: 0.05),
                         border: Border.all(
                           color: _selectedPeriod == index
                               ? const Color(0xFF3B82F6)
-                              : Colors.white.withOpacity(0.1),
+                              : Colors.white.withValues(alpha: 0.1),
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -207,9 +198,9 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: Colors.white.withValues(alpha: 0.04),
               border: Border.all(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -235,20 +226,19 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
                           Container(
                             height: 10,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withOpacity(0.3),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(5),
                               border: Border.all(
                                 color:
-                                    const Color(0xFF10B981).withOpacity(0.2),
+                                    const Color(0xFF10B981).withValues(alpha: 0.2),
                               ),
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(5),
-                              child: LinearProgressIndicator(
+                              child: const LinearProgressIndicator(
                                 value: 0.685,
                                 backgroundColor: Colors.transparent,
-                                valueColor:
-                                    const AlwaysStoppedAnimation<Color>(
+                                valueColor: AlwaysStoppedAnimation<Color>(
                                   Color(0xFF10B981),
                                 ),
                               ),
@@ -275,20 +265,19 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
                           Container(
                             height: 10,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(0.3),
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(5),
                               border: Border.all(
                                 color:
-                                    const Color(0xFFEF4444).withOpacity(0.2),
+                                    const Color(0xFFEF4444).withValues(alpha: 0.2),
                               ),
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(5),
-                              child: LinearProgressIndicator(
+                              child: const LinearProgressIndicator(
                                 value: 0.315,
                                 backgroundColor: Colors.transparent,
-                                valueColor:
-                                    const AlwaysStoppedAnimation<Color>(
+                                valueColor: AlwaysStoppedAnimation<Color>(
                                   Color(0xFFEF4444),
                                 ),
                               ),
@@ -317,9 +306,9 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: Colors.white.withValues(alpha: 0.04),
               border: Border.all(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -335,13 +324,12 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildStatRow('Total Trades', '43', Colors.white),
-                _buildStatRow('Avg Win', '+156 pips', const Color(0xFF10B981)),
-                _buildStatRow('Avg Loss', '-92 pips', const Color(0xFFEF4444)),
-                _buildStatRow('Best Trade', '+428 pips', const Color(0xFF10B981)),
-                _buildStatRow(
-                    'Worst Trade', '-245 pips', const Color(0xFFEF4444)),
-                _buildStatRow('Profit/Loss', '+\$3,450', const Color(0xFF10B981)),
+                _buildStatRow('Total Trades', '43', AppColors.textSecondary),
+                _buildStatRow('Avg Win', '+156 pips', AppColors.successGreen),
+                _buildStatRow('Avg Loss', '-92 pips', AppColors.errorRed),
+                _buildStatRow('Best Trade', '+428 pips', AppColors.successGreen),
+                _buildStatRow('Worst Trade', '-245 pips', AppColors.errorRed),
+                _buildStatRow('Profit/Loss', '+\$3,450', AppColors.successGreen),
               ],
             ),
           ),
@@ -362,18 +350,18 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            color.withOpacity(0.15),
-            color.withOpacity(0.05),
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.05),
           ],
         ),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
           width: 1,
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             blurRadius: 12,
             spreadRadius: 2,
           ),
@@ -404,7 +392,7 @@ class _PerformanceAnalyticsState extends State<PerformanceAnalytics> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.white,

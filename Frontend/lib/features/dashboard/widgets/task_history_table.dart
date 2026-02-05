@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../providers/task_provider.dart';
 import '../../../core/models/task.dart';
+import '../../../core/theme/app_colors.dart';
 
 class TaskHistoryTable extends StatelessWidget {
   const TaskHistoryTable({super.key});
@@ -14,12 +15,19 @@ class TaskHistoryTable extends StatelessWidget {
         final completedTasks = taskProvider.completedTasks;
 
         return Container(
+          constraints: const BoxConstraints(minHeight: 180),
           decoration: BoxDecoration(
-            color: Colors.white,
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.06),
+                Colors.white.withValues(alpha: 0.02),
+              ],
+            ),
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.2),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -39,6 +47,7 @@ class TaskHistoryTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -54,7 +63,7 @@ class TaskHistoryTable extends StatelessWidget {
                       'No completed tasks yet',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.black54,
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ),
@@ -64,37 +73,52 @@ class TaskHistoryTable extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     headingRowColor: MaterialStateProperty.all(
-                      Colors.grey.shade50,
+                      Colors.white.withValues(alpha: 0.04),
                     ),
                     columns: const [
                       DataColumn(
                         label: Text(
                           'Task',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
                           'Status',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
                           'Priority',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
                           'Completed',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
                           'Actions',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -113,7 +137,10 @@ class TaskHistoryTable extends StatelessWidget {
                       onPressed: () {
                         // TODO: Navigate to full history page
                       },
-                      child: const Text('View All History'),
+                      child: const Text(
+                        'View All History',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
                     ),
                   ),
                 ),
@@ -142,7 +169,10 @@ class TaskHistoryTable extends StatelessWidget {
                 child: Text(
                   task.title,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -154,7 +184,7 @@ class TaskHistoryTable extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: _getStatusColor(task.status).withOpacity(0.1),
+              color: _getStatusColor(task.status).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -171,8 +201,12 @@ class TaskHistoryTable extends StatelessWidget {
         // Priority
         DataCell(
           Text(
-            _formatDate(task.endTime),
-            style: const TextStyle(fontSize: 14),
+            _getPriorityText(task.priority),
+            style: TextStyle(
+              fontSize: 14,
+              color: _getPriorityColor(task.priority),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
 
@@ -180,7 +214,10 @@ class TaskHistoryTable extends StatelessWidget {
         DataCell(
           Text(
             _formatDate(task.endTime),
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
 
@@ -196,6 +233,7 @@ class TaskHistoryTable extends StatelessWidget {
                     // TODO: Download result
                   },
                   tooltip: 'Download',
+                  color: AppColors.textSecondary,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -206,13 +244,14 @@ class TaskHistoryTable extends StatelessWidget {
                     // TODO: View result
                   },
                   tooltip: 'View',
+                  color: AppColors.textSecondary,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
               ] else
                 const Text(
                   '-',
-                  style: TextStyle(color: Colors.grey),
+                  style: TextStyle(color: AppColors.textMuted),
                 ),
             ],
           ),
@@ -250,6 +289,28 @@ class TaskHistoryTable extends StatelessWidget {
       case TaskStatus.pending:
       default:
         return 'Pending';
+    }
+  }
+
+  String _getPriorityText(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.high:
+        return 'High';
+      case TaskPriority.medium:
+        return 'Medium';
+      case TaskPriority.low:
+        return 'Low';
+    }
+  }
+
+  Color _getPriorityColor(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.high:
+        return Colors.red;
+      case TaskPriority.medium:
+        return Colors.orange;
+      case TaskPriority.low:
+        return Colors.green;
     }
   }
 

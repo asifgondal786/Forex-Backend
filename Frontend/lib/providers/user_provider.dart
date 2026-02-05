@@ -28,7 +28,9 @@ class UserProvider with ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error fetching user: $e');
+      if (kDebugMode) {
+        debugPrint('Error fetching user: $e');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -52,7 +54,9 @@ class UserProvider with ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error updating user: $e');
+      if (kDebugMode) {
+        debugPrint('Error updating user: $e');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -93,7 +93,7 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         border: Border.all(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           width: 1,
         ),
         borderRadius: BorderRadius.circular(16),
@@ -101,8 +101,8 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.05),
-            Colors.white.withOpacity(0.02),
+            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.02),
           ],
         ),
       ),
@@ -110,31 +110,21 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '📰 Market News & Sentiment',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Financial news with market sentiment analysis',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          const Text(
+            'Market News and Sentiment',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Financial news with market sentiment analysis',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -156,11 +146,11 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
                       decoration: BoxDecoration(
                         color: _selectedCategory == index
                             ? const Color(0xFF3B82F6)
-                            : Colors.white.withOpacity(0.05),
+                            : Colors.white.withValues(alpha: 0.05),
                         border: Border.all(
                           color: _selectedCategory == index
                               ? const Color(0xFF3B82F6)
-                              : Colors.white.withOpacity(0.1),
+                              : Colors.white.withValues(alpha: 0.1),
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -190,7 +180,7 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
             separatorBuilder: (context, index) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Divider(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 height: 1,
               ),
             ),
@@ -205,9 +195,9 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: Colors.white.withValues(alpha: 0.04),
               border: Border.all(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -234,23 +224,23 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
                               borderRadius: BorderRadius.circular(4),
                               gradient: LinearGradient(
                                 colors: [
-                                  const Color(0xFFEF4444).withOpacity(0.3),
-                                  const Color(0xFFF59E0B).withOpacity(0.3),
-                                  const Color(0xFF3B82F6).withOpacity(0.3),
-                                  const Color(0xFF10B981).withOpacity(0.3),
+                                  const Color(0xFFEF4444).withValues(alpha: 0.3),
+                                  const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                                  const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                                  const Color(0xFF10B981).withValues(alpha: 0.3),
                                 ],
                               ),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                               ),
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
+                              child: const LinearProgressIndicator(
                                 value: 0.62,
                                 backgroundColor: Colors.transparent,
                                 valueColor:
-                                    const AlwaysStoppedAnimation<Color>(
+                                    AlwaysStoppedAnimation<Color>(
                                   Color(0xFF10B981),
                                 ),
                               ),
@@ -308,9 +298,9 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
                           ),
                           decoration: BoxDecoration(
                             color:
-                                const Color(0xFF10B981).withOpacity(0.15),
+                                const Color(0xFF10B981).withValues(alpha: 0.15),
                             border: Border.all(
-                              color: const Color(0xFF10B981).withOpacity(0.3),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.3),
                             ),
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -338,7 +328,6 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
   Widget _buildNewsItem(Map<String, dynamic> news, int index, bool isMobile) {
     return GestureDetector(
       onTap: () {
-        // Handle news item tap
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Opened: ${news['title']}'),
@@ -349,16 +338,15 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+          color: Colors.white.withValues(alpha: 0.03),
           border: Border.all(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title and Badges
             if (!isMobile)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,7 +411,6 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
               ),
             const SizedBox(height: 8),
 
-            // Excerpt
             Text(
               news['excerpt'],
               style: TextStyle(
@@ -435,7 +422,6 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
             ),
             const SizedBox(height: 8),
 
-            // Related Pairs and Footer
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -450,10 +436,10 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6).withOpacity(0.15),
+                          color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
                           border: Border.all(
                             color:
-                                const Color(0xFF3B82F6).withOpacity(0.3),
+                                const Color(0xFF3B82F6).withValues(alpha: 0.3),
                           ),
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -511,9 +497,9 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
         ),
         borderRadius: BorderRadius.circular(4),
       ),
@@ -535,9 +521,9 @@ class _NewsSentimentWidgetState extends State<NewsSentimentWidget> {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
         ),
         borderRadius: BorderRadius.circular(4),
       ),
