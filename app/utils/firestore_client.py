@@ -13,6 +13,16 @@ def _get_project_id() -> Optional[str]:
     return os.getenv("FIREBASE_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
 
 
+def _get_credential_source() -> str:
+    if os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"):
+        return "json"
+    if os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH"):
+        return "path"
+    if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        return "adc"
+    return "none"
+
+
 def _get_credentials():
     json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
     path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
@@ -53,3 +63,11 @@ def get_firestore_client():
 def verify_firebase_token(token: str) -> dict:
     init_firebase()
     return auth.verify_id_token(token)
+
+
+def get_firebase_config_status() -> dict:
+    return {
+        "credential_source": _get_credential_source(),
+        "project_id": _get_project_id(),
+        "initialized": bool(firebase_admin._apps),
+    }
