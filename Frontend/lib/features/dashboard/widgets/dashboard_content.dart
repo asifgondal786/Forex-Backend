@@ -1781,14 +1781,19 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'Access Forex.com + Limit Tasks + 24/7 Smart Alerts',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          const Expanded(
+            child: Text(
+              'Access Forex.com + Limit Tasks + 24/7 Smart Alerts',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
+          const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -1817,14 +1822,17 @@ class _DashboardContentState extends State<DashboardContent> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
-      child: Row(
-        children: [
-          _buildTickerItem('EUR/USD', '+0.41%', const Color(0xFF10B981)),
-          const SizedBox(width: 16),
-          _buildTickerItem('GBP/USD', '-0.15%', const Color(0xFFEF4444)),
-          const SizedBox(width: 16),
-          _buildTickerItem('USD/JPY', '+1.31%', const Color(0xFF10B981)),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildTickerItem('EUR/USD', '+0.41%', const Color(0xFF10B981)),
+            const SizedBox(width: 16),
+            _buildTickerItem('GBP/USD', '-0.15%', const Color(0xFFEF4444)),
+            const SizedBox(width: 16),
+            _buildTickerItem('USD/JPY', '+1.31%', const Color(0xFF10B981)),
+          ],
+        ),
       ),
     );
   }

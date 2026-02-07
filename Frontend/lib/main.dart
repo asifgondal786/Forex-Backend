@@ -10,10 +10,13 @@ import 'providers/user_provider.dart';
 import 'providers/theme_provider.dart';
 import 'helpers/mock_data_helper.dart';
 
-// Toggle this to switch between Firebase and API mode
-const bool useFirebase = true;
+// Toggle Firebase initialization (Auth/Storage/etc)
+const bool useFirebaseAuth = true;
 
-// Set to true for UI development without a backend. Overrides useFirebase.
+// Toggle Firestore-backed tasks on the client (backend is now the source of truth)
+const bool useFirestoreTasks = false;
+
+// Set to true for UI development without a backend. Overrides task/API usage.
 const bool useMockData = false;
 
 Future<void> main() async {
@@ -21,7 +24,7 @@ Future<void> main() async {
 
   // Initialize Firebase if enabled
   bool firebaseReady = false;
-  if (useFirebase) {
+  if (useFirebaseAuth) {
     try {
       await Firebase.initializeApp(
         options: FirebaseConfig.currentPlatform,
@@ -49,7 +52,7 @@ class ForexCompanionApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Initialize services
     final apiService = ApiService();
-    final firebaseService = (useFirebase && firebaseReady) ? FirebaseService() : null;
+    final firebaseService = (useFirebaseAuth && firebaseReady) ? FirebaseService() : null;
 
     return MultiProvider(
       providers: [
@@ -67,7 +70,7 @@ class ForexCompanionApp extends StatelessWidget {
             final provider = TaskProvider(
               apiService: apiService,
               firebaseService: firebaseService,
-              useFirebase: useFirebase && firebaseReady && !useMockData,
+              useFirebase: useFirestoreTasks && firebaseReady && !useMockData,
             );
             if (useMockData) {
               MockDataHelper.loadMockData(provider);

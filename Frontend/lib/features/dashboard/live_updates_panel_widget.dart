@@ -4,12 +4,7 @@ import '../../../services/live_updates_service.dart';
 import '../../../core/theme/app_colors.dart';
 
 class LiveUpdatesPanel extends StatefulWidget {
-  final String userId;
-  
-  const LiveUpdatesPanel({
-    Key? key,
-    required this.userId,
-  }) : super(key: key);
+  const LiveUpdatesPanel({super.key});
 
   @override
   State<LiveUpdatesPanel> createState() => _LiveUpdatesPanelState();
@@ -35,7 +30,7 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
   }
 
   void _initializeLiveUpdates() async {
-    await _liveService.connect(widget.userId);
+    await _liveService.connect();
     _liveService.subscribeToPairs(_watchedPairs);
     
     _liveService.updates.listen((update) {

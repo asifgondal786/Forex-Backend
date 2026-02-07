@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 class LiveUpdate {
   final String pair;
@@ -23,6 +25,10 @@ class LiveUpdate {
 
 class LiveUpdatesService {
   static const String _wsBaseUrl = 'ws://127.0.0.1:8080';
+  static const String _devUserId = String.fromEnvironment(
+    'DEV_USER_ID',
+    defaultValue: '',
+  );
 
   WebSocketChannel? _channel;
   final _updatesController = StreamController<LiveUpdate>.broadcast();
@@ -35,13 +41,38 @@ class LiveUpdatesService {
   bool get isConnected => _channel != null;
 
   /// Connect to live updates WebSocket (global stream).
-  Future<void> connect(String userId) async {
+  Future<void> connect() async {
     try {
       if (_channel != null) {
         await disconnect();
       }
 
-      final wsUrl = '$_wsBaseUrl/api/ws';
+      String? token;
+      try {
+        final user = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          token = await user.getIdToken();
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Live updates token fetch failed: $e');
+        }
+      }
+
+      final params = <String, String>{};
+      if (_devUserId.isNotEmpty) {
+        params['user_id'] = _devUserId;
+      }
+      if (token != null && token.isNotEmpty) {
+        params['token'] = token;
+      }
+      if (params.isEmpty) {
+        debugPrint('Live updates auth token missing. Connect aborted.');
+        _connectionController.add(false);
+        return;
+      }
+
+      final wsUrl = Uri.parse('$_wsBaseUrl/api/ws').replace(queryParameters: params).toString();
       debugPrint('Connecting to: $wsUrl');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));

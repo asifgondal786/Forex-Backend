@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../services/auth_service.dart';
+import '../../services/firebase_service.dart';
 import '../../core/widgets/app_background.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final AuthService _authService = AuthService();
+  final FirebaseService _firebaseService = FirebaseService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   
@@ -41,17 +41,17 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final response = await _authService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final user = await _firebaseService.signInWithEmail(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
 
       if (mounted) {
-        if (response.success && response.user != null) {
+        if (user != null) {
           debugPrint('✅ Login successful');
           widget.onLoginSuccess();
         } else {
-          setState(() => _errorMessage = response.message);
+          setState(() => _errorMessage = 'Invalid email or password');
         }
       }
     } catch (e) {

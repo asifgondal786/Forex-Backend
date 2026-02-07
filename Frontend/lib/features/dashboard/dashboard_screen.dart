@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/task_provider.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/dashboard_content.dart';
-import 'widgets/live_updates_panel.dart';
+import 'live_updates_panel_widget.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -28,12 +26,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             )
           : null,
-      body: Consumer<TaskProvider>(
-        builder: (context, taskProvider, _) {
-          final activeTasks = taskProvider.activeTasks;
-          final selectedTaskId =
-              activeTasks.isNotEmpty ? activeTasks.first.id : null;
-
+      body: Builder(
+        builder: (context) {
           if (isMobile) {
             // Mobile Layout - Single column with vertical scrolling
             return SingleChildScrollView(
@@ -94,8 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // Main Content
                   const DashboardContent(),
                   // Live Panel at bottom
-                  if (selectedTaskId != null)
-                    LiveUpdatesPanel(taskId: selectedTaskId),
+                  const LiveUpdatesPanel(),
                 ],
               ),
             );
@@ -112,18 +105,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: DashboardContent(),
                 ),
                 // Live Panel on right (if task selected)
-                if (selectedTaskId != null)
-                  Container(
-                    width: 280,
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(
-                          color: Colors.white.withOpacity(0.1),
-                        ),
+                Container(
+                  width: 280,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
                       ),
                     ),
-                    child: LiveUpdatesPanel(taskId: selectedTaskId),
                   ),
+                  child: const LiveUpdatesPanel(),
+                ),
               ],
             );
           } else {
@@ -140,21 +132,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
 
                 // Right Live Updates Panel (conditionally displayed)
-                if (selectedTaskId != null)
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: Colors.white.withOpacity(0.1),
-                            width: 1,
-                          ),
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
                         ),
                       ),
-                      child: LiveUpdatesPanel(taskId: selectedTaskId),
                     ),
+                    child: const LiveUpdatesPanel(),
                   ),
+                ),
               ],
             );
           }

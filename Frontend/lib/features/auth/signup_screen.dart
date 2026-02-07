@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../services/auth_service.dart';
+import '../../services/firebase_service.dart';
+import '../../core/models/user.dart' as app_user;
 import '../../core/widgets/app_background.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final AuthService _authService = AuthService();
+  final FirebaseService _firebaseService = FirebaseService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -75,24 +76,29 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      final response = await _authService.signup(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        username: _usernameController.text.trim(),
-        fullName: _fullNameController.text.trim(),
+      final user = await _firebaseService.signUpWithEmail(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
 
       if (mounted) {
-        if (response.success && response.user != null) {
-          debugPrint('✅ Signup successful');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Account created! Please login.')),
-            );
-            Navigator.pop(context);
-          }
+        if (user != null) {
+          final appUser = app_user.User(
+            id: user.uid,
+            name: _fullNameController.text.trim(),
+            email: _emailController.text.trim(),
+            createdAt: DateTime.now(),
+            preferences: {'username': _usernameController.text.trim()},
+          );
+          await _firebaseService.createUserDocument(appUser);
+
+          debugPrint('Signup successful');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Account created! Please login.')),
+          );
+          Navigator.pop(context);
         } else {
-          setState(() => _errorMessage = response.message);
+          setState(() => _errorMessage = 'Signup failed');
         }
       }
     } catch (e) {

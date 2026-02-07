@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../core/models/user.dart';
 import '../services/api_service.dart';
 
@@ -24,6 +25,14 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      const devUserId = String.fromEnvironment('DEV_USER_ID', defaultValue: '');
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null && devUserId.isEmpty) {
+        _isLoading = false;
+        _error = null;
+        notifyListeners();
+        return;
+      }
       _user = await _apiService.getCurrentUser();
       _error = null;
     } catch (e) {

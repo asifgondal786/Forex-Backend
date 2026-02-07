@@ -1,15 +1,70 @@
 """
 Complete WebSocket Routes with Live Forex Data Integration
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+import os
+import time
+from collections import defaultdict, deque
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
 
 from .enhanced_websocket_manager import ws_manager
 from .forex_data_service import forex_service
+from .security import get_current_user_id
+from .utils.firestore_client import verify_firebase_token
 
-router = APIRouter(prefix="/api", tags=["Live Updates"])
+router = APIRouter(prefix="/api", tags=["Live Updates"], dependencies=[Depends(get_current_user_id)])
+
+_ws_rate_limit_max = int(os.getenv("WS_CONN_MAX", "30"))
+_ws_rate_limit_window = int(os.getenv("WS_CONN_WINDOW_SECONDS", "60"))
+_ws_rate_limit_store = defaultdict(deque)
+
+
+def _ws_rate_limit_ok(websocket: WebSocket) -> bool:
+    client_host = websocket.client.host if websocket.client else "unknown"
+    now = time.time()
+    window_start = now - _ws_rate_limit_window
+    bucket = _ws_rate_limit_store[client_host]
+    while bucket and bucket[0] <= window_start:
+        bucket.popleft()
+    if len(bucket) >= _ws_rate_limit_max:
+        return False
+    bucket.append(now)
+    return True
+
+
+def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
+    auth_header = websocket.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header.split(" ", 1)[1].strip()
+    token = websocket.query_params.get("token")
+    if token:
+        return token
+    return None
+
+
+def _extract_dev_user(websocket: WebSocket) -> Optional[str]:
+    if os.getenv("ALLOW_DEV_USER_ID", "").lower() != "true":
+        return None
+    return websocket.headers.get("x-user-id") or websocket.query_params.get("user_id")
+
+
+async def _require_ws_auth(websocket: WebSocket):
+    dev_user = _extract_dev_user(websocket)
+    if dev_user:
+        return dev_user, None, True
+
+    token = _extract_ws_token(websocket)
+    if not token:
+        return None, None, False
+
+    try:
+        decoded = verify_firebase_token(token)
+    except Exception:
+        return None, None, False
+
+    return decoded.get("uid") or decoded.get("user_id"), token, False
 
 
 class UpdateRequest(BaseModel):
@@ -30,10 +85,26 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
     Connect to: ws://localhost:8080/api/ws/{task_id}
     """
+    if not _ws_rate_limit_ok(websocket):
+        await websocket.close(code=4408)
+        return
+
+    user_id, token, is_dev = await _require_ws_auth(websocket)
+    if not user_id:
+        await websocket.close(code=4401)
+        return
+
     await ws_manager.connect(websocket, task_id)
     try:
         while True:
             data = await websocket.receive_text()
+            if not is_dev:
+                try:
+                    verify_firebase_token(token)
+                except Exception:
+                    await websocket.close(code=4401)
+                    return
+
             if data == "ping":
                 await websocket.send_text("pong")
             else:
@@ -57,10 +128,26 @@ async def websocket_global(websocket: WebSocket):
 
     Connect to: ws://localhost:8080/api/ws
     """
+    if not _ws_rate_limit_ok(websocket):
+        await websocket.close(code=4408)
+        return
+
+    user_id, token, is_dev = await _require_ws_auth(websocket)
+    if not user_id:
+        await websocket.close(code=4401)
+        return
+
     await ws_manager.connect(websocket, "global")
     try:
         while True:
             data = await websocket.receive_text()
+            if not is_dev:
+                try:
+                    verify_firebase_token(token)
+                except Exception:
+                    await websocket.close(code=4401)
+                    return
+
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:

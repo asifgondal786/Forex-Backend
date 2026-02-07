@@ -2,11 +2,10 @@ import 'dialogs/create_task_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../providers/task_provider.dart';
 import '../../providers/user_provider.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/dashboard_content.dart';
-import 'widgets/live_updates_panel.dart';
+import 'live_updates_panel_widget.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/trust_bar.dart';
 import 'widgets/ai_status_banner.dart';
@@ -110,11 +109,8 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
               ),
             )
           : null,
-      body: Consumer2<TaskProvider, UserProvider>(
-        builder: (context, taskProvider, userProvider, _) {
-          final activeTasks = taskProvider.activeTasks;
-          final selectedTaskId =
-              activeTasks.isNotEmpty ? activeTasks.first.id : null;
+      body: Consumer<UserProvider>(
+        builder: (context, userProvider, _) {
           final isLoggedIn = userProvider.user != null;
           final userName = userProvider.user?.name ?? 'User';
 
@@ -205,8 +201,8 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
                       // Main Content
                       DashboardContent(),
                       // Live Panel
-                      if (selectedTaskId != null)
-                        LiveUpdatesPanel(taskId: selectedTaskId),
+                      if (isLoggedIn)
+                        const LiveUpdatesPanel(),
                     ],
                   ),
                 ),
@@ -230,7 +226,7 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
                     Expanded(
                       child: DashboardContent(),
                     ),
-                    if (selectedTaskId != null)
+                    if (isLoggedIn)
                       Container(
                         width: 280,
                         decoration: BoxDecoration(
@@ -240,7 +236,7 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
                             ),
                           ),
                         ),
-                        child: LiveUpdatesPanel(taskId: selectedTaskId),
+                        child: const LiveUpdatesPanel(),
                       ),
                   ],
                 ),
@@ -265,7 +261,7 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
                             flex: 3,
                             child: DashboardContent(),
                           ),
-                          if (selectedTaskId != null)
+                          if (isLoggedIn)
                             Expanded(
                               flex: 1,
                               child: Container(
@@ -277,8 +273,7 @@ class _DashboardScreenEnhancedState extends State<DashboardScreenEnhanced> {
                                     ),
                                   ),
                                 ),
-                                child:
-                                    LiveUpdatesPanel(taskId: selectedTaskId),
+                                child: const LiveUpdatesPanel(),
                               ),
                             ),
                         ],

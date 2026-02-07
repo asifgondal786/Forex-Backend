@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
+
+from .security import get_token_claims
 
 # Pydantic models for data validation and response shapes
 class User(BaseModel):
@@ -10,25 +12,46 @@ class User(BaseModel):
     name: str
     created_at: datetime
     preferences: Optional[dict] = None
-    avatarUrl: Optional[str] = None # Added to match original model
+    avatar_url: Optional[str] = None
 
 class UserUpdateRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     preferences: Optional[dict] = None
 
-# This is a dummy user database for demonstration.
-# In a real application, you would fetch this from a database.
-mock_users = {
-    "user_123": {
-        "id": "user-123",
-        "email": "demo@forexcompanion.com",
-        "name": "Demo User",
-        "created_at": "2026-01-17T00:00:00",
-        "avatarUrl": "https://i.pravatar.cc/150",
-        "preferences": {},
-    }
-}
+# In-memory user store (replace with Firestore or DB in production)
+users_db = {}
+
+
+async def get_current_user(
+    claims: dict = Depends(get_token_claims),
+) -> dict:
+    user_id = claims.get("uid") or claims.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid Firebase token payload")
+
+    email = claims.get("email") or ""
+    name = claims.get("name") or (email.split("@")[0] if email else "User")
+
+    user = users_db.get(user_id)
+    if not user:
+        user = {
+            "id": user_id,
+            "email": email,
+            "name": name,
+            "created_at": datetime.utcnow().isoformat(),
+            "avatar_url": None,
+            "preferences": {},
+        }
+        users_db[user_id] = user
+    else:
+        if email:
+            user["email"] = email
+        if name:
+            user["name"] = name
+        users_db[user_id] = user
+
+    return user
 
 router = APIRouter(
     prefix="/api/users",
@@ -36,52 +59,38 @@ router = APIRouter(
 )
 
 @router.get("/me", response_model=User)
-async def read_current_user(authorization: Optional[str] = Header(None)):
+async def read_current_user(current_user: dict = Depends(get_current_user)):
     """
     Get the current authenticated user.
 
     In a real app, you would get the user based on an auth token.
     """
-    # TODO: Implement JWT token verification
-    user_id = "user_123"  # In production, extract from JWT token
-
-    if user_id not in mock_users:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return mock_users[user_id]
+    return current_user
 
 @router.put("/me", response_model=User)
 async def update_current_user(
     user_update: UserUpdateRequest,
-    authorization: Optional[str] = Header(None)
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Update current user information.
 
     Allows users to update their profile information.
     """
-    # TODO: Implement JWT token verification
-    user_id = "user_123"  # In production, extract from JWT token
+    def _normalize_avatar(data):
+        if "avatar_url" in data:
+            return data
+        if "avatarUrl" in data:
+            data["avatar_url"] = data.pop("avatarUrl")
+        return data
 
-    if user_id not in mock_users:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Update user data
-    current_user = mock_users[user_id]
-    # Get update data, excluding fields that were not set and fields that are None.
+    user_id = current_user["id"]
     update_data = user_update.model_dump(exclude_unset=True, exclude_none=True)
-
-    # Update the user's data dictionary
-    current_user.update(update_data)
-
-    return current_user
+    update_data = _normalize_avatar(update_data)
+    users_db[user_id] = _normalize_avatar({**current_user, **update_data})
+    return users_db[user_id]
 
 @router.get("/me/preferences")
-async def get_user_preferences(authorization: Optional[str] = Header(None)):
+async def get_user_preferences(current_user: dict = Depends(get_current_user)):
     """Get user preferences"""
-    user_id = "user_123"
-
-    if user_id not in mock_users:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return mock_users[user_id].get("preferences", {})
+    return current_user.get("preferences", {})
