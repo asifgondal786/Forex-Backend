@@ -2,20 +2,79 @@
 AI Task Processing Routes
 Handles "Assign New Task" functionality with full AI capabilities
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Header
+from pydantic import BaseModel, Field, ConfigDict
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict
 from datetime import datetime
+import os
 import uuid
 import asyncio
 
 from .ai_forex_engine import ai_engine
 from .enhanced_websocket_manager import ws_manager
+from .utils.firestore_client import verify_firebase_token
+
+security = HTTPBearer(auto_error=False)
+
+async def get_current_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    x_user_id: Optional[str] = Header(default=None),
+) -> str:
+    allow_dev = os.getenv("ALLOW_DEV_USER_ID", "").lower() == "true"
+    if x_user_id and allow_dev:
+        return x_user_id
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Authorization header",
+        )
+
+    try:
+        decoded = verify_firebase_token(credentials.credentials)
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Firebase token",
+        )
+
+    user_id = decoded.get("uid") or decoded.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Firebase token payload",
+        )
+
+    return user_id
 
 router = APIRouter(prefix="/api/tasks", tags=["AI Tasks"])
 
 # In-memory task store (replace with DB in production)
 TASKS_DB: Dict[str, Dict] = {}
+
+
+_activity_logger = None
+
+async def _log_activity(user_id: str, message: str, activity_type: str = "monitor", emoji: str = None, color: str = None):
+    if not user_id:
+        return
+    global _activity_logger
+    try:
+        if _activity_logger is None:
+            from .services.engagement_activity_service import EngagementActivityService
+            _activity_logger = EngagementActivityService()
+        await asyncio.to_thread(
+            _activity_logger.log_activity,
+            user_id,
+            activity_type,
+            message,
+            emoji,
+            color,
+        )
+    except Exception as exc:
+        print(f"Activity log failed: {exc}")
+
 
 
 def _now_iso() -> str:
@@ -49,6 +108,9 @@ def _complete_step(task_id: str, step_name: str):
 # ============================================================================
 
 class TaskCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_id: Optional[str] = Field(default=None, alias="userId")
     title: str
     description: str
     task_type: str  # "market_analysis", "auto_trade", "forecast", "portfolio_monitor"
@@ -164,7 +226,8 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
                 task_id=task_id,
                 message=f"✅ Analyzed {pair}: {signal.action} signal with {signal.confidence:.0%} confidence",
                 update_type="info",
-                data=analysis_results[pair]
+                data=analysis_results[pair],
+                user_id=params.user_id
             )
         
         _complete_step(task_id, "Analyze Markets")
@@ -184,6 +247,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
         # Step 4: Complete
         await ws_manager.send_task_complete(
             task_id=task_id,
+            user_id=params.user_id,
             result={
                 "summary": f"Analysis complete for {len(params.currency_pairs)} pairs",
                 "file_url": f"/downloads/{task_id}_market_analysis.pdf",
@@ -198,9 +262,14 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
             endTime=_now_iso(),
             resultFileUrl=f"/downloads/{task_id}_market_analysis.pdf"
         )
+        await _log_activity(
+            user_id=params.user_id,
+            message=f"Task completed: {params.title}",
+            activity_type="decision",
+        )
         
     except Exception as e:
-        await ws_manager.send_error(task_id, str(e))
+        await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         _update_task(task_id, status="failed", endTime=_now_iso())
     finally:
         await ai_engine.close()
@@ -273,7 +342,8 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                             task_id=task_id,
                             message=f"🤖 AUTO-TRADE: {signal.action} {pair} at {signal.entry_price:.4f}",
                             update_type="success",
-                            data=trade_result
+                            data=trade_result,
+                            user_id=params.user_id
                         )
                         _complete_step(task_id, "Execute Trades")
             
@@ -286,7 +356,8 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                     task_id=task_id,
                     message=f"{profit_emoji} Position closed: {trade['pair']} | Profit: ${trade['profit']:.2f}",
                     update_type="success" if trade["profit"] > 0 else "warning",
-                    data=trade
+                    data=trade,
+                    user_id=params.user_id
                 )
                 _complete_step(task_id, "Manage Positions")
             
@@ -303,6 +374,7 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
         # Task completion
         await ws_manager.send_task_complete(
             task_id=task_id,
+            user_id=params.user_id,
             result={
                 "summary": "Auto-trading session completed",
                 "trades_executed": 5,
@@ -316,9 +388,14 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             endTime=_now_iso(),
             resultFileUrl=f"/downloads/{task_id}_trading_report.pdf"
         )
+        await _log_activity(
+            user_id=params.user_id,
+            message=f"Task completed: {params.title}",
+            activity_type="decision",
+        )
         
     except Exception as e:
-        await ws_manager.send_error(task_id, str(e))
+        await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         _update_task(task_id, status="failed", endTime=_now_iso())
     finally:
         await ai_engine.close()
@@ -371,13 +448,15 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
                 task_id=task_id,
                 message=f"📊 {pair}: Predicted {forecast['expected_change_percent']:+.2f}% change in next {params.forecast_horizon_hours}h",
                 update_type="info",
-                data=forecast
+                data=forecast,
+                user_id=params.user_id
             )
         
         _complete_step(task_id, "Generate Predictions")
 
         await ws_manager.send_task_complete(
             task_id=task_id,
+            user_id=params.user_id,
             result={
                 "summary": f"Forecasts generated for {len(params.currency_pairs)} pairs",
                 "forecasts": forecasts,
@@ -391,9 +470,14 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
             endTime=_now_iso(),
             resultFileUrl=f"/downloads/{task_id}_forecasts.pdf"
         )
+        await _log_activity(
+            user_id=params.user_id,
+            message=f"Task completed: {params.title}",
+            activity_type="decision",
+        )
         
     except Exception as e:
-        await ws_manager.send_error(task_id, str(e))
+        await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         _update_task(task_id, status="failed", endTime=_now_iso())
     finally:
         await ai_engine.close()
@@ -406,7 +490,8 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
 @router.post("/create", response_model=TaskResponse)
 async def create_task(
     task: TaskCreateRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Create and execute an AI-powered forex task
@@ -419,6 +504,12 @@ async def create_task(
     """
     
     task_id = str(uuid.uuid4())
+    task = task.model_copy(update={"user_id": user_id})
+    await _log_activity(
+        user_id=user_id,
+        message=f"Task created: {task.title}",
+        activity_type="monitor",
+    )
     
     # Define task steps based on type
     steps_map = {
@@ -461,7 +552,7 @@ async def create_task(
 
     TASKS_DB[task_id] = {
         "id": task_id,
-        "userId": None,
+        "userId": task.user_id,
         "title": task.title,
         "description": task.description,
         "status": "running",
@@ -489,54 +580,59 @@ async def create_task(
 
 
 @router.get("/")
-async def list_tasks(user_id: Optional[str] = None):
+async def list_tasks(user_id: Optional[str] = None, current_user_id: str = Depends(get_current_user_id)):
     """List tasks (in-memory)"""
-    tasks = list(TASKS_DB.values())
-    if user_id:
-        tasks = [t for t in tasks if t.get("userId") == user_id]
+    if user_id and user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    tasks = [t for t in TASKS_DB.values() if t.get("userId") == current_user_id]
     return {"tasks": tasks, "total": len(tasks)}
 
 
 @router.get("/{task_id}")
-async def get_task(task_id: str):
+async def get_task(task_id: str, current_user_id: str = Depends(get_current_user_id)):
     """Get task status and details"""
     task = TASKS_DB.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.get("userId") != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     return task
 
 
 @router.post("/{task_id}/stop")
-async def stop_task(task_id: str):
+async def stop_task(task_id: str, user_id: str = Depends(get_current_user_id)):
     """Stop a running task"""
     await ws_manager.send_update(
         task_id=task_id,
         message="Task stopped by user",
-        update_type="warning"
+        update_type="warning",
+        user_id=user_id
     )
     updated = _update_task(task_id, status="paused", endTime=_now_iso())
     return updated or {"message": "Task stopped", "task_id": task_id}
 
 
 @router.post("/{task_id}/pause")
-async def pause_task(task_id: str):
+async def pause_task(task_id: str, user_id: str = Depends(get_current_user_id)):
     """Pause a running task"""
     await ws_manager.send_update(
         task_id=task_id,
         message="Task paused by user",
-        update_type="warning"
+        update_type="warning",
+        user_id=user_id
     )
     updated = _update_task(task_id, status="paused")
     return updated or {"message": "Task paused", "task_id": task_id}
 
 
 @router.post("/{task_id}/resume")
-async def resume_task(task_id: str):
+async def resume_task(task_id: str, user_id: str = Depends(get_current_user_id)):
     """Resume a paused task"""
     await ws_manager.send_update(
         task_id=task_id,
         message="Task resumed by user",
-        update_type="info"
+        update_type="info",
+        user_id=user_id
     )
     updated = _update_task(task_id, status="running")
     return updated or {"message": "Task resumed", "task_id": task_id}

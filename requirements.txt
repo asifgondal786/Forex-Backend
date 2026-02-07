@@ -1,4 +1,4 @@
-# FastAPI and Web Framework
+﻿# FastAPI and Web Framework
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.19
@@ -29,4 +29,7 @@ PyJWT==2.8.1
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 email-validator==2.1.0
+
+# Firebase
+firebase-admin==6.5.0
 

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Enhanced WebSocket Manager with Live Forex Data Integration
 """
 from fastapi import WebSocket, WebSocketDisconnect
@@ -6,6 +6,7 @@ from typing import Dict, Set, Optional
 import asyncio
 import uuid
 from datetime import datetime
+import os
 
 
 class EnhancedWebSocketManager:
@@ -18,6 +19,9 @@ class EnhancedWebSocketManager:
         self.all_connections: Set[WebSocket] = set()
         # Track streaming tasks
         self.streaming_tasks: Dict[str, asyncio.Task] = {}
+        # Engagement logging (Firestore)
+        self.engagement_logging_enabled = os.getenv("ENABLE_ENGAGEMENT_LOGGING", "").lower() != "false"
+        self._activity_logger = None
 
     async def connect(self, websocket: WebSocket, task_id: str = "global"):
         """Accept a new WebSocket connection"""
@@ -63,7 +67,9 @@ class EnhancedWebSocketManager:
         update_type: str = "info",
         progress: Optional[float] = None,
         data: Optional[dict] = None,
-        websocket: Optional[WebSocket] = None
+        websocket: Optional[WebSocket] = None,
+        user_id: Optional[str] = None,
+        activity_type: Optional[str] = None,
     ):
         """Send an update to specific task connections or single websocket"""
         update = {
@@ -75,6 +81,14 @@ class EnhancedWebSocketManager:
             "progress": progress,
             "data": data
         }
+
+        await self._maybe_log_activity(
+            user_id=user_id,
+            update_type=update_type,
+            message=message,
+            data=data,
+            activity_type=activity_type,
+        )
 
         try:
             if websocket:
@@ -89,6 +103,60 @@ class EnhancedWebSocketManager:
                         self.disconnect(connection, task_id)
         except Exception as e:
             print(f"Error in send_update: {e}")
+
+    async def _maybe_log_activity(
+        self,
+        user_id: Optional[str],
+        update_type: str,
+        message: str,
+        data: Optional[dict] = None,
+        activity_type: Optional[str] = None,
+    ):
+        if not user_id or not self.engagement_logging_enabled:
+            return
+        if update_type == "progress":
+            return
+        if not self._has_firebase_config():
+            return
+
+        activity = activity_type or self._map_update_type(update_type, data)
+        emoji = data.get("emoji") if isinstance(data, dict) else None
+        color = data.get("color") if isinstance(data, dict) else None
+
+        try:
+            if self._activity_logger is None:
+                from .services.engagement_activity_service import EngagementActivityService
+                self._activity_logger = EngagementActivityService()
+
+            await asyncio.to_thread(
+                self._activity_logger.log_activity,
+                user_id,
+                activity,
+                message,
+                emoji,
+                color,
+            )
+        except Exception as e:
+            print(f"Activity log failed: {e}")
+
+    def _map_update_type(self, update_type: str, data: Optional[dict]) -> str:
+        if isinstance(data, dict):
+            explicit = data.get("activity_type")
+            if explicit:
+                return explicit
+
+        if update_type == "success":
+            return "decision"
+        if update_type in {"warning", "error"}:
+            return "alert"
+        return "monitor"
+
+    def _has_firebase_config(self) -> bool:
+        return bool(
+            os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+            or os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+            or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        )
 
     async def broadcast(self, message: str, update_type: str = "info", data: Optional[dict] = None):
         """Broadcast a message to all connected clients"""
@@ -131,22 +199,24 @@ class EnhancedWebSocketManager:
             data={"step": step}
         )
 
-    async def send_task_complete(self, task_id: str, result: dict):
+    async def send_task_complete(self, task_id: str, result: dict, user_id: Optional[str] = None):
         """Send task completion notification"""
         await self.send_update(
             task_id=task_id,
             message="Task completed successfully!",
             update_type="success",
             progress=1.0,
-            data=result
+            data=result,
+            user_id=user_id
         )
 
-    async def send_error(self, task_id: str, error_message: str):
+    async def send_error(self, task_id: str, error_message: str, user_id: Optional[str] = None):
         """Send error notification"""
         await self.send_update(
             task_id=task_id,
             message=f"Error: {error_message}",
-            update_type="error"
+            update_type="error",
+            user_id=user_id
         )
 
     def get_connection_count(self, task_id: Optional[str] = None) -> int:
