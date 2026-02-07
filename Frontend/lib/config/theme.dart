@@ -89,14 +89,47 @@ class AppTheme {
         labelSmall: captionText,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accentCyan,
-          foregroundColor: Colors.white,
+        style: glassElevatedButtonStyle(
+          tintColor: accentCyan,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
+          borderRadius: 12,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: glassOutlinedButtonStyle(
+          tintColor: accentCyan,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          borderRadius: 12,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: glassTextButtonStyle(
+          tintColor: accentCyan,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          borderRadius: 10,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: glassIconButtonStyle(
+          tintColor: accentCyan,
+          borderRadius: 10,
+          padding: const EdgeInsets.all(6),
+        ),
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        indicator: BoxDecoration(
+          color: _glassFill(accentCyan, 0.18),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accentCyan.withOpacity(0.35), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: accentCyan.withOpacity(0.35),
+              blurRadius: 14,
+              spreadRadius: 0,
+            ),
+          ],
         ),
       ),
       cardTheme: CardThemeData(
@@ -127,6 +160,116 @@ class AppTheme {
         ),
       ),
     );
+  }
+
+  static ButtonStyle glassElevatedButtonStyle({
+    Color? tintColor,
+    Color? foregroundColor,
+    EdgeInsetsGeometry? padding,
+    double borderRadius = 12,
+    double fillOpacity = 0.14,
+    double glowOpacity = 0.35,
+    double elevation = 3,
+  }) {
+    final resolvedTint = tintColor ?? accentCyan;
+    final resolvedForeground = foregroundColor ?? Colors.white;
+
+    return ButtonStyle(
+      padding:
+          padding == null ? null : MaterialStateProperty.all(padding),
+      foregroundColor: MaterialStateProperty.resolveWith((states) {
+        if (states.contains(MaterialState.disabled)) {
+          return resolvedForeground.withOpacity(0.5);
+        }
+        return resolvedForeground;
+      }),
+      backgroundColor: MaterialStateProperty.resolveWith((states) {
+        final opacity =
+            states.contains(MaterialState.disabled) ? fillOpacity * 0.6 : fillOpacity;
+        return _glassFill(resolvedTint, opacity);
+      }),
+      shadowColor: MaterialStateProperty.all(
+        resolvedTint.withOpacity(glowOpacity),
+      ),
+      elevation: MaterialStateProperty.resolveWith((states) {
+        return states.contains(MaterialState.disabled) ? 0 : elevation;
+      }),
+      overlayColor:
+          MaterialStateProperty.all(resolvedTint.withOpacity(0.12)),
+      side: MaterialStateProperty.all(
+        BorderSide(color: resolvedTint.withOpacity(0.35), width: 1),
+      ),
+      shape: MaterialStateProperty.all(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+      ),
+    );
+  }
+
+  static ButtonStyle glassOutlinedButtonStyle({
+    Color? tintColor,
+    Color? foregroundColor,
+    EdgeInsetsGeometry? padding,
+    double borderRadius = 12,
+  }) {
+    final resolvedTint = tintColor ?? accentCyan;
+    return glassElevatedButtonStyle(
+      tintColor: resolvedTint,
+      foregroundColor: foregroundColor ?? resolvedTint,
+      padding: padding,
+      borderRadius: borderRadius,
+      fillOpacity: 0.06,
+      glowOpacity: 0.3,
+      elevation: 1,
+    ).copyWith(
+      side: MaterialStateProperty.all(
+        BorderSide(color: resolvedTint.withOpacity(0.4), width: 1.2),
+      ),
+    );
+  }
+
+  static ButtonStyle glassTextButtonStyle({
+    Color? tintColor,
+    Color? foregroundColor,
+    EdgeInsetsGeometry? padding,
+    double borderRadius = 10,
+  }) {
+    final resolvedTint = tintColor ?? accentCyan;
+    return glassElevatedButtonStyle(
+      tintColor: resolvedTint,
+      foregroundColor: foregroundColor ?? resolvedTint,
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      borderRadius: borderRadius,
+      fillOpacity: 0.04,
+      glowOpacity: 0.25,
+      elevation: 0,
+    ).copyWith(
+      side: MaterialStateProperty.all(
+        BorderSide(color: resolvedTint.withOpacity(0.25), width: 1),
+      ),
+    );
+  }
+
+  static ButtonStyle glassIconButtonStyle({
+    Color? tintColor,
+    EdgeInsetsGeometry? padding,
+    double borderRadius = 10,
+  }) {
+    final resolvedTint = tintColor ?? accentCyan;
+    return glassElevatedButtonStyle(
+      tintColor: resolvedTint,
+      padding: padding ?? const EdgeInsets.all(8),
+      borderRadius: borderRadius,
+      fillOpacity: 0.08,
+      glowOpacity: 0.3,
+      elevation: 2,
+    );
+  }
+
+  static Color _glassFill(Color tint, double opacity) {
+    final blended = Color.lerp(tint, Colors.white, 0.18) ?? tint;
+    return blended.withOpacity(opacity);
   }
 
   // Box Decorations

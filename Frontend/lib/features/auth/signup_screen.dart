@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
 import '../../core/widgets/app_background.dart';
@@ -281,17 +282,11 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: ElevatedButton(
                               onPressed:
                                   _isLoading ? null : _handleSignup,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    const Color(0xFF3B82F6),
-                                disabledBackgroundColor: const Color(0xFF3B82F6)
-                                    .withOpacity(0.5),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                shadowColor: const Color(0xFF3B82F6)
-                                    .withOpacity(0.4),
-                                elevation: _isLoading ? 0 : 8,
+                              style: AppTheme.glassElevatedButtonStyle(
+                                tintColor: const Color(0xFF3B82F6),
+                                foregroundColor: Colors.white,
+                                borderRadius: 12,
+                                elevation: _isLoading ? 0 : 4,
                               ),
                               child: _isLoading
                                   ? SizedBox(

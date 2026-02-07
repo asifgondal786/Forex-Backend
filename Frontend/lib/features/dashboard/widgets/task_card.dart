@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/models/task.dart';
@@ -192,11 +193,14 @@ class TaskCard extends StatelessWidget {
               },
               icon: const Icon(Icons.arrow_forward),
               label: const Text('Suggest Next Task'),
-              style: OutlinedButton.styleFrom(
+              style: AppTheme.glassOutlinedButtonStyle(
+                tintColor: AppColors.primaryBlue,
+                foregroundColor: AppColors.primaryBlue,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 12,
                 ),
+                borderRadius: 12,
               ),
             ),
           ],
@@ -211,9 +215,10 @@ class TaskCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.stop),
                   label: const Text('Stop'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                  style: AppTheme.glassElevatedButtonStyle(
+                    tintColor: Colors.red,
                     foregroundColor: Colors.white,
+                    fillOpacity: 0.18,
                   ),
                 ),
                 const SizedBox(width: 12),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:typed_data';
 import 'dart:html' as html;
@@ -120,10 +121,11 @@ class _ExportReportWidgetState extends State<ExportReportWidget> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _isExporting ? null : _exportReport,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B82F6),
-                    disabledBackgroundColor: Colors.grey[600],
+                  style: AppTheme.glassElevatedButtonStyle(
+                    tintColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    borderRadius: 12,
                   ),
                   icon: _isExporting
                       ? const SizedBox(
@@ -146,12 +148,11 @@ class _ExportReportWidgetState extends State<ExportReportWidget> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _generatePreview,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(
-                      color: Color(0xFF3B82F6),
-                      width: 1.5,
-                    ),
+                  style: AppTheme.glassOutlinedButtonStyle(
+                    tintColor: const Color(0xFF3B82F6),
+                    foregroundColor: const Color(0xFF3B82F6),
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    borderRadius: 12,
                   ),
                   icon: const Icon(Icons.preview),
                   label: const Text(

@@ -1,5 +1,6 @@
 import '../../core/utils/date_formatter.dart';
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 // import 'package:intl/intl.dart';
 import '../../core/models/task.dart';
@@ -80,8 +81,8 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                             },
                             icon: const Icon(Icons.add),
                             label: const Text('New Task'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryGreen,
+                            style: AppTheme.glassElevatedButtonStyle(
+                              tintColor: AppColors.primaryGreen,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 24,
@@ -390,7 +391,10 @@ class _TaskHistoryCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.stop, size: 18),
                   label: const Text('Stop'),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.stopButton),
+                  style: AppTheme.glassTextButtonStyle(
+                    tintColor: AppColors.stopButton,
+                    foregroundColor: AppColors.stopButton,
+                  ),
                 ),
               ],
               const Spacer(),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../core/models/task.dart';
 import '../core/models/user.dart';
 
@@ -16,14 +17,44 @@ class ApiException implements Exception {
 
 class ApiService {
   // Backend URL - matches your backend port
-  static const String baseUrl = 'http://127.0.0.1:8080';
+  // Use --dart-define=API_BASE_URL=http://your.server:port for production
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8080',
+  );
   static const Duration _timeout = Duration(seconds: 10);
+  static const String _devUserId = String.fromEnvironment(
+    'DEV_USER_ID',
+    defaultValue: '',
+  );
   
   final http.Client _client = http.Client();
 
-  Map<String, String> get _headers => {
+  Map<String, String> get _baseHeaders => {
         'Content-Type': 'application/json; charset=UTF-8',
       };
+
+  Future<Map<String, String>> _buildHeaders() async {
+    final headers = <String, String>{..._baseHeaders};
+
+    if (_devUserId.isNotEmpty) {
+      headers['X-User-Id'] = _devUserId;
+    }
+
+    try {
+      final user = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final token = await user.getIdToken();
+        headers['Authorization'] = 'Bearer $token';
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Auth header skipped: $e');
+      }
+    }
+
+    return headers;
+  }
 
   dynamic _handleResponse(http.Response response) {
     if (kDebugMode) {
@@ -46,9 +77,10 @@ class ApiService {
 
   Future<User> getCurrentUser() async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.get(
         Uri.parse('$baseUrl/api/users/me'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
       final data = _handleResponse(response);
       return User.fromJson(data);
@@ -64,9 +96,10 @@ class ApiService {
       if (name != null) body['name'] = name;
       if (email != null) body['email'] = email;
 
+      final headers = await _buildHeaders();
       final response = await _client.put(
         Uri.parse('$baseUrl/api/users/me'),
-        headers: _headers,
+        headers: headers,
         body: json.encode(body),
       ).timeout(_timeout);
       final data = _handleResponse(response);
@@ -80,9 +113,10 @@ class ApiService {
 
   Future<List<Task>> getTasks() async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.get(
         Uri.parse('$baseUrl/api/tasks/'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
 
       final data = _handleResponse(response);
@@ -104,9 +138,10 @@ class ApiService {
 
   Future<Task> getTask(String taskId) async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.get(
         Uri.parse('$baseUrl/api/tasks/$taskId'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
       final data = _handleResponse(response);
       return Task.fromJson(data);
@@ -134,9 +169,10 @@ class ApiService {
         debugPrint('Creating task: $body');
       }
 
+      final headers = await _buildHeaders();
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/create'),
-        headers: _headers,
+        headers: headers,
         body: json.encode(body),
       ).timeout(_timeout);
 
@@ -154,9 +190,10 @@ class ApiService {
 
   Future<Task> stopTask(String taskId) async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/$taskId/stop'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
       final data = _handleResponse(response);
       return Task.fromJson(data);
@@ -167,9 +204,10 @@ class ApiService {
 
   Future<Task> pauseTask(String taskId) async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/$taskId/pause'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
       return Task.fromJson(_handleResponse(response));
     } catch (e) {
@@ -179,9 +217,10 @@ class ApiService {
 
   Future<Task> resumeTask(String taskId) async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.post(
         Uri.parse('$baseUrl/api/tasks/$taskId/resume'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
       return Task.fromJson(_handleResponse(response));
     } catch (e) {
@@ -191,9 +230,10 @@ class ApiService {
 
   Future<void> deleteTask(String taskId) async {
     try {
+      final headers = await _buildHeaders();
       final response = await _client.delete(
         Uri.parse('$baseUrl/api/tasks/$taskId'),
-        headers: _headers,
+        headers: headers,
       ).timeout(_timeout);
       _handleResponse(response);
     } catch (e) {

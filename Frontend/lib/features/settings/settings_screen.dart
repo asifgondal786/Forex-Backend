@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_background.dart';
@@ -182,9 +183,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       onPressed: userProvider.isLoading
                                           ? null
                                           : _saveProfile,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            AppColors.primaryGreen,
+                                      style: AppTheme.glassElevatedButtonStyle(
+                                        tintColor: AppColors.primaryGreen,
+                                        foregroundColor: Colors.white,
                                       ),
                                       child: userProvider.isLoading
                                           ? const SizedBox(
@@ -402,7 +403,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.pop(context);
               Navigator.pushReplacementNamed(context, '/');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: AppTheme.glassElevatedButtonStyle(
+              tintColor: Colors.red,
+              foregroundColor: Colors.white,
+              fillOpacity: 0.18,
+            ),
             child: const Text('Log Out'),
           ),
         ],
@@ -428,7 +433,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // TODO: Implement account deletion
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: AppTheme.glassElevatedButtonStyle(
+              tintColor: Colors.red,
+              foregroundColor: Colors.white,
+              fillOpacity: 0.18,
+            ),
             child: const Text('Delete'),
           ),
         ],

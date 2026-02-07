@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import '../../../core/models/live_update.dart';
 import '../../../services/live_update_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -124,8 +125,11 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
                       icon: const Icon(Icons.more_vert, size: 20),
                       onPressed: () {},
                       color: AppColors.textSecondary,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      style: AppTheme.glassIconButtonStyle(
+                        tintColor: AppColors.primaryBlue,
+                        borderRadius: 8,
+                        padding: const EdgeInsets.all(4),
+                      ),
                     ),
                   ],
                 ),

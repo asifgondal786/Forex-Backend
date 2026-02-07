@@ -6,7 +6,10 @@ import 'dart:convert';
 import '../models/user_model.dart';
 
 class AuthService {
-  static const String _baseUrl = 'http://127.0.0.1:8080';
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8080',
+  );
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userKey = 'user_data';

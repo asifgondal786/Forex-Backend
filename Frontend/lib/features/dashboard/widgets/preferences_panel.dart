@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../providers/theme_provider.dart';
@@ -360,9 +361,11 @@ class _PreferencesPanelState extends State<PreferencesPanel> {
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
+              style: AppTheme.glassElevatedButtonStyle(
+                tintColor: const Color(0xFF3B82F6),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
+                borderRadius: 12,
               ),
               icon: const Icon(Icons.check),
               label: const Text(

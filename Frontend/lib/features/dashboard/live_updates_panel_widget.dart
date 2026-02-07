@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import '../../../services/live_updates_service.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -231,12 +232,11 @@ class _LiveUpdatesPanelState extends State<LiveUpdatesPanel> {
                 // Trade action
                 debugPrint('Trading $pair');
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+              style: AppTheme.glassElevatedButtonStyle(
+                tintColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                borderRadius: 8,
               ),
               child: const Text(
                 'Trade',

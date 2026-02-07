@@ -1,0 +1,55 @@
+﻿import json
+import os
+from typing import Optional
+
+import firebase_admin
+from firebase_admin import credentials, auth, firestore
+
+
+_firebase_initialized = False
+
+
+def _get_project_id() -> Optional[str]:
+    return os.getenv("FIREBASE_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
+
+
+def _get_credentials():
+    json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+
+    if json_str:
+        return credentials.Certificate(json.loads(json_str))
+    if path:
+        return credentials.Certificate(path)
+
+    return credentials.ApplicationDefault()
+
+
+def init_firebase():
+    global _firebase_initialized
+    if _firebase_initialized:
+        return
+    if firebase_admin._apps:
+        _firebase_initialized = True
+        return
+
+    cred = _get_credentials()
+    project_id = _get_project_id()
+    options = {"projectId": project_id} if project_id else None
+
+    if options:
+        firebase_admin.initialize_app(cred, options)
+    else:
+        firebase_admin.initialize_app(cred)
+
+    _firebase_initialized = True
+
+
+def get_firestore_client():
+    init_firebase()
+    return firestore.client()
+
+
+def verify_firebase_token(token: str) -> dict:
+    init_firebase()
+    return auth.verify_id_token(token)

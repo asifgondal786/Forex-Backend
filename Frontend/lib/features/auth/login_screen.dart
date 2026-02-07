@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
 import '../../core/widgets/app_background.dart';
@@ -239,23 +240,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(
                               width: double.infinity,
                               height: 54,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleLogin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF3B82F6),
-                                  disabledBackgroundColor:
-                                      const Color(0xFF3B82F6).withOpacity(0.5),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _handleLogin,
+                                  style: AppTheme.glassElevatedButtonStyle(
+                                    tintColor: const Color(0xFF3B82F6),
+                                    foregroundColor: Colors.white,
+                                    borderRadius: 12,
+                                    elevation: _isLoading ? 0 : 4,
                                   ),
-                                  shadowColor: const Color(0xFF3B82F6)
-                                      .withOpacity(0.4),
-                                  elevation: _isLoading ? 0 : 8,
-                                ),
-                                child: _isLoading
-                                    ? SizedBox(
-                                        height: 24,
-                                        width: 24,
+                                  child: _isLoading
+                                      ? SizedBox(
+                                          height: 24,
+                                          width: 24,
                                         child: CircularProgressIndicator(
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
@@ -294,14 +290,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                             'demo123456';
                                         await _handleLogin();
                                       },
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Colors.white.withOpacity(0.2),
-                                    width: 1.5,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                                style: AppTheme.glassOutlinedButtonStyle(
+                                  tintColor: const Color(0xFF3B82F6),
+                                  foregroundColor: const Color(0xFF3B82F6),
+                                  borderRadius: 12,
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Forex Companion - Complete FastAPI Application
 """
 from fastapi import FastAPI
@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from .users import router as users_router
 from .websocket_routes import router as websocket_router
 from .auth_routes import router as auth_router
+from .engagement_routes import router as engagement_router
 
 try:
     from .ai_task_routes import router as ai_task_router
@@ -67,6 +68,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(websocket_router)
+app.include_router(engagement_router)
 if AI_ROUTES_AVAILABLE:
     app.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
@@ -116,3 +118,5 @@ async def api_health():
         "ai_engine": "active" if AI_ROUTES_AVAILABLE else "disabled",
         "connections": ws_manager.get_connection_count()
     }
+
+

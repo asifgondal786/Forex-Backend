@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class AlertsRiskPanel extends StatefulWidget {
@@ -209,16 +210,13 @@ class _AlertsRiskPanelState extends State<AlertsRiskPanel> {
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white.withOpacity(0.08),
+              style: AppTheme.glassElevatedButtonStyle(
+                tintColor: AppTheme.accentCyan,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                ),
+                borderRadius: 10,
+                fillOpacity: 0.1,
+                elevation: 2,
               ),
               child: const Text('Clear All Alerts'),
             ),

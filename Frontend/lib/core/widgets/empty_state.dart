@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -61,14 +62,12 @@ class EmptyState extends StatelessWidget {
                 onPressed: onAction,
                 icon: const Icon(Icons.add),
                 label: Text(actionLabel!),
-                style: ElevatedButton.styleFrom(
+                style: AppTheme.glassElevatedButtonStyle(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
                     vertical: 16,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  borderRadius: 12,
                 ),
               ),
             ],

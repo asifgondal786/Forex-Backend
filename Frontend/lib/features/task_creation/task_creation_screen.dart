@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_background.dart';
@@ -411,13 +412,12 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               )
             : const Icon(Icons.auto_awesome, size: 20),
         label: Text(_isAiEnhancing ? 'AI is analyzing...' : '✨ Enhance with AI'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF3B82F6),
+        style: AppTheme.glassElevatedButtonStyle(
+          tintColor: const Color(0xFF3B82F6),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 6,
-          shadowColor: const Color(0xFF3B82F6).withOpacity(0.4),
+          borderRadius: 12,
+          elevation: 4,
         ),
       ),
     );
@@ -729,12 +729,11 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _isLoading ? null : _createTask,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryGreen,
+        style: AppTheme.glassElevatedButtonStyle(
+          tintColor: AppColors.primaryGreen,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          borderRadius: 12,
         ),
         child: _isLoading
             ? const SizedBox(

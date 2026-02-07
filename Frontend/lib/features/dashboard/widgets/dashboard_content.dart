@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -11,6 +12,7 @@ import 'forex_feed_widget.dart';
 import 'performance_analytics.dart';
 import 'news_sentiment_widget.dart';
 import 'ai_prediction_widget.dart';
+import '../../../shared/widgets/glassmorphism_card.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -87,18 +89,15 @@ class _DashboardContentState extends State<DashboardContent> {
               },
               icon: const Icon(Icons.add_circle),
               label: const Text('Create New Task'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
+              style: AppTheme.glassElevatedButtonStyle(
+                tintColor: const Color(0xFF3B82F6),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 8,
-                shadowColor: const Color(0xFF3B82F6).withValues(alpha: 0.4),
+                borderRadius: 10,
+                elevation: 4,
               ),
             )
                 .animate()
@@ -1303,32 +1302,29 @@ class _DashboardContentState extends State<DashboardContent> {
   Widget _buildTabButton(String label, int index, bool isMobile) {
     final isSelected = _selectedTab == index;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => setState(() => _selectedTab = index),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF3B82F6)
-                : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? const Color(0xFF3B82F6)
-                  : Colors.white.withValues(alpha: 0.1),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey[400],
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              fontSize: isMobile ? 12 : 13,
-              letterSpacing: 0.3,
+    return GlassmorphismCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 10,
+      blur: 14,
+      opacity: isSelected ? 0.18 : 0.08,
+      borderColor: const Color(0xFF3B82F6),
+      borderWidth: 1,
+      showGlow: isSelected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _selectedTab = index),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: isMobile ? 12 : 13,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ),
@@ -2120,13 +2116,11 @@ class _DashboardContentState extends State<DashboardContent> {
                   onPressed: () {},
                   icon: const Icon(Icons.link),
                   label: const Text('Connect Account'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
+                  style: AppTheme.glassElevatedButtonStyle(
+                    tintColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    borderRadius: 12,
                   ),
                 ),
               ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class AutomationPanel extends StatefulWidget {
@@ -266,15 +267,11 @@ class _AutomationPanelState extends State<AutomationPanel> {
                       : null,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Start Trading'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    disabledBackgroundColor:
-                        const Color(0xFF10B981).withOpacity(0.5),
+                  style: AppTheme.glassElevatedButtonStyle(
+                    tintColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    borderRadius: 10,
                   ),
                 ),
               ),
@@ -288,15 +285,11 @@ class _AutomationPanelState extends State<AutomationPanel> {
                       : null,
                   icon: const Icon(Icons.pause),
                   label: const Text('Pause'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
-                    disabledBackgroundColor:
-                        const Color(0xFFF59E0B).withOpacity(0.5),
+                  style: AppTheme.glassElevatedButtonStyle(
+                    tintColor: const Color(0xFFF59E0B),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    borderRadius: 10,
                   ),
                 ),
               ),
@@ -308,13 +301,12 @@ class _AutomationPanelState extends State<AutomationPanel> {
                   },
                   icon: const Icon(Icons.stop_circle),
                   label: const Text('Stop'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
+                  style: AppTheme.glassElevatedButtonStyle(
+                    tintColor: const Color(0xFFEF4444),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    borderRadius: 10,
+                    fillOpacity: 0.18,
                   ),
                 ),
               ),
@@ -505,8 +497,10 @@ class _AutomationPanelState extends State<AutomationPanel> {
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
+            style: AppTheme.glassElevatedButtonStyle(
+              tintColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+              borderRadius: 10,
             ),
             child: const Text('Confirm'),
           ),
