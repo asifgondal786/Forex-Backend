@@ -12,6 +12,8 @@ import os
 import smtplib
 from email.message import EmailMessage
 
+from ..utils.firestore_client import get_firestore_client
+
 
 class NotificationChannel(Enum):
     """Notification delivery channels"""
@@ -125,6 +127,13 @@ class EnhancedNotificationService:
         self.smtp_from = os.getenv("SMTP_FROM", self.smtp_user or "")
         self.smtp_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
         self.email_configured = all([self.smtp_host, self.smtp_user, self.smtp_pass, self.smtp_from])
+
+        self._firestore = None
+
+    def _get_firestore(self):
+        if self._firestore is None:
+            self._firestore = get_firestore_client()
+        return self._firestore
 
     def _initialize_templates(self):
         """Initialize standard notification templates"""
@@ -428,6 +437,27 @@ class EnhancedNotificationService:
     async def _store_in_app(self, notification: Notification):
         """Store in-app notification"""
         # Already stored in self.notifications
+        try:
+            db = self._get_firestore()
+            db.collection("notifications").document(notification.notification_id).set(
+                {
+                    "notificationId": notification.notification_id,
+                    "userId": notification.user_id,
+                    "title": notification.title,
+                    "message": notification.message,
+                    "shortMessage": notification.short_message,
+                    "category": notification.category.value,
+                    "priority": notification.priority.value,
+                    "timestamp": notification.timestamp,
+                    "read": notification.read,
+                    "actionUrl": notification.action_url,
+                    "createdAt": datetime.utcnow(),
+                },
+                merge=True,
+            )
+        except Exception as exc:
+            print(f"[IN_APP] Firestore unavailable: {exc}")
+
         print(f"[IN_APP] Stored notification for {notification.user_id}")
 
     def _is_quiet_hours(self, prefs: NotificationPreference) -> bool:
@@ -461,33 +491,111 @@ class EnhancedNotificationService:
 
     async def get_notifications(self, user_id: str, unread_only: bool = False, limit: int = 20) -> List[Dict]:
         """Get notifications for user"""
-        notifications = [n for n in self.notifications if n.user_id == user_id]
-        
-        if unread_only:
-            notifications = [n for n in notifications if not n.read]
-        
-        notifications = sorted(notifications, key=lambda x: x.timestamp, reverse=True)[:limit]
-        
-        return [
-            {
-                "notification_id": n.notification_id,
-                "title": n.title,
-                "message": n.message,
-                "category": n.category.value,
-                "priority": n.priority.value,
-                "timestamp": n.timestamp.isoformat(),
-                "read": n.read,
-                "clicked": n.clicked,
-            }
-            for n in notifications
-        ]
+        def _coerce_dt(value: Optional[object]) -> datetime:
+            if isinstance(value, datetime):
+                return value
+            if isinstance(value, str):
+                try:
+                    return datetime.fromisoformat(value)
+                except ValueError:
+                    return datetime.min
+            return datetime.min
 
-    async def mark_as_read(self, notification_id: str) -> Dict:
+        def _format_ts(value: Optional[object]) -> str:
+            if isinstance(value, datetime):
+                return value.isoformat()
+            if isinstance(value, str):
+                return value
+            return ""
+
+        try:
+            db = self._get_firestore()
+            docs = list(db.collection("notifications").where("userId", "==", user_id).stream())
+            items: List[Dict] = []
+            for doc in docs:
+                data = doc.to_dict() or {}
+                read = data.get("read")
+                if read is None:
+                    read = data.get("is_read") or data.get("isRead") or False
+                if unread_only and read:
+                    continue
+
+                timestamp = data.get("timestamp") or data.get("createdAt") or data.get("created_at")
+                sort_dt = _coerce_dt(timestamp)
+                items.append(
+                    {
+                        "notification_id": data.get("notificationId") or data.get("notification_id") or doc.id,
+                        "title": data.get("title") or "",
+                        "message": data.get("message") or "",
+                        "category": data.get("category") or "",
+                        "priority": data.get("priority") or "",
+                        "timestamp": _format_ts(timestamp),
+                        "read": bool(read),
+                        "clicked": bool(data.get("clicked") or False),
+                        "_sort_ts": sort_dt,
+                    }
+                )
+
+            items.sort(key=lambda item: item.get("_sort_ts", datetime.min), reverse=True)
+            for item in items:
+                item.pop("_sort_ts", None)
+            return items[:limit]
+        except Exception:
+            # Fallback to in-memory notifications if Firestore is unavailable
+            notifications = [n for n in self.notifications if n.user_id == user_id]
+
+            if unread_only:
+                notifications = [n for n in notifications if not n.read]
+
+            notifications = sorted(notifications, key=lambda x: x.timestamp, reverse=True)[:limit]
+
+            return [
+                {
+                    "notification_id": n.notification_id,
+                    "title": n.title,
+                    "message": n.message,
+                    "category": n.category.value,
+                    "priority": n.priority.value,
+                    "timestamp": n.timestamp.isoformat(),
+                    "read": n.read,
+                    "clicked": n.clicked,
+                }
+                for n in notifications
+            ]
+
+    async def mark_as_read(self, notification_id: str, user_id: Optional[str] = None) -> Dict:
         """Mark notification as read"""
+        updated = False
+
         notif = next((n for n in self.notifications if n.notification_id == notification_id), None)
         if notif:
+            if user_id and notif.user_id != user_id:
+                return {"error": "Notification not found"}
             notif.read = True
             notif.read_at = datetime.now()
+            updated = True
+
+        try:
+            db = self._get_firestore()
+            doc_ref = db.collection("notifications").document(notification_id)
+            if user_id:
+                doc = doc_ref.get()
+                if doc.exists:
+                    data = doc.to_dict() or {}
+                    if data.get("userId") and data.get("userId") != user_id:
+                        return {"error": "Notification not found"}
+            doc_ref.set(
+                {
+                    "read": True,
+                    "readAt": datetime.utcnow(),
+                },
+                merge=True,
+            )
+            updated = True
+        except Exception:
+            pass
+
+        if updated:
             return {"success": True}
         return {"error": "Notification not found"}
 
