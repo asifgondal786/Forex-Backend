@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../core/models/task.dart';
 import '../core/models/user.dart';
+import '../core/models/header_model.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -106,6 +107,26 @@ class ApiService {
       return User.fromJson(data);
     } catch (e) {
       throw ApiException('Error updating user: $e');
+    }
+  }
+
+  // ========== HEADER ENDPOINTS ==========
+
+  Future<HeaderData> getHeader() async {
+    try {
+      final headers = await _buildHeaders();
+      final response = await _client.get(
+        Uri.parse('$baseUrl/api/header'),
+        headers: headers,
+      ).timeout(_timeout);
+      final data = _handleResponse(response);
+      if (data is Map<String, dynamic>) {
+        return HeaderData.fromJson(data);
+      }
+      throw ApiException('Invalid header response');
+    } catch (e) {
+      debugPrint('Error fetching header: $e');
+      throw ApiException('Error fetching header: $e');
     }
   }
 

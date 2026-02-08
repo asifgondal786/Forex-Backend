@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../providers/task_provider.dart';
+import '../../../providers/header_provider.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../core/widgets/app_background.dart';
 import 'task_card.dart';
@@ -109,72 +110,95 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildTopNavBar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
+    return Consumer<HeaderProvider>(
+      builder: (context, headerProvider, _) {
+        final header = headerProvider.header;
+        final name = header?.user.name ?? 'John Doe';
+        final status = header?.user.status ?? 'Available Online';
+        final avatarUrl = header?.user.avatarUrl;
+        final balanceAmount = header?.balance.amount ?? 5843.21;
+        final balanceCurrency = header?.balance.currency ?? 'USD';
+        final unread = header?.notifications.unread ?? 0;
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-              ),
-              child: const Icon(Icons.menu, color: Colors.white70, size: 18),
-            ),
-            const SizedBox(width: 14),
             Row(
               children: [
-                Image.asset(
-                  'assets/images/companion_logo.png',
-                  width: 28,
-                  height: 28,
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Forex Companion',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    letterSpacing: 0.4,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                   ),
+                  child: const Icon(Icons.menu, color: Colors.white70, size: 18),
+                ),
+                const SizedBox(width: 14),
+                Row(
+                  children: [
+                    Image.asset(
+                      'assets/images/companion_logo.png',
+                      width: 28,
+                      height: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Forex Companion',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        Row(
-          children: [
-            _buildUserPill(),
-            const SizedBox(width: 10),
-            _buildBalancePill(),
-            const SizedBox(width: 10),
-            _buildIconPill(
-              icon: Icons.power_settings_new,
-              onTap: () {},
+            Row(
+              children: [
+                _buildUserPill(
+                  name: name,
+                  status: status,
+                  avatarUrl: avatarUrl,
+                ),
+                const SizedBox(width: 10),
+                _buildBalancePill(
+                  amount: balanceAmount,
+                  currency: balanceCurrency,
+                ),
+                const SizedBox(width: 10),
+                _buildIconPill(
+                  icon: Icons.power_settings_new,
+                  onTap: () {},
+                ),
+                const SizedBox(width: 8),
+                Consumer<ThemeProvider>(
+                  builder: (context, themeProvider, _) {
+                    return _buildIconPill(
+                      icon: themeProvider.isDarkMode
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined,
+                      onTap: themeProvider.toggleTheme,
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildNotificationPill(unread: unread),
+              ],
             ),
-            const SizedBox(width: 8),
-            Consumer<ThemeProvider>(
-              builder: (context, themeProvider, _) {
-                return _buildIconPill(
-                  icon: themeProvider.isDarkMode
-                      ? Icons.light_mode_outlined
-                      : Icons.dark_mode_outlined,
-                  onTap: themeProvider.toggleTheme,
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-            _buildNotificationPill(),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildUserPill() {
+  Widget _buildUserPill({
+    required String name,
+    required String status,
+    String? avatarUrl,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -184,25 +208,32 @@ class _DashboardContentState extends State<DashboardContent> {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 12,
-            backgroundColor: Color(0xFF22C55E),
-            child: Icon(Icons.person, size: 14, color: Colors.white),
-          ),
+          if (avatarUrl != null && avatarUrl.isNotEmpty)
+            CircleAvatar(
+              radius: 12,
+              backgroundImage: NetworkImage(avatarUrl),
+              backgroundColor: const Color(0xFF22C55E),
+            )
+          else
+            const CircleAvatar(
+              radius: 12,
+              backgroundColor: Color(0xFF22C55E),
+              child: Icon(Icons.person, size: 14, color: Colors.white),
+            ),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'John Doe',
-                style: TextStyle(
+              Text(
+                name,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                'Available Online',
+                status,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 10,
@@ -221,7 +252,11 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildBalancePill() {
+  Widget _buildBalancePill({
+    required double amount,
+    required String currency,
+  }) {
+    final label = _formatCurrency(amount, currency);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -230,12 +265,12 @@ class _DashboardContentState extends State<DashboardContent> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
-        children: const [
-          Icon(Icons.account_balance_wallet, color: Color(0xFF00FFC2), size: 18),
-          SizedBox(width: 8),
+        children: [
+          const Icon(Icons.account_balance_wallet, color: Color(0xFF00FFC2), size: 18),
+          const SizedBox(width: 8),
           Text(
-            '\$5,843.21',
-            style: TextStyle(
+            label,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -244,6 +279,15 @@ class _DashboardContentState extends State<DashboardContent> {
         ],
       ),
     );
+  }
+
+  String _formatCurrency(double amount, String currency) {
+    final normalized = currency.trim().isEmpty ? 'USD' : currency.trim().toUpperCase();
+    final formatted = amount.toStringAsFixed(2);
+    if (normalized == 'USD') {
+      return '\$$formatted';
+    }
+    return '$normalized $formatted';
   }
 
   Widget _buildIconPill({
@@ -268,7 +312,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildNotificationPill() {
+  Widget _buildNotificationPill({int unread = 0}) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -287,10 +331,36 @@ class _DashboardContentState extends State<DashboardContent> {
           ),
         ],
       ),
-      child: const Icon(
-        Icons.notifications_active,
-        color: Colors.white,
-        size: 18,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(
+            Icons.notifications_active,
+            color: Colors.white,
+            size: 18,
+          ),
+          if (unread > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 1),
+                ),
+                child: Text(
+                  unread > 99 ? '99+' : unread.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

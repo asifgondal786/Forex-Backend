@@ -7,6 +7,7 @@ import 'services/api_service.dart';
 import 'services/firebase_service.dart';
 import 'providers/task_provider.dart';
 import 'providers/user_provider.dart';
+import 'providers/header_provider.dart';
 import 'providers/theme_provider.dart';
 import 'helpers/mock_data_helper.dart';
 
@@ -87,6 +88,17 @@ class ForexCompanionApp extends StatelessWidget {
               provider.setUser(MockDataHelper.generateMockUser());
             } else {
               provider.fetchUser();
+            }
+            return provider;
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (_) {
+            final provider = HeaderProvider(apiService: apiService);
+            if (useMockData) {
+              provider.setHeader(MockDataHelper.generateMockHeader());
+            } else {
+              provider.fetchHeader();
             }
             return provider;
           },

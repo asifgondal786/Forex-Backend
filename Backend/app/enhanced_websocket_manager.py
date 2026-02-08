@@ -19,6 +19,11 @@ class EnhancedWebSocketManager:
         self.all_connections: Set[WebSocket] = set()
         # Track streaming tasks
         self.streaming_tasks: Dict[str, asyncio.Task] = {}
+        # Track forex stream interval
+        try:
+            self.forex_stream_interval = int(os.getenv("FOREX_STREAM_INTERVAL", "10"))
+        except ValueError:
+            self.forex_stream_interval = 10
         # Engagement logging (Firestore)
         self.engagement_logging_enabled = os.getenv("ENABLE_ENGAGEMENT_LOGGING", "").lower() != "false"
         self._activity_logger = None
@@ -225,13 +230,26 @@ class EnhancedWebSocketManager:
             return len(self.active_connections.get(task_id, set()))
         return len(self.all_connections)
 
+    def is_forex_stream_running(self) -> bool:
+        """Check if the forex stream task is running."""
+        task = self.streaming_tasks.get("forex_stream")
+        return bool(task and not task.done())
+
+    def get_forex_stream_interval(self) -> int:
+        """Get the current forex stream interval."""
+        return int(self.forex_stream_interval)
+
     async def start_forex_stream(self, interval: int = 10):
         """Start streaming live forex data to all clients"""
         from .forex_data_service import forex_service
 
-        if "forex_stream" in self.streaming_tasks and not self.streaming_tasks["forex_stream"].done():
-            print("Forex stream is already running.")
-            return
+        interval = int(interval)
+        if self.is_forex_stream_running():
+            if interval == self.forex_stream_interval:
+                print("Forex stream is already running.")
+                return
+            self.stop_forex_stream()
+        self.forex_stream_interval = interval
 
         async def stream_callback(forex_data):
             await self.send_forex_update(forex_data)

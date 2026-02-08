@@ -1,5 +1,6 @@
 import '../core/models/task.dart';
 import '../core/models/user.dart';
+import '../core/models/header_model.dart';
 import '../providers/task_provider.dart';
 
 class MockDataHelper {
@@ -10,6 +11,24 @@ class MockDataHelper {
       email: 'sohaib@forexcompanion.com',
       name: 'Sohaib',
       createdAt: DateTime.now().subtract(const Duration(days: 30)),
+    );
+  }
+
+  /// Generates mock header data
+  static HeaderData generateMockHeader() {
+    return HeaderData(
+      user: HeaderUser(
+        id: 'mock_user_1',
+        name: 'John Doe',
+        status: 'Available Online',
+        avatarUrl: null,
+        riskLevel: 'Moderate',
+      ),
+      balance: HeaderBalance(
+        amount: 5843.21,
+        currency: 'USD',
+      ),
+      notifications: HeaderNotifications(unread: 2),
     );
   }
 
