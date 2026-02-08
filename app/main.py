@@ -1,6 +1,7 @@
 """
 Forex Companion - Complete FastAPI Application
 """
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,12 +9,19 @@ from contextlib import asynccontextmanager
 import os
 import time
 from collections import defaultdict, deque
+from dotenv import load_dotenv
+
+# Load environment variables from Backend/.env if present
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 # Import routers
 from .users import router as users_router
 from .websocket_routes import router as websocket_router
 from .engagement_routes import router as engagement_router
 from .auth_status_routes import router as auth_status_router
+from .header_routes import router as header_router
+from .notifications_routes import router as notifications_router
+from .settings_routes import router as settings_router
 
 try:
     from .ai_task_routes import router as ai_task_router
@@ -155,8 +163,22 @@ def _get_cors_origins():
         "http://127.0.0.1:3000",
     ]
 
+def _get_cors_origin_regex() -> str | None:
+    if os.getenv("CORS_ALLOW_ALL", "").lower() == "true":
+        return None
+    explicit = os.getenv("CORS_ORIGIN_REGEX", "").strip()
+    if explicit:
+        return explicit
+    allow_localhost = os.getenv("CORS_ALLOW_LOCALHOST", "").lower() == "true"
+    debug = os.getenv("DEBUG", "").lower() == "true"
+    if allow_localhost or debug:
+        # Allow any localhost/127.0.0.1 port in dev
+        return r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+    return None
+
 _cors_allow_all = os.getenv("CORS_ALLOW_ALL", "").lower() == "true"
 _cors_allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "").lower() == "true" and not _cors_allow_all
+_cors_origin_regex = _get_cors_origin_regex()
 
 app.add_middleware(
     CORSMiddleware,
@@ -164,6 +186,7 @@ app.add_middleware(
     allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=_cors_origin_regex,
 )
 
 # Include routers
@@ -171,6 +194,9 @@ app.include_router(users_router)
 app.include_router(websocket_router)
 app.include_router(engagement_router)
 app.include_router(auth_status_router)
+app.include_router(header_router)
+app.include_router(notifications_router)
+app.include_router(settings_router)
 if AI_ROUTES_AVAILABLE:
     app.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:

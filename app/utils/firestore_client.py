@@ -1,4 +1,5 @@
-﻿import json
+﻿import base64
+import json
 import os
 from typing import Optional
 
@@ -14,6 +15,8 @@ def _get_project_id() -> Optional[str]:
 
 
 def _get_credential_source() -> str:
+    if os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON_B64"):
+        return "json_b64"
     if os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"):
         return "json"
     if os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH"):
@@ -24,11 +27,22 @@ def _get_credential_source() -> str:
 
 
 def _get_credentials():
+    b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON_B64")
     json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
     path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
 
+    if b64:
+        try:
+            decoded = base64.b64decode(b64).decode("utf-8")
+            return credentials.Certificate(json.loads(decoded))
+        except Exception as exc:
+            raise ValueError("Invalid FIREBASE_SERVICE_ACCOUNT_JSON_B64") from exc
+
     if json_str:
-        return credentials.Certificate(json.loads(json_str))
+        try:
+            return credentials.Certificate(json.loads(json_str))
+        except json.JSONDecodeError as exc:
+            raise ValueError("Invalid FIREBASE_SERVICE_ACCOUNT_JSON") from exc
     if path:
         return credentials.Certificate(path)
 
