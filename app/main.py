@@ -37,6 +37,13 @@ except ImportError:
     ADVANCED_FEATURES_AVAILABLE = False
     print("??  Advanced features routes not available")
 
+try:
+    from .accounts_routes import router as accounts_router
+    ACCOUNTS_ROUTES_AVAILABLE = True
+except ImportError:
+    ACCOUNTS_ROUTES_AVAILABLE = False
+    print("??  Accounts routes not available")
+
 from .enhanced_websocket_manager import ws_manager
 from .utils.firestore_client import get_firebase_config_status, init_firebase
 from .security import verify_http_request
@@ -201,6 +208,8 @@ if AI_ROUTES_AVAILABLE:
     app.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
     app.include_router(advanced_router)
+if ACCOUNTS_ROUTES_AVAILABLE:
+    app.include_router(accounts_router)
 
 
 @app.get("/")
@@ -250,6 +259,4 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
-
-
 

@@ -261,8 +261,19 @@ class RiskManagementService:
         daily_stat = self.daily_stats.get(user_id)
         active_trades = self.active_trades.get(user_id, [])
         
+        # Provide default limits if not configured
         if not limits:
-            return {"error": "User risk limits not found"}
+            limits = RiskLimits(
+                max_trade_size=10000,
+                daily_loss_limit=10,
+                max_open_positions=5,
+                max_drawdown_percent=20,
+                mandatory_stop_loss=True,
+                mandatory_take_profit=True,
+                kill_switch_enabled=True
+            )
+            # Initialize user with default limits
+            await self.initialize_user_limits(user_id, limits)
         
         # Calculate risk level
         risk_level = await self._calculate_risk_level(user_id, limits, daily_stat, active_trades)

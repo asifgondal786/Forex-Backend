@@ -372,7 +372,7 @@ class PredictionExplainabilityService:
         
         return {"success": True, "message": "Prediction outcome recorded"}
 
-    async def get_prediction_history(self, pair: Optional[str] = None, limit: int = 10) -> List[Dict]:
+    async def get_prediction_history(self, pair: Optional[str] = None, limit: int = 10) -> Dict:
         """Get prediction history with formatting"""
         history = self.predictions_history
         
@@ -381,24 +381,26 @@ class PredictionExplainabilityService:
         
         history = history[-limit:]  # Most recent
         
-        return [
-            {
-                "prediction_id": p.prediction_id,
-                "pair": p.pair,
-                "action": p.action,
-                "confidence": f"{p.confidence_score:.1f}%",
-                "sentiment": p.sentiment.value,
-                "key_reasons": p.key_reasons,
-                "indicators": {
-                    "bullish": p.indicators_bullish,
-                    "bearish": p.indicators_bearish,
-                    "neutral": p.indicators_neutral,
-                },
-                "convergence": f"{p.convergence_strength:.1f}%",
-                "timestamp": p.timestamp.isoformat()
-            }
-            for p in history
-        ]
+        return {
+            "predictions": [
+                {
+                    "prediction_id": p.prediction_id,
+                    "pair": p.pair,
+                    "action": p.action,
+                    "confidence": f"{p.confidence_score:.1f}%",
+                    "sentiment": p.sentiment.value,
+                    "key_reasons": p.key_reasons,
+                    "indicators": {
+                        "bullish": p.indicators_bullish,
+                        "bearish": p.indicators_bearish,
+                        "neutral": p.indicators_neutral,
+                    },
+                    "convergence": f"{p.convergence_strength:.1f}%",
+                    "timestamp": p.timestamp.isoformat()
+                }
+                for p in history
+            ]
+        }
 
     async def get_detailed_explanation(self, prediction_id: str) -> Dict:
         """Get detailed explanation panel for a prediction"""

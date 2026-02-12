@@ -1,12 +1,24 @@
 """
 Execution Intelligence Service
 Handles conditional automation, time-bound orders, and session-aware trading
+Integrates with Google Generative AI (Gemini) for intelligent condition analysis
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Callable
 from enum import Enum
 import asyncio
+import os
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 class TradingSession(Enum):
@@ -223,6 +235,137 @@ class ExecutionIntelligenceService:
             
             await asyncio.sleep(30)  # Check every 30 seconds
 
+    async def analyze_conditions_with_gemini(self, user_id: str, conditions: List[Dict]) -> Dict:
+        """
+        Use Google Generative AI (Gemini) to analyze conditions and provide recommendations
+        """
+        try:
+            if not GEMINI_API_KEY:
+                return {
+                    "success": False,
+                    "message": "Gemini API key not configured",
+                    "analysis": None
+                }
+                
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            
+            # Create prompt for Gemini
+            conditions_text = "\n".join([
+                f"- {cond['description']}"
+                for cond in conditions
+            ])
+            
+            prompt = f"""
+            You are an expert forex trading analyst specializing in conditional order evaluation.
+            
+            Analyze the following trading conditions for potential success:
+            
+            {conditions_text}
+            
+            Please provide:
+            1. A detailed analysis of each condition's potential effectiveness
+            2. Overall probability of conditions being met (0-100%)
+            3. Risk assessment of this strategy
+            4. Alternative conditions that might improve success rate
+            5. Timeframe recommendations for these conditions
+            
+            Format your response in JSON with clear, actionable insights.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            # Parse JSON response
+            import json
+            try:
+                analysis = json.loads(response.text)
+            except:
+                analysis = {
+                    "confidence": 50,
+                    "risk_level": "medium",
+                    "analysis": response.text,
+                    "suggestions": ["Could not parse structured response"]
+                }
+                
+            return {
+                "success": True,
+                "message": "Conditions analyzed successfully",
+                "analysis": analysis
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Gemini analysis failed: {str(e)}",
+                "analysis": None
+            }
+
+    async def generate_conditions_with_gemini(self, user_id: str, pair: str, action: str, strategy: str) -> Dict:
+        """
+        Use Google Generative AI (Gemini) to generate trading conditions from natural language strategy
+        """
+        try:
+            if not GEMINI_API_KEY:
+                return {
+                    "success": False,
+                    "message": "Gemini API key not configured",
+                    "conditions": None
+                }
+                
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            
+            prompt = f"""
+            You are an expert forex trading condition generator.
+            
+            Generate detailed, actionable trading conditions for:
+            - Currency Pair: {pair}
+            - Action: {action}
+            - Strategy: {strategy}
+            
+            Each condition should include:
+            1. condition_type (price_level, indicator_value, time, sentiment)
+            2. operator (>, <, ==, >=, <=, crosses)
+            3. value (numeric value)
+            4. description (human-readable description)
+            
+            Examples of valid conditions:
+            {{
+                "condition_type": "indicator_value",
+                "operator": "<",
+                "value": 30,
+                "description": "RSI (14-period) drops below 30 (oversold)"
+            }}
+            
+            {{
+                "condition_type": "price_level",
+                "operator": "crosses",
+                "value": 1.1050,
+                "description": "Price crosses above 1.1050 resistance"
+            }}
+            
+            Format your response as a JSON array of conditions.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            import json
+            try:
+                conditions = json.loads(response.text)
+            except:
+                conditions = []
+                
+            return {
+                "success": True,
+                "message": "Conditions generated successfully",
+                "conditions": conditions
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Gemini condition generation failed: {str(e)}",
+                "conditions": None
+            }
+
     async def _evaluate_conditions(self, order: ConditionalOrder) -> bool:
         """Evaluate if all conditions for an order are met"""
         # Placeholder: In production, fetch live data and evaluate
@@ -291,23 +434,25 @@ class ExecutionIntelligenceService:
         
         return {"error": "Order not found"}
 
-    async def get_active_orders(self, user_id: str) -> List[Dict]:
+    async def get_active_orders(self, user_id: str) -> Dict:
         """Get all active conditional orders for a user"""
         orders = self.pending_orders.get(user_id, [])
         active = [o for o in orders if o.status == OrderStatus.PENDING]
         
-        return [
-            {
-                "order_id": o.order_id,
-                "pair": o.pair,
-                "action": o.action,
-                "conditions_count": len(o.conditions),
-                "session_filter": o.session_filter.value if o.session_filter else "any",
-                "max_execution_time": o.max_execution_time.isoformat() if o.max_execution_time else None,
-                "created_at": o.created_at.isoformat(),
-            }
-            for o in active
-        ]
+        return {
+            "orders": [
+                {
+                    "order_id": o.order_id,
+                    "pair": o.pair,
+                    "action": o.action,
+                    "conditions_count": len(o.conditions),
+                    "session_filter": o.session_filter.value if o.session_filter else "any",
+                    "max_execution_time": o.max_execution_time.isoformat() if o.max_execution_time else None,
+                    "created_at": o.created_at.isoformat(),
+                }
+                for o in active
+            ]
+        }
 
     async def get_session_analysis(self) -> Dict:
         """Get analysis for all trading sessions"""

@@ -30,3 +30,6 @@ email-validator==2.1.0
 # Firebase
 firebase-admin==6.5.0
 
+# Google Generative AI (Gemini)
+google-generativeai>=0.8.0
+

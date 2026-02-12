@@ -372,6 +372,8 @@ class EnhancedNotificationService:
                     await self._send_email(notification)
                 elif channel == NotificationChannel.IN_APP:
                     await self._store_in_app(notification)
+                    # Broadcast in-app notification via WebSocket
+                    await self._broadcast_in_app_notification(notification)
                 elif channel == NotificationChannel.TELEGRAM:
                     await self._send_telegram(notification)
                 elif channel == NotificationChannel.WHATSAPP:
@@ -382,6 +384,33 @@ class EnhancedNotificationService:
                 notification.delivery_status[channel] = "sent"
             except Exception as e:
                 notification.delivery_status[channel] = f"failed: {str(e)}"
+    
+    async def _broadcast_in_app_notification(self, notification: Notification):
+        """Broadcast in-app notification to connected clients via WebSocket"""
+        try:
+            from ..enhanced_websocket_manager import ws_manager
+            
+            # Broadcast notification to all connected clients
+            await ws_manager.broadcast(
+                message=notification.title,
+                update_type="notification",
+                data={
+                    "notification_id": notification.notification_id,
+                    "user_id": notification.user_id,
+                    "title": notification.title,
+                    "message": notification.message,
+                    "short_message": notification.short_message,
+                    "category": notification.category.value,
+                    "priority": notification.priority.value,
+                    "timestamp": notification.timestamp.isoformat(),
+                    "read": notification.read,
+                    "action_url": notification.action_url,
+                    "rich_data": notification.rich_data,
+                }
+            )
+            print(f"[WS] Broadcasted notification to all clients")
+        except Exception as e:
+            print(f"[WS] Failed to broadcast notification: {e}")
 
     async def _send_push(self, notification: Notification):
         """Send push notification (Firebase Cloud Messaging)"""
