@@ -1,6 +1,7 @@
 """
 AI-Powered Forex Trading Engine
 Autonomous trading system that works while you sleep
+Integrates with Google Generative AI (Gemini) for intelligent decision-making
 """
 import asyncio
 import aiohttp
@@ -9,6 +10,17 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from dataclasses import dataclass
 import json
+import os
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 @dataclass
@@ -237,13 +249,95 @@ class ForexAIEngine:
     # AI TRADING SIGNALS
     # ========================================================================
     
+    async def generate_trading_signal_with_gemini(
+        self,
+        pair: str,
+        market_condition: MarketCondition,
+        user_strategy: Dict,
+        historical_data: List[Dict]
+    ) -> TradingSignal:
+        """
+        Generate AI-powered trading signal using Google Generative AI (Gemini)
+        """
+        try:
+            if not GEMINI_API_KEY:
+                return self.generate_trading_signal(pair, market_condition, user_strategy)
+                
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            
+            # Format market conditions for analysis
+            condition_text = f"""
+            MARKET CONDITIONS FOR {pair}:
+            - Current Price: {market_condition.current_price:.5f}
+            - Trend: {market_condition.trend}
+            - RSI: {market_condition.rsi:.1f}
+            - MACD: {market_condition.macd['macd']:.3f}
+            - Histogram: {market_condition.macd['histogram']:.3f}
+            - Volatility: {market_condition.volatility:.5f}
+            - Support: {market_condition.support_level:.5f}
+            - Resistance: {market_condition.resistance_level:.5f}
+            """
+            
+            # Format historical data
+            data_text = "\n".join([
+                f"- {data['timestamp']}: {data['close']:.5f}"
+                for data in historical_data[-30:]  # Last 30 candles
+            ])
+            
+            prompt = f"""
+            You are an expert forex trading signal generator.
+            
+            Analyze the following for {pair}:
+            
+            {condition_text}
+            
+            LAST 30 PRICE CANDLES:
+            {data_text}
+            
+            USER STRATEGY:
+            {json.dumps(user_strategy, indent=2)}
+            
+            Generate a trading signal with:
+            1. Action: BUY, SELL, or HOLD
+            2. Confidence level (0-100%)
+            3. Entry price suggestion
+            4. Stop loss level
+            5. Take profit level
+            6. Detailed reason for the signal
+            
+            Format your response as JSON.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            import json
+            try:
+                signal_data = json.loads(response.text)
+            except:
+                return self.generate_trading_signal(pair, market_condition, user_strategy)
+                
+            return TradingSignal(
+                pair=pair,
+                action=signal_data.get("action", "HOLD"),
+                confidence=signal_data.get("confidence", 0.0),
+                entry_price=signal_data.get("entry_price", market_condition.current_price),
+                stop_loss=signal_data.get("stop_loss", 0.0),
+                take_profit=signal_data.get("take_profit", 0.0),
+                reason=signal_data.get("reason", "AI analysis"),
+                timestamp=datetime.now()
+            )
+            
+        except Exception as e:
+            print(f"Gemini signal generation failed: {e}")
+            return self.generate_trading_signal(pair, market_condition, user_strategy)
+
     async def generate_trading_signal(
         self,
         pair: str,
         market_condition: MarketCondition,
         user_strategy: Dict
     ) -> TradingSignal:
-        """Generate AI-powered trading signal"""
+        """Generate AI-powered trading signal (fallback method)"""
         
         action = "HOLD"
         confidence = 0.0
@@ -310,6 +404,63 @@ class ForexAIEngine:
             reason=reason,
             timestamp=datetime.now()
         )
+
+    async def analyze_portfolio_performance(self, portfolio_data: Dict) -> Dict[str, Any]:
+        """
+        Use Google Generative AI (Gemini) to analyze portfolio performance
+        """
+        try:
+            if not GEMINI_API_KEY:
+                return self._get_default_portfolio_analysis(portfolio_data)
+                
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            
+            prompt = f"""
+            You are an expert portfolio analyst.
+            
+            Analyze this forex trading portfolio:
+            
+            {json.dumps(portfolio_data, indent=2)}
+            
+            Please provide:
+            1. Overall performance assessment
+            2. Risk analysis
+            3. Profitability by currency pair
+            4. Trading strategy effectiveness
+            5. Improvement recommendations
+            6. Next steps
+            
+            Format your response as JSON.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            import json
+            try:
+                analysis = json.loads(response.text)
+                analysis["timestamp"] = datetime.now().isoformat()
+            except:
+                analysis = self._get_default_portfolio_analysis(portfolio_data)
+                analysis["ai_analysis"] = response.text
+                
+            return analysis
+            
+        except Exception as e:
+            print(f"Portfolio analysis failed: {e}")
+            return self._get_default_portfolio_analysis(portfolio_data)
+
+    def _get_default_portfolio_analysis(self, portfolio_data: Dict) -> Dict[str, Any]:
+        """Fallback portfolio analysis when AI is unavailable"""
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "performance": "stable",
+            "risk_level": "moderate",
+            "profitability": {
+                "overall": portfolio_data.get("total_pnl", 0)
+            },
+            "recommendations": ["Review trading strategy", "Monitor key pairs"],
+            "next_steps": ["Continue monitoring", "Consider adjustments"]
+        }
     
     # ========================================================================
     # AUTOMATED TRADING

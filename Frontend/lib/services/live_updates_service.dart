@@ -23,6 +23,50 @@ class LiveUpdate {
   });
 }
 
+class NotificationUpdate {
+  final String notificationId;
+  final String userId;
+  final String title;
+  final String message;
+  final String? shortMessage;
+  final String category;
+  final String priority;
+  final DateTime timestamp;
+  final bool read;
+  final String? actionUrl;
+  final Map<String, dynamic> richData;
+
+  NotificationUpdate({
+    required this.notificationId,
+    required this.userId,
+    required this.title,
+    required this.message,
+    this.shortMessage,
+    required this.category,
+    required this.priority,
+    required this.timestamp,
+    required this.read,
+    this.actionUrl,
+    required this.richData,
+  });
+
+  factory NotificationUpdate.fromJson(Map<String, dynamic> json) {
+    return NotificationUpdate(
+      notificationId: json['notification_id'] ?? '',
+      userId: json['user_id'] ?? '',
+      title: json['title'] ?? '',
+      message: json['message'] ?? '',
+      shortMessage: json['short_message'],
+      category: json['category'] ?? '',
+      priority: json['priority'] ?? 'medium',
+      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
+      read: json['read'] ?? false,
+      actionUrl: json['action_url'],
+      richData: Map<String, dynamic>.from(json['rich_data'] ?? {}),
+    );
+  }
+}
+
 class LiveUpdatesService {
   static const String _wsBaseUrl = 'ws://127.0.0.1:8080';
   static const String _devUserId = String.fromEnvironment(
@@ -32,10 +76,12 @@ class LiveUpdatesService {
 
   WebSocketChannel? _channel;
   final _updatesController = StreamController<LiveUpdate>.broadcast();
+  final _notificationsController = StreamController<NotificationUpdate>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
   final Map<String, double> _lastRates = {};
 
   Stream<LiveUpdate> get updates => _updatesController.stream;
+  Stream<NotificationUpdate> get notifications => _notificationsController.stream;
   Stream<bool> get connectionStatus => _connectionController.stream;
 
   bool get isConnected => _channel != null;
@@ -88,11 +134,27 @@ class LiveUpdatesService {
             }
             final decoded = jsonDecode(message);
             if (decoded is Map<String, dynamic>) {
-              final data = decoded['data'];
-              if (data is Map<String, dynamic>) {
-                final rates = data['rates'];
-                if (rates is Map<String, dynamic>) {
-                  _emitRateUpdates(rates);
+              final updateType = decoded['type'];
+              
+              // Handle notification updates
+              if (updateType == 'notification') {
+                final data = decoded['data'];
+                if (data is Map<String, dynamic>) {
+                  final notification = NotificationUpdate.fromJson(data);
+                  if (!_notificationsController.isClosed) {
+                    _notificationsController.add(notification);
+                  }
+                  debugPrint('Notification received: ${notification.title}');
+                }
+              } 
+              // Handle forex rate updates
+              else {
+                final data = decoded['data'];
+                if (data is Map<String, dynamic>) {
+                  final rates = data['rates'];
+                  if (rates is Map<String, dynamic>) {
+                    _emitRateUpdates(rates);
+                  }
                 }
               }
             }
@@ -174,6 +236,7 @@ class LiveUpdatesService {
   void dispose() {
     disconnect();
     _updatesController.close();
+    _notificationsController.close();
     _connectionController.close();
   }
 }

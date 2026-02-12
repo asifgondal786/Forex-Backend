@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../../services/firebase_service.dart';
 import '../../core/widgets/app_background.dart';
 
@@ -48,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (user != null) {
-          debugPrint('✅ Login successful');
+          debugPrint('Login successful');
           widget.onLoginSuccess();
         } else {
           setState(() => _errorMessage = 'Invalid email or password');
@@ -63,6 +64,60 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final controller = TextEditingController(text: _emailController.text.trim());
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset Password'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              hintText: 'you@example.com',
+            ),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final email = controller.text.trim();
+                if (email.isEmpty || !email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter a valid email')),
+                  );
+                  return;
+                }
+                try {
+                  await firebase_auth.FirebaseAuth.instance
+                      .sendPasswordResetEmail(email: email);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Password reset email sent.')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Reset failed: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   bool _validateInputs() {
@@ -96,20 +151,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     // Logo Animation
                     Container(
-                      width: isMobile ? 96 : 110,
-                      height: isMobile ? 96 : 110,
+                      width: isMobile ? 144 : 165,
+                      height: isMobile ? 144 : 165,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(36),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF3B82F6).withOpacity(0.3),
-                            blurRadius: 24,
-                            spreadRadius: 6,
+                            color: const Color(0xFF3B82F6).withOpacity(0.4),
+                            blurRadius: 36,
+                            spreadRadius: 9,
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(36),
                         child: Image.asset(
                           'assets/images/companion_logo.png',
                           fit: BoxFit.cover,
@@ -127,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Title
                     Text(
-                      '🚀 Forex Companion',
+                      'Forex Companion',
                       style: TextStyle(
                         fontSize: isMobile ? 24 : 28,
                         fontWeight: FontWeight.bold,
@@ -234,24 +289,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             // Password Field
                             _buildPasswordField(),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : _showForgotPasswordDialog,
+                                child: const Text(
+                                  'Forgot password?',
+                                  style: TextStyle(
+                                    color: Color(0xFF3B82F6),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
                             const SizedBox(height: 24),
 
                             // Login Button
                             SizedBox(
                               width: double.infinity,
                               height: 54,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _handleLogin,
-                                  style: AppTheme.glassElevatedButtonStyle(
-                                    tintColor: const Color(0xFF3B82F6),
-                                    foregroundColor: Colors.white,
-                                    borderRadius: 12,
-                                    elevation: _isLoading ? 0 : 4,
-                                  ),
-                                  child: _isLoading
-                                      ? SizedBox(
-                                          height: 24,
-                                          width: 24,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _handleLogin,
+                                style: AppTheme.glassElevatedButtonStyle(
+                                  tintColor: const Color(0xFF3B82F6),
+                                  foregroundColor: Colors.white,
+                                  borderRadius: 12,
+                                  elevation: _isLoading ? 0 : 4,
+                                ),
+                                child: _isLoading
+                                    ? SizedBox(
+                                        height: 24,
+                                        width: 24,
                                         child: CircularProgressIndicator(
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
@@ -496,3 +568,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ],
     );
   }
+}

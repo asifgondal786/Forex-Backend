@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/firebase_service.dart';
 import '../../core/models/user.dart' as app_user;
 import '../../core/widgets/app_background.dart';
+import '../../routes/app_routes.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -14,11 +15,15 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final FirebaseService _firebaseService = FirebaseService();
+  final _titleController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _secondNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _addressController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _usernameController = TextEditingController();
-  final _fullNameController = TextEditingController();
   
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -27,25 +32,32 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
+    _titleController.dispose();
+    _firstNameController.dispose();
+    _secondNameController.dispose();
     _emailController.dispose();
+    _mobileController.dispose();
+    _addressController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _usernameController.dispose();
-    _fullNameController.dispose();
     super.dispose();
   }
 
   bool _validateInputs() {
-    if (_emailController.text.isEmpty || 
+    if (_firstNameController.text.isEmpty || 
+        _secondNameController.text.isEmpty ||
+        _emailController.text.isEmpty ||
+        _mobileController.text.isEmpty ||
+        _addressController.text.isEmpty ||
         _passwordController.text.isEmpty ||
-        _usernameController.text.isEmpty ||
-        _fullNameController.text.isEmpty) {
-      setState(() => _errorMessage = 'Please fill all fields');
+        _usernameController.text.isEmpty) {
+      setState(() => _errorMessage = 'Please fill all required fields');
       return false;
     }
     
-    if (!_emailController.text.contains('@')) {
-      setState(() => _errorMessage = 'Please enter a valid email');
+    if (!_emailController.text.contains('@') || !_emailController.text.contains('.com')) {
+      setState(() => _errorMessage = 'Please enter a valid Gmail address');
       return false;
     }
     
@@ -61,6 +73,11 @@ class _SignupScreenState extends State<SignupScreen> {
     
     if (_usernameController.text.length < 3) {
       setState(() => _errorMessage = 'Username must be at least 3 characters');
+      return false;
+    }
+    
+    if (_mobileController.text.length < 10) {
+      setState(() => _errorMessage = 'Mobile number must be at least 10 digits');
       return false;
     }
     
@@ -85,18 +102,32 @@ class _SignupScreenState extends State<SignupScreen> {
         if (user != null) {
           final appUser = app_user.User(
             id: user.uid,
-            name: _fullNameController.text.trim(),
+            name: '${_firstNameController.text.trim()} ${_secondNameController.text.trim()}',
             email: _emailController.text.trim(),
             createdAt: DateTime.now(),
-            preferences: {'username': _usernameController.text.trim()},
+            preferences: {
+              'username': _usernameController.text.trim(),
+              'title': _titleController.text.trim(),
+              'mobile': _mobileController.text.trim(),
+              'address': _addressController.text.trim(),
+            },
           );
           await _firebaseService.createUserDocument(appUser);
+          try {
+            await user.sendEmailVerification();
+          } catch (e) {
+            debugPrint('Email verification failed: $e');
+          }
 
           debugPrint('Signup successful');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Account created! Please login.')),
+            const SnackBar(content: Text('Account created! Verify your email.')),
           );
-          Navigator.pop(context);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.root,
+            (route) => false,
+          );
         } else {
           setState(() => _errorMessage = 'Signup failed');
         }
@@ -134,7 +165,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '🚀 Create Account',
+                            'Create Account',
                             style: TextStyle(
                               fontSize: isMobile ? 24 : 28,
                               fontWeight: FontWeight.bold,
@@ -226,12 +257,60 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           if (_errorMessage != null) const SizedBox(height: 20),
 
-                          // Full Name Field
+                          // Title Field (Optional)
                           _buildInputField(
-                            controller: _fullNameController,
-                            label: 'Full Name',
-                            hint: 'John Doe',
+                            controller: _titleController,
+                            label: 'Title (Optional)',
+                            hint: 'Mr./Ms./Mrs.',
+                            icon: Icons.title_outlined,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // First Name Field
+                          _buildInputField(
+                            controller: _firstNameController,
+                            label: 'First Name',
+                            hint: 'John',
                             icon: Icons.person_outline,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Second Name Field
+                          _buildInputField(
+                            controller: _secondNameController,
+                            label: 'Second Name',
+                            hint: 'Doe',
+                            icon: Icons.person_outline,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Email Field
+                          _buildInputField(
+                            controller: _emailController,
+                            label: 'Gmail Address',
+                            hint: 'john.doe@gmail.com',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Mobile Number Field
+                          _buildInputField(
+                            controller: _mobileController,
+                            label: 'Mobile Number',
+                            hint: '+1 234 567 8900',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Address Field
+                          _buildInputField(
+                            controller: _addressController,
+                            label: 'Address',
+                            hint: '123 Main Street, City, Country',
+                            icon: Icons.location_on_outlined,
+                            keyboardType: TextInputType.streetAddress,
                           ),
                           const SizedBox(height: 16),
 
@@ -244,16 +323,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Email Field
-                          _buildInputField(
-                            controller: _emailController,
-                            label: 'Email Address',
-                            hint: 'your@email.com',
-                            icon: Icons.email_outlined,
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                          const SizedBox(height: 16),
-
                           // Password Field
                           _buildPasswordField(
                             controller: _passwordController,
@@ -261,8 +330,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint: 'Minimum 8 characters',
                             obscure: _obscurePassword,
                             onToggle: () {
-                              setState(
-                                  () => _obscurePassword = !_obscurePassword);
+                              setState(() => _obscurePassword = !_obscurePassword);
                             },
                           ),
                           const SizedBox(height: 16),
@@ -274,9 +342,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint: 'Re-enter your password',
                             obscure: _obscureConfirmPassword,
                             onToggle: () {
-                              setState(() =>
-                                  _obscureConfirmPassword =
-                                      !_obscureConfirmPassword);
+                              setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
                             },
                           ),
                           const SizedBox(height: 28),
@@ -286,8 +352,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             width: double.infinity,
                             height: 54,
                             child: ElevatedButton(
-                              onPressed:
-                                  _isLoading ? null : _handleSignup,
+                              onPressed: _isLoading ? null : _handleSignup,
                               style: AppTheme.glassElevatedButtonStyle(
                                 tintColor: const Color(0xFF3B82F6),
                                 foregroundColor: Colors.white,
@@ -299,8 +364,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                       height: 24,
                                       width: 24,
                                       child: CircularProgressIndicator(
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
+                                        valueColor: AlwaysStoppedAnimation<Color>(
                                           Colors.white.withOpacity(0.8),
                                         ),
                                         strokeWidth: 2.5,
@@ -318,13 +382,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           )
                               .animate()
-                              .fadeIn(
-                                  duration:
-                                      const Duration(milliseconds: 600))
-                              .slideY(
-                                  begin: 0.3,
-                                  delay: const Duration(
-                                      milliseconds: 200)),
+                              .fadeIn(duration: const Duration(milliseconds: 600))
+                              .slideY(begin: 0.3, delay: const Duration(milliseconds: 200)),
                         ],
                       ),
                     ),
@@ -401,8 +460,7 @@ class _SignupScreenState extends State<SignupScreen> {
               color: Colors.grey[600],
               fontSize: 13,
             ),
-            prefixIcon: Icon(icon,
-                color: const Color(0xFF3B82F6), size: 20),
+            prefixIcon: Icon(icon, color: const Color(0xFF3B82F6), size: 20),
             filled: true,
             fillColor: Colors.white.withOpacity(0.05),
             border: OutlineInputBorder(
@@ -466,13 +524,10 @@ class _SignupScreenState extends State<SignupScreen> {
               color: Colors.grey[600],
               fontSize: 13,
             ),
-            prefixIcon: Icon(Icons.lock_outline,
-                color: const Color(0xFF3B82F6), size: 20),
+            prefixIcon: Icon(Icons.lock_outline, color: const Color(0xFF3B82F6), size: 20),
             suffixIcon: IconButton(
               icon: Icon(
-                obscure
-                    ? Icons.visibility_off
-                    : Icons.visibility,
+                obscure ? Icons.visibility_off : Icons.visibility,
                 color: const Color(0xFF3B82F6),
                 size: 18,
               ),
@@ -507,3 +562,4 @@ class _SignupScreenState extends State<SignupScreen> {
       ],
     );
   }
+}

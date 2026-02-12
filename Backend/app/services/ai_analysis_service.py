@@ -8,6 +8,16 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 import requests
 import os
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 class AIAnalysisService:
     """
@@ -32,6 +42,139 @@ class AIAnalysisService:
         except Exception as e:
             print(f"Model loading error: {e}")
     
+    async def analyze_news_impact(self, news: List[Dict], currency_pairs: List[str]) -> Dict[str, Any]:
+        """
+        Use Google Generative AI (Gemini) to analyze news impact on currency pairs
+        """
+        try:
+            if not GEMINI_API_KEY:
+                return self._get_default_news_analysis(news, currency_pairs)
+                
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            
+            # Format news for analysis
+            news_text = "\n".join([
+                f"- {news_item['time']}: {news_item['currency']} - {news_item['event']} (Impact: {news_item['impact']})"
+                for news_item in news
+            ])
+            
+            prompt = f"""
+            You are an expert forex news analyst specializing in event impact analysis.
+            
+            Analyze the impact of economic news on currency pairs:
+            
+            NEWS ITEMS:
+            {news_text}
+            
+            CURRENCY PAIRS TO ANALYZE:
+            {', '.join(currency_pairs)}
+            
+            Please provide:
+            1. Overall market sentiment shift caused by these news items
+            2. Impact level for each currency pair
+            3. Expected volatility changes
+            4. Trading opportunities created by this news
+            5. Risk assessment
+            6. Timeframe for this analysis
+            
+            Format your response as JSON.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            import json
+            try:
+                analysis = json.loads(response.text)
+                analysis["timestamp"] = datetime.now().isoformat()
+            except:
+                analysis = self._get_default_news_analysis(news, currency_pairs)
+                analysis["ai_analysis"] = response.text
+                
+            return analysis
+            
+        except Exception as e:
+            print(f"News analysis failed: {e}")
+            return self._get_default_news_analysis(news, currency_pairs)
+
+    def _get_default_news_analysis(self, news: List[Dict], currency_pairs: List[str]) -> Dict[str, Any]:
+        """Fallback news analysis when AI is unavailable"""
+        impacts = {}
+        for pair in currency_pairs:
+            # Determine impact based on currency matches
+            news_currencies = [n['currency'] for n in news]
+            base_curr, quote_curr = pair.split('/')
+            
+            if base_curr in news_currencies or quote_curr in news_currencies:
+                impacts[pair] = "medium"
+            else:
+                impacts[pair] = "low"
+                
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "sentiment": "neutral",
+            "impact_levels": impacts,
+            "volatility": "medium",
+            "risk": "moderate",
+            "trading_opportunities": [],
+            "timeframe": "1H"
+        }
+
+    async def analyze_news_sentiment(self, news_text: str) -> Dict[str, Any]:
+        """
+        Use Google Generative AI (Gemini) to analyze sentiment from raw news text
+        """
+        try:
+            if not GEMINI_API_KEY:
+                return self._get_default_sentiment_analysis()
+                
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            
+            prompt = f"""
+            You are an expert financial news sentiment analyzer.
+            
+            Analyze the following news for forex market sentiment:
+            
+            {news_text}
+            
+            Please provide:
+            1. Overall sentiment (bullish, bearish, neutral)
+            2. Sentiment strength (weak, moderate, strong)
+            3. Key currency impacts
+            4. Volatility expectation
+            5. Risk assessment
+            6. Trading recommendation
+            
+            Format your response as JSON.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            import json
+            try:
+                sentiment = json.loads(response.text)
+                sentiment["timestamp"] = datetime.now().isoformat()
+            except:
+                sentiment = self._get_default_sentiment_analysis()
+                sentiment["ai_analysis"] = response.text
+                
+            return sentiment
+            
+        except Exception as e:
+            print(f"News sentiment analysis failed: {e}")
+            return self._get_default_sentiment_analysis()
+
+    def _get_default_sentiment_analysis(self) -> Dict[str, Any]:
+        """Fallback sentiment analysis when AI is unavailable"""
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "sentiment": "neutral",
+            "strength": "moderate",
+            "currency_impacts": [],
+            "volatility": "medium",
+            "risk": "moderate",
+            "recommendation": "hold"
+        }
+
     def is_healthy(self) -> bool:
         """Check if service is operational"""
         return True

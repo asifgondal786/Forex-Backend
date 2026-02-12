@@ -3,9 +3,11 @@ import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../providers/task_provider.dart';
 import '../../../providers/header_provider.dart';
 import '../../../providers/theme_provider.dart';
+import '../../../providers/account_connection_provider.dart';
 import '../../../core/widgets/app_background.dart';
 import 'task_card.dart';
 import 'task_history_table.dart';
@@ -14,6 +16,9 @@ import 'performance_analytics.dart';
 import 'news_sentiment_widget.dart';
 import 'ai_prediction_widget.dart';
 import '../../../shared/widgets/glassmorphism_card.dart';
+import 'notifications_sheet.dart';
+import '../dialogs/connect_forex_account_dialog.dart';
+import '../../../services/api_service.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -24,6 +29,7 @@ class DashboardContent extends StatefulWidget {
 
 class _DashboardContentState extends State<DashboardContent> {
   int _selectedTab = 0;
+  bool _isAIActive = true;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +64,24 @@ class _DashboardContentState extends State<DashboardContent> {
         ),
       ),
     );
+  }
+
+  void _toggleAI() {
+    setState(() {
+      _isAIActive = !_isAIActive;
+      // Show notification when AI is toggled
+      final message = _isAIActive 
+          ? 'AI Companion activated - Monitoring markets in real time'
+          : 'AI Companion deactivated - All autonomous trading stopped';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: _isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    });
   }
 
   Widget _buildHeader(BuildContext context, bool isMobile) {
@@ -110,14 +134,15 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildTopNavBar() {
-    return Consumer<HeaderProvider>(
-      builder: (context, headerProvider, _) {
+    return Consumer2<HeaderProvider, AccountConnectionProvider>(
+      builder: (context, headerProvider, accountProvider, _) {
         final header = headerProvider.header;
         final name = header?.user.name ?? 'John Doe';
         final status = header?.user.status ?? 'Available Online';
         final avatarUrl = header?.user.avatarUrl;
-        final balanceAmount = header?.balance.amount ?? 5843.21;
-        final balanceCurrency = header?.balance.currency ?? 'USD';
+        final selectedAccount = accountProvider.selectedAccount;
+        final balanceAmount = selectedAccount?.balance ?? 5843.21;
+        final balanceCurrency = selectedAccount?.currency ?? 'USD';
         final unread = header?.notifications.unread ?? 0;
 
         return Row(
@@ -125,22 +150,38 @@ class _DashboardContentState extends State<DashboardContent> {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
+                // Hamburger Menu
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      // Show sidebar or menu - you can implement this with a drawer or bottom sheet
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Menu functionality coming soon!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                      ),
+                      child: const Icon(Icons.menu, color: Colors.white70, size: 20),
+                    ),
                   ),
-                  child: const Icon(Icons.menu, color: Colors.white70, size: 18),
                 ),
                 const SizedBox(width: 14),
                 Row(
                   children: [
                     Image.asset(
                       'assets/images/companion_logo.png',
-                      width: 28,
-                      height: 28,
+                      width: 90,
+                      height: 90,
                     ),
                     const SizedBox(width: 10),
                     const Text(
@@ -164,14 +205,12 @@ class _DashboardContentState extends State<DashboardContent> {
                   avatarUrl: avatarUrl,
                 ),
                 const SizedBox(width: 10),
-                _buildBalancePill(
-                  amount: balanceAmount,
-                  currency: balanceCurrency,
-                ),
+                _buildBalancePill(),
                 const SizedBox(width: 10),
                 _buildIconPill(
-                  icon: Icons.power_settings_new,
-                  onTap: () {},
+                  icon: _isAIActive ? Icons.power_settings_new : Icons.power_off,
+                  onTap: _toggleAI,
+                  color: _isAIActive ? null : const Color(0xFFEF4444),
                 ),
                 const SizedBox(width: 8),
                 Consumer<ThemeProvider>(
@@ -185,7 +224,10 @@ class _DashboardContentState extends State<DashboardContent> {
                   },
                 ),
                 const SizedBox(width: 8),
-                _buildNotificationPill(unread: unread),
+                _buildNotificationPill(
+                  unread: unread,
+                  onTap: () => _openNotifications(context),
+                ),
               ],
             ),
           ],
@@ -194,91 +236,346 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+  void _openNotifications(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => const NotificationsSheet(),
+    );
+  }
+
   Widget _buildUserPill({
     required String name,
     required String status,
     String? avatarUrl,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // Navigate to settings page
+          Navigator.pushNamed(context, '/settings');
+        },
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          if (avatarUrl != null && avatarUrl.isNotEmpty)
-            CircleAvatar(
-              radius: 12,
-              backgroundImage: NetworkImage(avatarUrl),
-              backgroundColor: const Color(0xFF22C55E),
-            )
-          else
-            const CircleAvatar(
-              radius: 12,
-              backgroundColor: Color(0xFF22C55E),
-              child: Icon(Icons.person, size: 14, color: Colors.white),
-            ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Row(
             children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+              if (avatarUrl != null && avatarUrl.isNotEmpty)
+                CircleAvatar(
+                  radius: 12,
+                  backgroundImage: NetworkImage(avatarUrl),
+                  backgroundColor: const Color(0xFF22C55E),
+                )
+              else
+                const CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Color(0xFF22C55E),
+                  child: Icon(Icons.person, size: 14, color: Colors.white),
                 ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    status,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                status,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 10,
-                ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.keyboard_arrow_down,
+                size: 16,
+                color: Colors.white54,
               ),
             ],
           ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.keyboard_arrow_down,
-            size: 16,
-            color: Colors.white54,
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildBalancePill({
-    required double amount,
-    required String currency,
-  }) {
-    final label = _formatCurrency(amount, currency);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.account_balance_wallet, color: Color(0xFF00FFC2), size: 18),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+  Widget _buildBalancePill() {
+    return Consumer<AccountConnectionProvider>(
+      builder: (context, provider, _) {
+        final account = provider.selectedAccount;
+        
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.account_balance_wallet, color: Color(0xFF00FFC2), size: 18),
+                const SizedBox(width: 8),
+                account == null 
+                    ? const Text(
+                        '\$0.00',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          Text(
+                            _formatCurrency(account.balance, account.currency),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: account.isConnected 
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.2) 
+                                  : const Color(0xFFEF4444).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: account.isConnected 
+                                    ? const Color(0xFF10B981).withValues(alpha: 0.4) 
+                                    : const Color(0xFFEF4444).withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              account.isConnected ? 'Live' : 'Disconnected',
+                              style: TextStyle(
+                                color: account.isConnected 
+                                    ? const Color(0xFF10B981) 
+                                    : const Color(0xFFEF4444),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                const SizedBox(width: 8),
+                _buildForexComHoverButton(),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  Widget _buildForexComHoverButton() {
+    return Consumer<HeaderProvider>(
+      builder: (context, headerProvider, _) {
+        final userId = headerProvider.header?.user.id ?? 'guest';
+        
+        return StatefulBuilder(
+          builder: (context, setState) {
+            bool isHovered = false;
+            
+            return MouseRegion(
+              onEnter: (_) => setState(() => isHovered = true),
+              onExit: (_) => setState(() => isHovered = false),
+              child: GestureDetector(
+                onTap: () {
+                  final url = 'https://www.forex.com?ref=$userId';
+                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutCubic,
+                  padding: isHovered 
+                      ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
+                      : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    // Glassmorphism effect
+                    color: isHovered 
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : Colors.white.withValues(alpha: 0.08),
+                    // Heartbeat border animation
+                    border: Border.all(
+                      color: isHovered 
+                          ? _getHeartbeatBorderColor()
+                          : Colors.white.withValues(alpha: 0.2),
+                      width: isHovered ? 2.0 : 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    // Advanced glassmorphism shadow with heartbeat effect
+                    boxShadow: isHovered 
+                        ? [
+                            BoxShadow(
+                              color: _getHeartbeatShadowColor().withValues(alpha: 0.5),
+                              blurRadius: _getHeartbeatBlurRadius(),
+                              spreadRadius: 4,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: _getHeartbeatShadowColor().withValues(alpha: 0.3),
+                              blurRadius: _getHeartbeatBlurRadius() * 1.5,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                    // Inner glow effect
+                    gradient: isHovered 
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withValues(alpha: 0.25),
+                              Colors.white.withValues(alpha: 0.1),
+                              _getHeartbeatBorderColor().withValues(alpha: 0.1),
+                            ],
+                          )
+                        : null,
+                  ),
+                  child: isHovered 
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Continuous heartbeat animation
+                            Container(
+                              width: 20,
+                              height: 20,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Main heart icon
+                                  const Icon(
+                                    Icons.favorite,
+                                    color: Color(0xFFEF4444),
+                                    size: 20,
+                                  ),
+                                  // Red pulse
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                                      ),
+                                    ).animate(
+                                      onComplete: (controller) => controller.repeat(),
+                                    ).scale(
+                                      begin: const Offset(1.0, 1.0),
+                                      end: const Offset(1.8, 1.8),
+                                      duration: const Duration(milliseconds: 600),
+                                      curve: Curves.easeInOut,
+                                    ),
+                                  ),
+                                  // Green pulse
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                      ),
+                                    ).animate(
+                                      delay: const Duration(milliseconds: 300),
+                                      onComplete: (controller) => controller.repeat(),
+                                    ).scale(
+                                      begin: const Offset(1.0, 1.0),
+                                      end: const Offset(1.6, 1.6),
+                                      duration: const Duration(milliseconds: 800),
+                                      curve: Curves.easeInOut,
+                                    ),
+                                  ),
+                                  // White inner glow
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.white.withValues(alpha: 0.3),
+                                      ),
+                                    ).animate(
+                                      delay: const Duration(milliseconds: 150),
+                                      onComplete: (controller) => controller.repeat(),
+                                    ).scale(
+                                      begin: const Offset(1.0, 1.0),
+                                      end: const Offset(1.4, 1.4),
+                                      duration: const Duration(milliseconds: 500),
+                                      curve: Curves.easeInOut,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Forex.com',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.open_in_new,
+                              color: Color(0xFF3B82F6),
+                              size: 13,
+                            ),
+                          ],
+                        )
+                      : const Icon(
+                          Icons.link,
+                          color: Colors.white60,
+                          size: 16,
+                        ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Helper method to get heartbeat border color (alternating red/green)
+  Color _getHeartbeatBorderColor() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return now % 1000 < 500 ? const Color(0xFFEF4444) : const Color(0xFF10B981);
+  }
+
+  // Helper method to get heartbeat shadow color (matching border)
+  Color _getHeartbeatShadowColor() {
+    return _getHeartbeatBorderColor();
+  }
+
+  // Helper method to get heartbeat blur radius (pulsing effect)
+  double _getHeartbeatBlurRadius() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return 16 + (now % 1000 < 500 ? 8 : 4);
   }
 
   String _formatCurrency(double amount, String currency) {
@@ -293,6 +590,7 @@ class _DashboardContentState extends State<DashboardContent> {
   Widget _buildIconPill({
     required IconData icon,
     required VoidCallback onTap,
+    Color? color,
   }) {
     return Material(
       color: Colors.transparent,
@@ -306,14 +604,14 @@ class _DashboardContentState extends State<DashboardContent> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
-          child: Icon(icon, color: Colors.white70, size: 18),
+          child: Icon(icon, color: color ?? Colors.white70, size: 18),
         ),
       ),
     );
   }
 
-  Widget _buildNotificationPill({int unread = 0}) {
-    return Container(
+  Widget _buildNotificationPill({int unread = 0, VoidCallback? onTap}) {
+    final content = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -361,6 +659,22 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
             ),
         ],
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return Tooltip(
+      message: 'Notifications',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: content,
+        ),
       ),
     );
   }
@@ -430,64 +744,114 @@ class _DashboardContentState extends State<DashboardContent> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Fully autonomous AI: "U Sleep, I Work for U"',
+          'Your Companion: "U Sleep, I Work"',
           style: TextStyle(
             color: const Color(0xFF7DD3FC),
             fontSize: 14,
           ),
         ),
         const SizedBox(height: 14),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _buildHeroChip('Smart Triggers', Icons.bolt),
-            _buildHeroChip('Realtime Charts', Icons.candlestick_chart),
-            _buildHeroChip('News-Aware', Icons.newspaper),
-            _buildHeroChip('Autonomous Actions', Icons.auto_awesome),
-          ],
+        FutureBuilder<Map<String, dynamic>>(
+          future: ApiService().getFeaturesStatus(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              );
+            }
+            
+            final data = snapshot.data;
+            final features = data?['features'] as Map<String, dynamic>? ?? {};
+            
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _buildHeroChip('Smart Triggers', Icons.bolt, features['smart_triggers']),
+                _buildHeroChip('Realtime Charts', Icons.candlestick_chart, features['realtime_charts']),
+                _buildHeroChip('News-Aware', Icons.newspaper, features['news_aware']),
+                _buildHeroChip('Autonomous Actions', Icons.auto_awesome, features['autonomous_actions']),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 16),
-        _buildAccountSummaryCard(
-          title: 'Welcome back, John!',
-          subtitle: 'Online',
-          value: '\$5,843.21',
-          accent: const Color(0xFF10B981),
-          wide: true,
-          showValueInHeader: true,
+        Consumer<AccountConnectionProvider>(
+          builder: (context, provider, _) {
+            final account = provider.selectedAccount;
+            return _buildAccountSummaryCard(
+              title: 'Welcome Back!',
+              subtitle: 'Online',
+              value: account != null ? _formatCurrency(account.balance, account.currency) : '\$0.00',
+              accent: const Color(0xFF10B981),
+              wide: true,
+              showValueInHeader: true,
+            );
+          },
         ),
         const SizedBox(height: 10),
-        _buildAccountSummaryCard(
-          title: 'Total Account Balance',
-          subtitle: 'All assets',
-          value: '\$3,582.44',
-          accent: const Color(0xFF60A5FA),
-          wide: true,
+        Consumer<AccountConnectionProvider>(
+          builder: (context, provider, _) {
+            final account = provider.selectedAccount;
+            return _buildAccountSummaryCard(
+              title: 'Total Account Balance',
+              subtitle: 'All assets',
+              value: account != null ? _formatCurrency(account.balance, account.currency) : '\$0.00',
+              accent: const Color(0xFF60A5FA),
+              wide: true,
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildHeroChip(String label, IconData icon) {
+  Widget _buildHeroChip(String label, IconData icon, dynamic featureData) {
+    final isActive = featureData?['active'] ?? false;
+    final status = featureData?['status'] ?? 'inactive';
+    final count = featureData?['count'] ?? 0;
+    final sentiment = featureData?['sentiment'] ?? 'neutral';
+    final volatility = featureData?['volatility'] ?? 'low';
+    final riskLevel = featureData?['risk_level'] ?? 'low';
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: isActive ? Colors.green.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: isActive ? Colors.green.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF7DD3FC)),
+          Icon(icon, size: 14, color: isActive ? const Color(0xFF10B981) : const Color(0xFF7DD3FC)),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? Colors.white : Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (count > 0 || sentiment != 'neutral' || volatility != 'low' || riskLevel != 'low')
+                Text(
+                  [
+                    if (count > 0) '$count active',
+                    if (sentiment != 'neutral') sentiment,
+                    if (volatility != 'low') volatility,
+                    if (riskLevel != 'low') riskLevel,
+                  ].join(' • '),
+                  style: TextStyle(
+                    color: isActive ? const Color(0xFF10B981) : Colors.white54,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -527,12 +891,12 @@ class _DashboardContentState extends State<DashboardContent> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.9),
+                color: _isAIActive ? const Color(0xFF10B981).withValues(alpha: 0.9) : const Color(0xFFEF4444).withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'STOP TRADING',
-                style: TextStyle(
+              child: Text(
+                _isAIActive ? 'AI ACTIVE' : 'AI STOPPED',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -736,30 +1100,37 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal: 8,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFEF4444).withValues(alpha: 0.9),
-                      const Color(0xFFDC2626).withValues(alpha: 0.9),
+                      (_isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.9),
+                      (_isAIActive ? const Color(0xFF059669) : const Color(0xFFDC2626)).withValues(alpha: 0.9),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                      color: (_isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.35),
                       blurRadius: 10,
                     ),
                   ],
                 ),
-                child: const Text(
-                  'STOP TRADING',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 70,
+                  ),
+                  child: Text(
+                    _isAIActive ? 'AI ACTIVE' : 'AI STOPPED',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -2191,7 +2562,12 @@ class _DashboardContentState extends State<DashboardContent> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => const ConnectForexAccountDialog(),
+                    );
+                  },
                   icon: const Icon(Icons.link),
                   label: const Text('Connect Account'),
                   style: AppTheme.glassElevatedButtonStyle(

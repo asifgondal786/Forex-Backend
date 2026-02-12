@@ -260,6 +260,130 @@ async def get_execution_intelligence_panel():
     return await execution_svc.get_execution_intelligence_panel()
 
 
+@router.post("/market/analyze")
+async def analyze_market_with_gemini():
+    """
+    Use Google Generative AI (Gemini) to analyze current market conditions
+    Returns sentiment, volatility, risk assessment, and key currency pairs to watch
+    """
+    from .forex_data_service import forex_service
+    
+    rates = await forex_service.get_currency_rates()
+    news = await forex_service.get_forex_factory_news()
+    
+    return await forex_service.analyze_market_with_gemini(rates, news)
+
+
+@router.post("/market/predict")
+async def predict_price_movements(pair: str, historical_data: List[Dict]):
+    """
+    Use Google Generative AI (Gemini) to predict future price movements for a currency pair
+    """
+    from .forex_data_service import forex_service
+    
+    return await forex_service.predict_price_movements(pair, historical_data)
+
+
+@router.post("/news/analyze-impact")
+async def analyze_news_impact(news: List[Dict], currency_pairs: List[str]):
+    """
+    Use Google Generative AI (Gemini) to analyze news impact on currency pairs
+    """
+    from .services.ai_analysis_service import AIAnalysisService
+    
+    ai_analysis = AIAnalysisService()
+    return await ai_analysis.analyze_news_impact(news, currency_pairs)
+
+
+@router.post("/news/analyze-sentiment")
+async def analyze_news_sentiment(news_text: str):
+    """
+    Use Google Generative AI (Gemini) to analyze sentiment from raw news text
+    """
+    from .services.ai_analysis_service import AIAnalysisService
+    
+    ai_analysis = AIAnalysisService()
+    return await ai_analysis.analyze_news_sentiment(news_text)
+
+
+@router.post("/autonomous/generate-signal")
+async def generate_trading_signal_with_gemini(
+    pair: str,
+    market_condition: Dict,
+    user_strategy: Dict,
+    historical_data: List[Dict]
+):
+    """
+    Use Google Generative AI (Gemini) to generate trading signal with full context
+    """
+    from .ai_forex_engine import ai_engine
+    from .ai_forex_engine import MarketCondition
+    
+    # Convert market condition dictionary to dataclass
+    condition = MarketCondition(
+        pair=pair,
+        current_price=market_condition['current_price'],
+        trend=market_condition['trend'],
+        volatility=market_condition['volatility'],
+        support_level=market_condition['support_level'],
+        resistance_level=market_condition['resistance_level'],
+        rsi=market_condition['rsi'],
+        macd=market_condition['macd']
+    )
+    
+    signal = await ai_engine.generate_trading_signal_with_gemini(
+        pair, condition, user_strategy, historical_data
+    )
+    
+    return {
+        "success": True,
+        "signal": {
+            "pair": signal.pair,
+            "action": signal.action,
+            "confidence": signal.confidence,
+            "entry_price": signal.entry_price,
+            "stop_loss": signal.stop_loss,
+            "take_profit": signal.take_profit,
+            "reason": signal.reason,
+            "timestamp": signal.timestamp.isoformat()
+        }
+    }
+
+
+@router.post("/autonomous/analyze-portfolio")
+async def analyze_portfolio_performance(portfolio_data: Dict):
+    """
+    Use Google Generative AI (Gemini) to analyze portfolio performance
+    """
+    from .ai_forex_engine import ai_engine
+    
+    return await ai_engine.analyze_portfolio_performance(portfolio_data)
+
+
+@router.post("/execution/analyze-conditions")
+async def analyze_conditions_with_gemini(user_id: str, conditions: List[Dict]):
+    """
+    Use Google Generative AI (Gemini) to analyze trading conditions
+    Returns confidence score, risk assessment, and recommendations
+    """
+    return await execution_svc.analyze_conditions_with_gemini(user_id, conditions)
+
+
+@router.post("/execution/generate-conditions")
+async def generate_conditions_with_gemini(
+    user_id: str,
+    pair: str,
+    action: str,
+    strategy: str
+):
+    """
+    Use Google Generative AI (Gemini) to generate trading conditions from strategy
+    """
+    return await execution_svc.generate_conditions_with_gemini(
+        user_id, pair, action, strategy
+    )
+
+
 # ============================================================================
 # SECURITY & COMPLIANCE ENDPOINTS
 # ============================================================================
@@ -358,14 +482,17 @@ async def set_notification_preferences(
 
 
 @router.post("/notifications/send")
-async def send_notification(
-    user_id: str,
-    template_id: str,
-    category: str,
-    priority: str = "medium",
-    **kwargs
-):
+async def send_notification(request: Dict):
     """Send notification"""
+    user_id = request.get("user_id", "dev_user_001")
+    template_id = request.get("template_id", "price_alert")
+    category = request.get("category", "PRICE_ALERT")
+    priority = request.get("priority", "medium")
+    
+    # Extract template variables from request body
+    kwargs = {k: v for k, v in request.items() 
+             if k not in ["user_id", "template_id", "category", "priority"]}
+    
     return await notification_svc.send_notification(
         user_id=user_id,
         template_id=template_id,
@@ -511,6 +638,70 @@ async def get_copilot_status(user_id: str):
         },
         "timestamp": datetime.now().isoformat()
     }
+
+
+@router.get("/features/status")
+async def get_features_status(user_id: str):
+    """Get status of all autonomous trading features"""
+    try:
+        # Get copilot status
+        copilot_status = await get_copilot_status(user_id)
+        
+        # Get market data
+        from .forex_data_service import forex_service
+        sentiment = await forex_service.get_market_sentiment()
+        
+        # Get active orders
+        active_orders = await execution_svc.get_active_orders(user_id)
+        
+        # Get risk assessment
+        risk_assessment = await risk_manager.get_risk_assessment(user_id)
+        
+        # Get prediction history
+        predictions = await explainability_svc.get_prediction_history(limit=5)
+        
+        return {
+            "success": True,
+            "timestamp": datetime.now().isoformat(),
+            "features": {
+                "smart_triggers": {
+                    "active": copilot_status.get("features", {}).get("conditional_orders", False),
+                    "count": len(active_orders.get("orders", [])),
+                    "status": "active" if len(active_orders.get("orders", [])) > 0 else "inactive",
+                    "last_updated": datetime.now().isoformat()
+                },
+                "realtime_charts": {
+                    "active": True,
+                    "market_data": sentiment,
+                    "status": "connected",
+                    "last_updated": datetime.now().isoformat()
+                },
+                "news_aware": {
+                    "active": True,
+                    "sentiment": sentiment.get("trend", "neutral"),
+                    "volatility": sentiment.get("volatility", "low"),
+                    "risk_level": sentiment.get("risk_level", "low"),
+                    "last_updated": datetime.now().isoformat()
+                },
+                "autonomous_actions": {
+                    "active": copilot_status.get("copilot_active", False),
+                    "risk_level": risk_assessment.get("risk_level", "moderate"),
+                    "predictions": len(predictions.get("predictions", [])),
+                    "status": "active" if copilot_status.get("copilot_active", False) else "inactive",
+                    "last_updated": datetime.now().isoformat()
+                }
+            },
+            "market": {
+                "sentiment": sentiment.get("trend", "neutral"),
+                "volatility": sentiment.get("volatility", "low"),
+                "risk_level": sentiment.get("risk_level", "low"),
+                "rates": sentiment.get("major_pairs", {})
+            },
+            "risk": risk_assessment
+        }
+    except Exception as e:
+        print(f"Error fetching features status: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching features status: {str(e)}")
 
 
 @router.get("/health")
