@@ -6,7 +6,7 @@ Integrates with Google Generative AI (Gemini) for intelligent decision-making
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 from dataclasses import dataclass
 import json
@@ -263,7 +263,7 @@ class ForexAIEngine:
             if not GEMINI_API_KEY:
                 return self.generate_trading_signal(pair, market_condition, user_strategy)
                 
-            model = genai.GenerativeModel("gemini-1.5-pro")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             
             # Format market conditions for analysis
             condition_text = f"""

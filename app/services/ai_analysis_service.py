@@ -50,7 +50,7 @@ class AIAnalysisService:
             if not GEMINI_API_KEY:
                 return self._get_default_news_analysis(news, currency_pairs)
                 
-            model = genai.GenerativeModel("gemini-1.5-pro")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             
             # Format news for analysis
             news_text = "\n".join([
