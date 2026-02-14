@@ -106,7 +106,7 @@ class ForexDataService:
             if not GEMINI_API_KEY:
                 return self.get_default_sentiment(rates)
                 
-            model = genai.GenerativeModel("gemini-1.5-pro")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             
             # Format news for analysis
             news_text = "\n".join([
