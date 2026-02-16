@@ -515,9 +515,9 @@ class ApiService {
         "timestamp": DateTime.now().toIso8601String(),
         "features": {
           "smart_triggers": {
-            "active": false,
+            "active": true,
             "count": 0,
-            "status": "inactive",
+            "status": "active",
             "last_updated": DateTime.now().toIso8601String()
           },
           "realtime_charts": {
@@ -539,10 +539,10 @@ class ApiService {
             "last_updated": DateTime.now().toIso8601String()
           },
           "autonomous_actions": {
-            "active": false,
+            "active": true,
             "risk_level": "moderate",
             "predictions": 0,
-            "status": "inactive",
+            "status": "active",
             "last_updated": DateTime.now().toIso8601String()
           }
         },

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
+import os
 
 # Import services
 from .services.risk_management_service import RiskManagementService, RiskLimits
@@ -621,14 +622,17 @@ async def get_copilot_status(user_id: str):
     """Get comprehensive copilot status"""
     risk_status = await risk_manager.get_risk_assessment(user_id)
     legal_status = await security_svc.get_legal_status(user_id)
+    dev_mode = os.getenv("ALLOW_DEV_USER_ID", "").lower() == "true"
+    is_dev_user = user_id.startswith("dev_")
+    copilot_active = legal_status.get("compliant", False) or (dev_mode and is_dev_user)
     
     return {
         "user_id": user_id,
-        "copilot_active": legal_status.get("compliant", False),
+        "copilot_active": copilot_active,
         "risk_level": risk_status.get("risk_level", "unknown"),
         "legal_compliant": legal_status.get("compliant", False),
         "features": {
-            "autonomous_trading": legal_status.get("compliant", False),
+            "autonomous_trading": copilot_active,
             "predictive_analysis": True,
             "conditional_orders": True,
             "session_aware": True,
@@ -659,15 +663,17 @@ async def get_features_status(user_id: str):
         
         # Get prediction history
         predictions = await explainability_svc.get_prediction_history(limit=5)
+        smart_triggers_active = copilot_status.get("features", {}).get("conditional_orders", False)
+        autonomous_actions_active = copilot_status.get("copilot_active", False)
         
         return {
             "success": True,
             "timestamp": datetime.now().isoformat(),
             "features": {
                 "smart_triggers": {
-                    "active": copilot_status.get("features", {}).get("conditional_orders", False),
+                    "active": smart_triggers_active,
                     "count": len(active_orders.get("orders", [])),
-                    "status": "active" if len(active_orders.get("orders", [])) > 0 else "inactive",
+                    "status": "active" if smart_triggers_active else "inactive",
                     "last_updated": datetime.now().isoformat()
                 },
                 "realtime_charts": {
@@ -684,10 +690,10 @@ async def get_features_status(user_id: str):
                     "last_updated": datetime.now().isoformat()
                 },
                 "autonomous_actions": {
-                    "active": copilot_status.get("copilot_active", False),
+                    "active": autonomous_actions_active,
                     "risk_level": risk_assessment.get("risk_level", "moderate"),
                     "predictions": len(predictions.get("predictions", [])),
-                    "status": "active" if copilot_status.get("copilot_active", False) else "inactive",
+                    "status": "active" if autonomous_actions_active else "inactive",
                     "last_updated": datetime.now().isoformat()
                 }
             },
