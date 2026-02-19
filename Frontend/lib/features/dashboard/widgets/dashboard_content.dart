@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
@@ -17,8 +19,10 @@ import 'news_sentiment_widget.dart';
 import 'ai_prediction_widget.dart';
 import '../../../shared/widgets/glassmorphism_card.dart';
 import 'notifications_sheet.dart';
+import 'automation_panel.dart';
 import '../dialogs/connect_forex_account_dialog.dart';
 import '../../../services/api_service.dart';
+import '../../../services/live_updates_service.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -30,6 +34,64 @@ class DashboardContent extends StatefulWidget {
 class _DashboardContentState extends State<DashboardContent> {
   int _selectedTab = 0;
   bool _isAIActive = true;
+  final GlobalKey _featureTabContentKey = GlobalKey();
+  StreamSubscription<NotificationUpdate>? _notificationSubscription;
+  Timer? _headerRefreshDebounce;
+  bool _realtimeNotificationsReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _initializeRealtimeNotifications();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    _headerRefreshDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _initializeRealtimeNotifications() {
+    if (_realtimeNotificationsReady) {
+      return;
+    }
+    _realtimeNotificationsReady = true;
+
+    final liveUpdatesService = context.read<LiveUpdatesService>();
+    unawaited(liveUpdatesService.connect());
+
+    _notificationSubscription = liveUpdatesService.notifications.listen(
+      (_) {
+        if (!mounted) {
+          return;
+        }
+        context.read<HeaderProvider>().incrementUnreadNotifications();
+        _scheduleHeaderRefresh();
+      },
+      onError: (Object error) {
+        debugPrint('Realtime notification listener error: $error');
+      },
+    );
+  }
+
+  void _scheduleHeaderRefresh() {
+    _headerRefreshDebounce?.cancel();
+    _headerRefreshDebounce = Timer(
+      const Duration(milliseconds: 250),
+      () {
+        if (!mounted) {
+          return;
+        }
+        context.read<HeaderProvider>().fetchHeader();
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +117,12 @@ class _DashboardContentState extends State<DashboardContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildActiveTasksTab(isMobile),
+                    _buildTabNavigation(isMobile),
+                    const SizedBox(height: 16),
+                    KeyedSubtree(
+                      key: _featureTabContentKey,
+                      child: _buildTabContent(isMobile),
+                    ),
                   ],
                 ),
               ),
@@ -70,18 +137,59 @@ class _DashboardContentState extends State<DashboardContent> {
     setState(() {
       _isAIActive = !_isAIActive;
       // Show notification when AI is toggled
-      final message = _isAIActive 
+      final message = _isAIActive
           ? 'AI Companion activated - Monitoring markets in real time'
           : 'AI Companion deactivated - All autonomous trading stopped';
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: _isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          backgroundColor:
+              _isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
           duration: const Duration(seconds: 3),
         ),
       );
     });
+  }
+
+  void _scrollToFeatureContent() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = _featureTabContentKey.currentContext;
+      if (targetContext == null) return;
+
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    });
+  }
+
+  void _selectFeatureTab(int tabIndex) {
+    setState(() {
+      _selectedTab = tabIndex;
+    });
+    _scrollToFeatureContent();
+  }
+
+  void _handleHeroChipTap(String label) {
+    switch (label) {
+      case 'Smart Triggers':
+        Navigator.pushNamed(context, '/create-task');
+        return;
+      case 'Realtime Charts':
+        _selectFeatureTab(2);
+        return;
+      case 'News-Aware':
+        _selectFeatureTab(3);
+        return;
+      case 'Autonomous Actions':
+        _selectFeatureTab(0);
+        return;
+      default:
+        return;
+    }
   }
 
   Widget _buildHeader(BuildContext context, bool isMobile) {
@@ -154,24 +262,18 @@ class _DashboardContentState extends State<DashboardContent> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () {
-                      // Show sidebar or menu - you can implement this with a drawer or bottom sheet
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Menu functionality coming soon!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
+                    onTap: _openMainMenu,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12)),
                       ),
-                      child: const Icon(Icons.menu, color: Colors.white70, size: 20),
+                      child: const Icon(Icons.menu,
+                          color: Colors.white70, size: 20),
                     ),
                   ),
                 ),
@@ -208,7 +310,8 @@ class _DashboardContentState extends State<DashboardContent> {
                 _buildBalancePill(),
                 const SizedBox(width: 10),
                 _buildIconPill(
-                  icon: _isAIActive ? Icons.power_settings_new : Icons.power_off,
+                  icon:
+                      _isAIActive ? Icons.power_settings_new : Icons.power_off,
                   onTap: _toggleAI,
                   color: _isAIActive ? null : const Color(0xFFEF4444),
                 ),
@@ -233,6 +336,21 @@ class _DashboardContentState extends State<DashboardContent> {
           ],
         );
       },
+    );
+  }
+
+  void _openMainMenu() {
+    final scaffoldState = Scaffold.maybeOf(context);
+    if (scaffoldState != null && scaffoldState.hasDrawer) {
+      scaffoldState.openDrawer();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Menu is unavailable on this screen.'),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 
@@ -316,7 +434,7 @@ class _DashboardContentState extends State<DashboardContent> {
     return Consumer<AccountConnectionProvider>(
       builder: (context, provider, _) {
         final account = provider.selectedAccount;
-        
+
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           child: Container(
@@ -328,9 +446,10 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.account_balance_wallet, color: Color(0xFF00FFC2), size: 18),
+                const Icon(Icons.account_balance_wallet,
+                    color: Color(0xFF00FFC2), size: 18),
                 const SizedBox(width: 8),
-                account == null 
+                account == null
                     ? const Text(
                         '\$0.00',
                         style: TextStyle(
@@ -351,23 +470,28 @@ class _DashboardContentState extends State<DashboardContent> {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: account.isConnected 
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.2) 
-                                  : const Color(0xFFEF4444).withValues(alpha: 0.2),
+                              color: account.isConnected
+                                  ? const Color(0xFF10B981)
+                                      .withValues(alpha: 0.2)
+                                  : const Color(0xFFEF4444)
+                                      .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: account.isConnected 
-                                    ? const Color(0xFF10B981).withValues(alpha: 0.4) 
-                                    : const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                color: account.isConnected
+                                    ? const Color(0xFF10B981)
+                                        .withValues(alpha: 0.4)
+                                    : const Color(0xFFEF4444)
+                                        .withValues(alpha: 0.4),
                               ),
                             ),
                             child: Text(
                               account.isConnected ? 'Live' : 'Disconnected',
                               style: TextStyle(
-                                color: account.isConnected 
-                                    ? const Color(0xFF10B981) 
+                                color: account.isConnected
+                                    ? const Color(0xFF10B981)
                                     : const Color(0xFFEF4444),
                                 fontSize: 9,
                                 fontWeight: FontWeight.w600,
@@ -390,49 +514,52 @@ class _DashboardContentState extends State<DashboardContent> {
     return Consumer<HeaderProvider>(
       builder: (context, headerProvider, _) {
         final userId = headerProvider.header?.user.id ?? 'guest';
-        
+
         return StatefulBuilder(
           builder: (context, setState) {
             bool isHovered = false;
-            
+
             return MouseRegion(
               onEnter: (_) => setState(() => isHovered = true),
               onExit: (_) => setState(() => isHovered = false),
               child: GestureDetector(
                 onTap: () {
                   final url = 'https://www.forex.com?ref=$userId';
-                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                  launchUrl(Uri.parse(url),
+                      mode: LaunchMode.externalApplication);
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 400),
                   curve: Curves.easeOutCubic,
-                  padding: isHovered 
+                  padding: isHovered
                       ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
                       : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     // Glassmorphism effect
-                    color: isHovered 
+                    color: isHovered
                         ? Colors.white.withValues(alpha: 0.15)
                         : Colors.white.withValues(alpha: 0.08),
                     // Heartbeat border animation
                     border: Border.all(
-                      color: isHovered 
+                      color: isHovered
                           ? _getHeartbeatBorderColor()
                           : Colors.white.withValues(alpha: 0.2),
                       width: isHovered ? 2.0 : 1.5,
                     ),
                     borderRadius: BorderRadius.circular(16),
                     // Advanced glassmorphism shadow with heartbeat effect
-                    boxShadow: isHovered 
+                    boxShadow: isHovered
                         ? [
                             BoxShadow(
-                              color: _getHeartbeatShadowColor().withValues(alpha: 0.5),
+                              color: _getHeartbeatShadowColor()
+                                  .withValues(alpha: 0.5),
                               blurRadius: _getHeartbeatBlurRadius(),
                               spreadRadius: 4,
                               offset: const Offset(0, 8),
                             ),
                             BoxShadow(
-                              color: _getHeartbeatShadowColor().withValues(alpha: 0.3),
+                              color: _getHeartbeatShadowColor()
+                                  .withValues(alpha: 0.3),
                               blurRadius: _getHeartbeatBlurRadius() * 1.5,
                               spreadRadius: 2,
                               offset: const Offset(0, 4),
@@ -447,7 +574,7 @@ class _DashboardContentState extends State<DashboardContent> {
                             ),
                           ],
                     // Inner glow effect
-                    gradient: isHovered 
+                    gradient: isHovered
                         ? LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -459,7 +586,7 @@ class _DashboardContentState extends State<DashboardContent> {
                           )
                         : null,
                   ),
-                  child: isHovered 
+                  child: isHovered
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -481,50 +608,67 @@ class _DashboardContentState extends State<DashboardContent> {
                                     child: Container(
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                                        color: const Color(0xFFEF4444)
+                                            .withValues(alpha: 0.5),
                                       ),
-                                    ).animate(
-                                      onComplete: (controller) => controller.repeat(),
-                                    ).scale(
-                                      begin: const Offset(1.0, 1.0),
-                                      end: const Offset(1.8, 1.8),
-                                      duration: const Duration(milliseconds: 600),
-                                      curve: Curves.easeInOut,
-                                    ),
+                                    )
+                                        .animate(
+                                          onComplete: (controller) =>
+                                              controller.repeat(),
+                                        )
+                                        .scale(
+                                          begin: const Offset(1.0, 1.0),
+                                          end: const Offset(1.8, 1.8),
+                                          duration:
+                                              const Duration(milliseconds: 600),
+                                          curve: Curves.easeInOut,
+                                        ),
                                   ),
                                   // Green pulse
                                   Positioned.fill(
                                     child: Container(
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                        color: const Color(0xFF10B981)
+                                            .withValues(alpha: 0.4),
                                       ),
-                                    ).animate(
-                                      delay: const Duration(milliseconds: 300),
-                                      onComplete: (controller) => controller.repeat(),
-                                    ).scale(
-                                      begin: const Offset(1.0, 1.0),
-                                      end: const Offset(1.6, 1.6),
-                                      duration: const Duration(milliseconds: 800),
-                                      curve: Curves.easeInOut,
-                                    ),
+                                    )
+                                        .animate(
+                                          delay:
+                                              const Duration(milliseconds: 300),
+                                          onComplete: (controller) =>
+                                              controller.repeat(),
+                                        )
+                                        .scale(
+                                          begin: const Offset(1.0, 1.0),
+                                          end: const Offset(1.6, 1.6),
+                                          duration:
+                                              const Duration(milliseconds: 800),
+                                          curve: Curves.easeInOut,
+                                        ),
                                   ),
                                   // White inner glow
                                   Positioned.fill(
                                     child: Container(
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: Colors.white.withValues(alpha: 0.3),
+                                        color:
+                                            Colors.white.withValues(alpha: 0.3),
                                       ),
-                                    ).animate(
-                                      delay: const Duration(milliseconds: 150),
-                                      onComplete: (controller) => controller.repeat(),
-                                    ).scale(
-                                      begin: const Offset(1.0, 1.0),
-                                      end: const Offset(1.4, 1.4),
-                                      duration: const Duration(milliseconds: 500),
-                                      curve: Curves.easeInOut,
-                                    ),
+                                    )
+                                        .animate(
+                                          delay:
+                                              const Duration(milliseconds: 150),
+                                          onComplete: (controller) =>
+                                              controller.repeat(),
+                                        )
+                                        .scale(
+                                          begin: const Offset(1.0, 1.0),
+                                          end: const Offset(1.4, 1.4),
+                                          duration:
+                                              const Duration(milliseconds: 500),
+                                          curve: Curves.easeInOut,
+                                        ),
                                   ),
                                 ],
                               ),
@@ -579,7 +723,8 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   String _formatCurrency(double amount, String currency) {
-    final normalized = currency.trim().isEmpty ? 'USD' : currency.trim().toUpperCase();
+    final normalized =
+        currency.trim().isEmpty ? 'USD' : currency.trim().toUpperCase();
     final formatted = amount.toStringAsFixed(2);
     if (normalized == 'USD') {
       return '\$$formatted';
@@ -759,18 +904,38 @@ class _DashboardContentState extends State<DashboardContent> {
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               );
             }
-            
+
             final data = snapshot.data;
             final features = data?['features'] as Map<String, dynamic>? ?? {};
-            
+
             return Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
-                _buildHeroChip('Smart Triggers', Icons.bolt, features['smart_triggers']),
-                _buildHeroChip('Realtime Charts', Icons.candlestick_chart, features['realtime_charts']),
-                _buildHeroChip('News-Aware', Icons.newspaper, features['news_aware']),
-                _buildHeroChip('Autonomous Actions', Icons.auto_awesome, features['autonomous_actions']),
+                _buildHeroChip(
+                  'Smart Triggers',
+                  Icons.bolt,
+                  features['smart_triggers'],
+                  onTap: () => _handleHeroChipTap('Smart Triggers'),
+                ),
+                _buildHeroChip(
+                  'Realtime Charts',
+                  Icons.candlestick_chart,
+                  features['realtime_charts'],
+                  onTap: () => _handleHeroChipTap('Realtime Charts'),
+                ),
+                _buildHeroChip(
+                  'News-Aware',
+                  Icons.newspaper,
+                  features['news_aware'],
+                  onTap: () => _handleHeroChipTap('News-Aware'),
+                ),
+                _buildHeroChip(
+                  'Autonomous Actions',
+                  Icons.auto_awesome,
+                  features['autonomous_actions'],
+                  onTap: () => _handleHeroChipTap('Autonomous Actions'),
+                ),
               ],
             );
           },
@@ -782,7 +947,9 @@ class _DashboardContentState extends State<DashboardContent> {
             return _buildAccountSummaryCard(
               title: 'Welcome Back!',
               subtitle: 'Online',
-              value: account != null ? _formatCurrency(account.balance, account.currency) : '\$0.00',
+              value: account != null
+                  ? _formatCurrency(account.balance, account.currency)
+                  : '\$0.00',
               accent: const Color(0xFF10B981),
               wide: true,
               showValueInHeader: true,
@@ -796,7 +963,9 @@ class _DashboardContentState extends State<DashboardContent> {
             return _buildAccountSummaryCard(
               title: 'Total Account Balance',
               subtitle: 'All assets',
-              value: account != null ? _formatCurrency(account.balance, account.currency) : '\$0.00',
+              value: account != null
+                  ? _formatCurrency(account.balance, account.currency)
+                  : '\$0.00',
               accent: const Color(0xFF60A5FA),
               wide: true,
             );
@@ -806,54 +975,90 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildHeroChip(String label, IconData icon, dynamic featureData) {
+  Widget _buildHeroChip(
+    String label,
+    IconData icon,
+    dynamic featureData, {
+    required VoidCallback onTap,
+  }) {
     final isActive = featureData?['active'] ?? false;
-    final status = featureData?['status'] ?? 'inactive';
     final count = featureData?['count'] ?? 0;
     final sentiment = featureData?['sentiment'] ?? 'neutral';
     final volatility = featureData?['volatility'] ?? 'low';
     final riskLevel = featureData?['risk_level'] ?? 'low';
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.green.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isActive ? Colors.green.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: isActive ? const Color(0xFF10B981) : const Color(0xFF7DD3FC)),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? Colors.white : Colors.white70,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+
+    return Tooltip(
+      message: 'Open $label',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? Colors.green.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isActive
+                      ? Colors.green.withValues(alpha: 0.3)
+                      : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
-              if (count > 0 || sentiment != 'neutral' || volatility != 'low' || riskLevel != 'low')
-                Text(
-                  [
-                    if (count > 0) '$count active',
-                    if (sentiment != 'neutral') sentiment,
-                    if (volatility != 'low') volatility,
-                    if (riskLevel != 'low') riskLevel,
-                  ].join(' • '),
-                  style: TextStyle(
-                    color: isActive ? const Color(0xFF10B981) : Colors.white54,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w500,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 14,
+                    color: isActive
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF7DD3FC),
                   ),
-                ),
-            ],
+                  const SizedBox(width: 6),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: isActive ? Colors.white : Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (count > 0 ||
+                          sentiment != 'neutral' ||
+                          volatility != 'low' ||
+                          riskLevel != 'low')
+                        Text(
+                          [
+                            if (count > 0) '$count active',
+                            if (sentiment != 'neutral') sentiment,
+                            if (volatility != 'low') volatility,
+                            if (riskLevel != 'low') riskLevel,
+                          ].join(' - '),
+                          style: TextStyle(
+                            color: isActive
+                                ? const Color(0xFF10B981)
+                                : Colors.white54,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -891,7 +1096,9 @@ class _DashboardContentState extends State<DashboardContent> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: _isAIActive ? const Color(0xFF10B981).withValues(alpha: 0.9) : const Color(0xFFEF4444).withValues(alpha: 0.9),
+                color: _isAIActive
+                    ? const Color(0xFF10B981).withValues(alpha: 0.9)
+                    : const Color(0xFFEF4444).withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -1012,7 +1219,8 @@ class _DashboardContentState extends State<DashboardContent> {
               const Spacer(),
               if (title.startsWith('Welcome'))
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
@@ -1085,7 +1293,8 @@ class _DashboardContentState extends State<DashboardContent> {
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12)),
                     ),
                     child: const Text(
                       '1H',
@@ -1106,14 +1315,23 @@ class _DashboardContentState extends State<DashboardContent> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      (_isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.9),
-                      (_isAIActive ? const Color(0xFF059669) : const Color(0xFFDC2626)).withValues(alpha: 0.9),
+                      (_isAIActive
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444))
+                          .withValues(alpha: 0.9),
+                      (_isAIActive
+                              ? const Color(0xFF059669)
+                              : const Color(0xFFDC2626))
+                          .withValues(alpha: 0.9),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: (_isAIActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.35),
+                      color: (_isAIActive
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444))
+                          .withValues(alpha: 0.35),
                       blurRadius: 10,
                     ),
                   ],
@@ -1711,10 +1929,7 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
           ],
         ),
-      )
-          .animate()
-          .fadeIn(duration: const Duration(milliseconds: 600))
-          .slideY(
+      ).animate().fadeIn(duration: const Duration(milliseconds: 600)).slideY(
             begin: 0.3,
             delay: Duration(milliseconds: delay),
           ),
@@ -1754,7 +1969,7 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => setState(() => _selectedTab = index),
+          onTap: () => _selectFeatureTab(index),
           borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1825,6 +2040,8 @@ class _DashboardContentState extends State<DashboardContent> {
               const SizedBox(height: 16),
               const AIPredictionWidget(),
               const SizedBox(height: 24),
+              const AutomationPanel(),
+              const SizedBox(height: 24),
               _buildSecurityAndPermissions(),
               const SizedBox(height: 24),
               const TaskHistoryTable(),
@@ -1867,6 +2084,8 @@ class _DashboardContentState extends State<DashboardContent> {
               _buildAccessHeader(),
               const SizedBox(height: 16),
               const AIPredictionWidget(),
+              const SizedBox(height: 24),
+              const AutomationPanel(),
               const SizedBox(height: 24),
               _buildSecurityAndPermissions(),
               const SizedBox(height: 24),
@@ -1941,11 +2160,13 @@ class _DashboardContentState extends State<DashboardContent> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.12)),
                 ),
                 child: const Text(
                   'Online',
@@ -2115,7 +2336,8 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
@@ -2169,7 +2391,7 @@ class _DashboardContentState extends State<DashboardContent> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Selling \$ when USD/PKR hits 289 shortly. Confidence: 81%',
+            'Selling \$ when USD/PKR hits 289 shortly. Confidence: 83%',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.6),
               fontSize: 11,
@@ -2201,9 +2423,8 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Text(
         label,
         style: TextStyle(
-          color: color == const Color(0xFF3B82F6)
-              ? Colors.white
-              : Colors.white70,
+          color:
+              color == const Color(0xFF3B82F6) ? Colors.white : Colors.white70,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
@@ -2394,7 +2615,8 @@ class _DashboardContentState extends State<DashboardContent> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -2547,13 +2769,16 @@ class _DashboardContentState extends State<DashboardContent> {
           const SizedBox(height: 8),
           Text(
             'Link your broker to unlock autonomous execution and real-time alerts.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Column(
             children: [
-              _buildConnectRow(Icons.shield_outlined, 'Secure API with limited authority'),
-              _buildConnectRow(Icons.link_outlined, 'Instantly link accounts to Forex.com'),
+              _buildConnectRow(
+                  Icons.shield_outlined, 'Secure API with limited authority'),
+              _buildConnectRow(
+                  Icons.link_outlined, 'Instantly link accounts to Forex.com'),
               _buildConnectRow(Icons.emergency_outlined, '24/7 emergency stop'),
             ],
           ),
@@ -2573,18 +2798,21 @@ class _DashboardContentState extends State<DashboardContent> {
                   style: AppTheme.glassElevatedButtonStyle(
                     tintColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     borderRadius: 12,
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.12)),
                 ),
                 child: const Text(
                   '+\$16.02',
@@ -2618,7 +2846,8 @@ class _DashboardContentState extends State<DashboardContent> {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
             ),
           ),
         ],
@@ -2662,29 +2891,17 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildAnalyticsTab() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const PerformanceAnalytics()
-              .animate()
-              .fadeIn(duration: const Duration(milliseconds: 600))
-              .slideY(begin: 0.2),
-        ],
-      ),
-    );
+    return const PerformanceAnalytics()
+        .animate()
+        .fadeIn(duration: const Duration(milliseconds: 600))
+        .slideY(begin: 0.2);
   }
 
   Widget _buildNewsTab() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const NewsSentimentWidget()
-              .animate()
-              .fadeIn(duration: const Duration(milliseconds: 600))
-              .slideY(begin: 0.2),
-        ],
-      ),
-    );
+    return const NewsSentimentWidget()
+        .animate()
+        .fadeIn(duration: const Duration(milliseconds: 600))
+        .slideY(begin: 0.2);
   }
 
   Widget _buildAlertsTab() {

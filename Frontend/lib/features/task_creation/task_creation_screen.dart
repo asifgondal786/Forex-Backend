@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_background.dart';
 import '../../core/models/task.dart';
@@ -19,7 +20,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final GeminiService _geminiService = GeminiService();
-  
+
   TaskPriority _selectedPriority = TaskPriority.medium;
   bool _isLoading = false;
   bool _isAiEnhancing = false;
@@ -36,8 +37,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     setState(() => _isAiEnhancing = true);
 
     try {
-      final suggestion =
-          await _geminiService.generateTaskSuggestion(_titleController.text.trim());
+      final suggestion = await _geminiService
+          .generateTaskSuggestion(_titleController.text.trim());
 
       if (mounted) {
         setState(() {
@@ -95,6 +96,54 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showCapabilitySnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _handleAdaptiveSignalScoring() async {
+    if (_titleController.text.trim().isEmpty) {
+      _titleController.text = 'Adaptive signal scoring for EUR/USD momentum';
+    }
+    await _getAiSuggestion();
+    _showCapabilitySnack('Adaptive Signal Scoring applied to this task.');
+  }
+
+  Future<void> _handleVolatilityWatch() async {
+    _titleController.text = 'Real-time volatility watch for EUR/USD';
+    if (_descriptionController.text.trim().isEmpty) {
+      _descriptionController.text =
+          'Watch volatility spikes and trigger guarded alerts for fast market moves.';
+    }
+    setState(() => _selectedPriority = TaskPriority.high);
+    await _getAiSuggestion();
+    _showCapabilitySnack('Real Time Volatility Watch configured.');
+  }
+
+  Future<void> _handleForexMonitor() async {
+    final url = Uri.parse('https://www.forex.com/en-us/market-analysis/');
+    try {
+      final launched = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        _showCapabilitySnack('Unable to open Forex.com Monitor right now.');
+      }
+    } catch (_) {
+      _showCapabilitySnack('Unable to open Forex.com Monitor right now.');
+    }
+  }
+
+  void _handleRiskGuardlessAndAlerts() {
+    Navigator.pushNamed(context, '/settings');
   }
 
   @override
@@ -225,7 +274,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                   Icon(Icons.auto_awesome, size: 16, color: Colors.white70),
                   SizedBox(width: 6),
                   Text(
-                    'ML + DL Enabled',
+                    'Track charts, news and signal',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -382,7 +431,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primaryGreen, width: 2),
+              borderSide:
+                  const BorderSide(color: AppColors.primaryGreen, width: 2),
             ),
           ),
           validator: (value) {
@@ -408,10 +458,12 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             ? const SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
               )
             : const Icon(Icons.auto_awesome, size: 20),
-        label: Text(_isAiEnhancing ? 'AI is analyzing...' : '✨ Enhance with AI'),
+        label:
+            Text(_isAiEnhancing ? 'AI is analyzing...' : '✨ Enhance with AI'),
         style: AppTheme.glassElevatedButtonStyle(
           tintColor: const Color(0xFF3B82F6),
           foregroundColor: Colors.white,
@@ -455,7 +507,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primaryGreen, width: 2),
+              borderSide:
+                  const BorderSide(color: AppColors.primaryGreen, width: 2),
             ),
           ),
           validator: (value) {
@@ -495,7 +548,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               'Medium',
               AppColors.priorityMedium,
             ),
-            _buildPriorityChip(TaskPriority.high, 'High', AppColors.priorityHigh),
+            _buildPriorityChip(
+                TaskPriority.high, 'High', AppColors.priorityHigh),
           ],
         ),
       ],
@@ -609,7 +663,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...examples.map((example) => Padding( // This part cannot be const due to `_getAiSuggestion`
+        ...examples.map((example) => Padding(
+              // This part cannot be const due to `_getAiSuggestion`
               padding: const EdgeInsets.only(bottom: 8),
               child: InkWell(
                 onTap: () {
@@ -624,7 +679,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                     border: Border.all(color: Colors.white.withAlpha(26)),
                   ),
                   child: Row(
-                    children: [ // This part cannot be const due to `example`
+                    children: [
+                      // This part cannot be const due to `example`
                       Icon(Icons.lightbulb_outline,
                           color: Colors.white.withAlpha(160), size: 16),
                       const SizedBox(width: 8),
@@ -654,25 +710,31 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'AI Companion Mode',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
           Text(
-            'ML + DL engines track charts, news, and learning signals so you stay ahead.',
+            'ML + DL engines track charts, news signal. Track charts, news and signal.',
             style: TextStyle(color: Colors.white.withOpacity(0.7), height: 1.4),
           ),
           const SizedBox(height: 16),
-          _buildCapabilityRow(Icons.auto_graph, 'Adaptive signal scoring'),
-          _buildCapabilityRow(Icons.radar, 'Real-time volatility watch'),
-          _buildCapabilityRow(Icons.newspaper, 'News impact detection'),
-          _buildCapabilityRow(Icons.school_outlined, 'Forex.com learning monitor'),
-          _buildCapabilityRow(Icons.shield_outlined, 'Risk guardrails & alerts'),
+          _buildCapabilityRow(
+            Icons.auto_graph,
+            'Adaptive Signal Scoring',
+            onTap: _handleAdaptiveSignalScoring,
+          ),
+          _buildCapabilityRow(
+            Icons.radar,
+            'Real Time Volatility Watch',
+            onTap: _handleVolatilityWatch,
+          ),
+          _buildCapabilityRow(
+            Icons.school_outlined,
+            'Forex.com Monitor',
+            onTap: _handleForexMonitor,
+          ),
+          _buildCapabilityRow(
+            Icons.shield_outlined,
+            'Risk guardless and alerts',
+            onTap: _handleRiskGuardlessAndAlerts,
+          ),
           const SizedBox(height: 16),
           Container(
             width: double.infinity,
@@ -685,7 +747,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               ),
             ),
             child: const Text(
-              'U Sleep, I Work: The companion stays active and notifies you when markets shift.',
+              'I am here active and will notify you periodically',
               style: TextStyle(
                 color: Color(0xFF9AE6B4),
                 fontSize: 12,
@@ -698,28 +760,47 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     );
   }
 
-  Widget _buildCapabilityRow(IconData icon, String label) {
+  Widget _buildCapabilityRow(
+    IconData icon,
+    String label, {
+    required VoidCallback onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 16, color: Colors.white70),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
+                Icon(
+                  Icons.open_in_new,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.45),
+                ),
+              ],
             ),
-            child: Icon(icon, size: 16, color: Colors.white70),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

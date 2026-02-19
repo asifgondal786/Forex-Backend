@@ -32,6 +32,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
     _apiService = context.read<ApiService>();
     _liveUpdatesService = context.read<LiveUpdatesService>();
     _initialized = true;
+    unawaited(_liveUpdatesService.connect());
     _loadNotifications();
     _listenForNotifications();
   }
@@ -51,6 +52,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           timestamp: notificationUpdate.timestamp,
           read: notificationUpdate.read,
           clicked: false,
+          richData: Map<String, dynamic>.from(notificationUpdate.richData),
         );
 
         setState(() {
@@ -238,6 +240,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
     final isUnread = !item.read;
     final accent = _priorityColor(item.priority);
     final timestamp = _formatTimestamp(item.timestamp);
+    final deepStudy = _extractDeepStudy(item);
 
     return Material(
       color: Colors.transparent,
@@ -325,6 +328,10 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                         ),
                       ],
                     ),
+                    if (deepStudy != null) ...[
+                      const SizedBox(height: 8),
+                      _buildDeepStudyStrip(deepStudy, accent),
+                    ],
                   ],
                 ),
               ),
@@ -343,6 +350,92 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
         ),
       ),
     );
+  }
+
+  Map<String, dynamic>? _extractDeepStudy(AppNotification item) {
+    final raw = item.richData['deep_study'];
+    if (raw is Map<String, dynamic>) {
+      return raw;
+    }
+    if (raw is Map) {
+      final parsed = <String, dynamic>{};
+      raw.forEach((key, value) {
+        parsed[key.toString()] = value;
+      });
+      return parsed;
+    }
+    return null;
+  }
+
+  Widget _buildDeepStudyStrip(Map<String, dynamic> deepStudy, Color accent) {
+    final confidence = _toDouble(deepStudy['consensus_score']);
+    final confidencePct = (confidence * 100).toStringAsFixed(1);
+
+    final sourceCoverage = deepStudy['source_coverage'];
+    int analyzed = 0;
+    int requested = 0;
+    if (sourceCoverage is Map) {
+      analyzed = _toInt(sourceCoverage['analyzed']);
+      requested = _toInt(sourceCoverage['requested']);
+    } else {
+      analyzed = _toInt(deepStudy['sources_analyzed']);
+      requested = _toInt(deepStudy['sources_requested']);
+    }
+
+    final signal = (deepStudy['recommendation'] ?? deepStudy['signal'] ?? 'n/a')
+        .toString()
+        .replaceAll('_', ' ');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.insights, size: 14, color: accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Deep Study: $confidencePct% | Sources $analyzed/$requested | Signal $signal',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.88),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _toInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value) ?? 0;
+    }
+    return 0;
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
   }
 
   Widget _buildBody() {

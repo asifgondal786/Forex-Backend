@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -73,6 +72,7 @@ class LiveUpdatesService {
     'DEV_USER_ID',
     defaultValue: '',
   );
+  static const String _defaultDevUserId = 'dev_user_001';
 
   WebSocketChannel? _channel;
   final _updatesController = StreamController<LiveUpdate>.broadcast();
@@ -106,8 +106,10 @@ class LiveUpdatesService {
       }
 
       final params = <String, String>{};
-      if (_devUserId.isNotEmpty) {
-        params['user_id'] = _devUserId;
+      final resolvedDevUserId =
+          _devUserId.isNotEmpty ? _devUserId : _defaultDevUserId;
+      if (resolvedDevUserId.isNotEmpty) {
+        params['user_id'] = resolvedDevUserId;
       }
       if (token != null && token.isNotEmpty) {
         params['token'] = token;

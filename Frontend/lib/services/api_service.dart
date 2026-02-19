@@ -206,6 +206,10 @@ class ApiService {
     String? quietHoursEnd,
     int? maxPerHour,
     bool? digestMode,
+    bool? autonomousMode,
+    String? autonomousProfile,
+    double? autonomousMinConfidence,
+    Map<String, dynamic>? channelSettings,
   }) async {
     try {
       final body = <String, dynamic>{};
@@ -215,6 +219,12 @@ class ApiService {
       if (quietHoursEnd != null) body['quiet_hours_end'] = quietHoursEnd;
       if (maxPerHour != null) body['max_per_hour'] = maxPerHour;
       if (digestMode != null) body['digest_mode'] = digestMode;
+      if (autonomousMode != null) body['autonomous_mode'] = autonomousMode;
+      if (autonomousProfile != null) body['autonomous_profile'] = autonomousProfile;
+      if (autonomousMinConfidence != null) {
+        body['autonomous_min_confidence'] = autonomousMinConfidence;
+      }
+      if (channelSettings != null) body['channel_settings'] = channelSettings;
 
       final headers = await _buildHeaders();
       final response = await _client.post(
@@ -253,6 +263,35 @@ class ApiService {
     } catch (e) {
       debugPrint('Error sending notification: $e');
       throw ApiException('Error sending notification: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> sendAutonomousStudyAlert({
+    required String pair,
+    String? userInstruction,
+    String? priority,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'pair': pair,
+      };
+      if (userInstruction != null && userInstruction.trim().isNotEmpty) {
+        body['user_instruction'] = userInstruction.trim();
+      }
+      if (priority != null && priority.trim().isNotEmpty) {
+        body['priority'] = priority.trim().toLowerCase();
+      }
+
+      final headers = await _buildHeaders();
+      final response = await _client.post(
+        Uri.parse('$baseUrl/api/notifications/autonomous-study'),
+        headers: headers,
+        body: json.encode(body),
+      ).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error sending autonomous study alert: $e');
+      throw ApiException('Error sending autonomous study alert: $e');
     }
   }
 
@@ -554,6 +593,129 @@ class ApiService {
         },
         "risk": {}
       };
+    }
+  }
+
+  Future<Map<String, dynamic>> getAutonomyGuardrails() async {
+    try {
+      final headers = await _buildHeaders();
+      final userId = headers['x-user-id'] ?? '';
+      if (userId.isEmpty) {
+        throw ApiException('User ID unavailable for guardrails lookup');
+      }
+      final response = await _client.get(
+        Uri.parse('$baseUrl/api/advanced/autonomy/guardrails/$userId'),
+        headers: headers,
+      ).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error fetching autonomy guardrails: $e');
+      throw ApiException('Error fetching autonomy guardrails: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> configureAutonomyGuardrails({
+    String? level,
+    Map<String, dynamic>? probation,
+    Map<String, dynamic>? riskBudget,
+  }) async {
+    try {
+      final headers = await _buildHeaders();
+      final userId = headers['x-user-id'] ?? '';
+      if (userId.isEmpty) {
+        throw ApiException('User ID unavailable for guardrails configuration');
+      }
+      final body = <String, dynamic>{
+        'user_id': userId,
+      };
+      if (level != null && level.trim().isNotEmpty) {
+        body['level'] = level.trim().toLowerCase();
+      }
+      if (probation != null) body['probation'] = probation;
+      if (riskBudget != null) body['risk_budget'] = riskBudget;
+
+      final response = await _client.post(
+        Uri.parse('$baseUrl/api/advanced/autonomy/guardrails/configure'),
+        headers: headers,
+        body: json.encode(body),
+      ).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error configuring autonomy guardrails: $e');
+      throw ApiException('Error configuring autonomy guardrails: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> explainBeforeExecute({
+    required Map<String, dynamic> tradeParams,
+  }) async {
+    try {
+      final headers = await _buildHeaders();
+      final userId = headers['x-user-id'] ?? '';
+      if (userId.isEmpty) {
+        throw ApiException('User ID unavailable for explain-before-execute');
+      }
+      final response = await _client.post(
+        Uri.parse('$baseUrl/api/advanced/autonomy/explain-before-execute'),
+        headers: headers,
+        body: json.encode({
+          'user_id': userId,
+          'trade_params': tradeParams,
+        }),
+      ).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error running explain-before-execute: $e');
+      throw ApiException('Error running explain-before-execute: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> executeAutonomousTrade({
+    required Map<String, dynamic> tradeParams,
+  }) async {
+    try {
+      final headers = await _buildHeaders();
+      final userId = headers['x-user-id'] ?? '';
+      if (userId.isEmpty) {
+        throw ApiException('User ID unavailable for trade execution');
+      }
+      final uri = Uri.parse('$baseUrl/api/advanced/risk/execute-trade').replace(
+        queryParameters: {
+          'user_id': userId,
+        },
+      );
+      final response = await _client.post(
+        uri,
+        headers: headers,
+        body: json.encode(tradeParams),
+      ).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error executing autonomous trade: $e');
+      throw ApiException('Error executing autonomous trade: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> activateKillSwitch() async {
+    try {
+      final headers = await _buildHeaders();
+      final userId = headers['x-user-id'] ?? '';
+      if (userId.isEmpty) {
+        throw ApiException('User ID unavailable for kill switch');
+      }
+      final uri = Uri.parse('$baseUrl/api/advanced/risk/kill-switch').replace(
+        queryParameters: {
+          'user_id': userId,
+        },
+      );
+      final response = await _client.post(
+        uri,
+        headers: headers,
+      ).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error activating kill switch: $e');
+      throw ApiException('Error activating kill switch: $e');
     }
   }
 

@@ -7,6 +7,7 @@ class AppNotification {
   final DateTime? timestamp;
   final bool read;
   final bool clicked;
+  final Map<String, dynamic> richData;
 
   const AppNotification({
     required this.id,
@@ -17,12 +18,14 @@ class AppNotification {
     required this.timestamp,
     required this.read,
     required this.clicked,
+    required this.richData,
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     final rawRead = json['read'] ?? json['is_read'] ?? json['isRead'];
     final rawClicked = json['clicked'] ?? json['is_clicked'] ?? json['isClicked'];
     final timestamp = _parseTimestamp(json['timestamp']);
+    final richData = _parseMap(json['rich_data'] ?? json['richData']);
 
     return AppNotification(
       id: (json['notification_id'] ??
@@ -37,10 +40,11 @@ class AppNotification {
       timestamp: timestamp,
       read: rawRead == true,
       clicked: rawClicked == true,
+      richData: richData,
     );
   }
 
-  AppNotification copyWith({bool? read, bool? clicked}) {
+  AppNotification copyWith({bool? read, bool? clicked, Map<String, dynamic>? richData}) {
     return AppNotification(
       id: id,
       title: title,
@@ -50,6 +54,7 @@ class AppNotification {
       timestamp: timestamp,
       read: read ?? this.read,
       clicked: clicked ?? this.clicked,
+      richData: richData ?? this.richData,
     );
   }
 
@@ -68,5 +73,19 @@ class AppNotification {
       }
     }
     return null;
+  }
+
+  static Map<String, dynamic> _parseMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      final result = <String, dynamic>{};
+      value.forEach((key, val) {
+        result[key.toString()] = val;
+      });
+      return result;
+    }
+    return <String, dynamic>{};
   }
 }

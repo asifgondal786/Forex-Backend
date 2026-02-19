@@ -42,6 +42,18 @@ class RiskLimitsRequest(BaseModel):
     mandatory_take_profit: bool = True
 
 
+class AutonomyGuardrailsConfigRequest(BaseModel):
+    user_id: str
+    level: Optional[str] = None
+    probation: Optional[Dict] = None
+    risk_budget: Optional[Dict] = None
+
+
+class ExplainBeforeExecuteRequest(BaseModel):
+    user_id: str
+    trade_params: Dict
+
+
 @router.post("/risk/initialize-limits")
 async def initialize_risk_limits(user_id: str, limits: RiskLimitsRequest):
     """Initialize risk management limits for a user"""
@@ -70,13 +82,69 @@ async def validate_trade(user_id: str, trade_params: Dict):
 @router.post("/risk/execute-trade")
 async def execute_trade_with_risk_check(user_id: str, trade_params: Dict):
     """Execute trade with automatic risk checks"""
-    return await risk_manager.execute_trade_with_safety(user_id, trade_params)
+    pair = str(trade_params.get("pair") or "EUR/USD").strip().upper()
+    deep_study = await notification_svc.get_deep_study(pair=pair, max_headlines_per_source=3)
+    paper_summary = await paper_trading.get_paper_account_summary(user_id)
+
+    guard_passed, guard_reason, guard_context = await risk_manager.can_execute_autonomous_trade(
+        user_id=user_id,
+        trade_params=trade_params,
+        paper_summary=paper_summary,
+        deep_study=deep_study,
+    )
+    if not guard_passed:
+        risk_assessment = await risk_manager.get_risk_assessment(user_id)
+        await notification_svc.send_notification(
+            user_id=user_id,
+            template_id="risk_warning",
+            category="RISK_WARNING",
+            priority="critical",
+            warning_text=guard_reason,
+            account_status=f"Risk={risk_assessment.get('risk_level', 'unknown')}",
+        )
+        return {
+            "success": False,
+            "error": guard_reason,
+            "risk_check_failed": True,
+            "guardrails": guard_context,
+        }
+
+    result = await risk_manager.execute_trade_with_safety(user_id, trade_params)
+    if not result.get("success"):
+        result["guardrails"] = guard_context
+        return result
+
+    risk_assessment = await risk_manager.get_risk_assessment(user_id)
+    explain_card = await risk_manager.build_explain_before_execute(
+        user_id=user_id,
+        trade_params=trade_params,
+        risk_assessment=risk_assessment,
+        deep_study=deep_study,
+        guardrail_decision=guard_context,
+    )
+    result["guardrails"] = guard_context
+    result["explain_before_execute"] = explain_card
+    return result
 
 
 @router.post("/risk/close-trade")
 async def close_trade_with_pl(user_id: str, trade_id: str, exit_price: float):
     """Close a trade and calculate P&L"""
-    return await risk_manager.close_trade(user_id, trade_id, exit_price)
+    result = await risk_manager.close_trade(user_id, trade_id, exit_price)
+    risk_assessment = await risk_manager.get_risk_assessment(user_id)
+    guardrails = risk_assessment.get("autonomy_guardrails", {})
+    result["autonomy_guardrails"] = guardrails
+
+    if guardrails.get("paused"):
+        await notification_svc.send_notification(
+            user_id=user_id,
+            template_id="risk_warning",
+            category="RISK_WARNING",
+            priority="critical",
+            warning_text=str(guardrails.get("pause_reason") or "Autonomy paused"),
+            account_status=f"Risk={risk_assessment.get('risk_level', 'unknown')}",
+        )
+    return result
 
 
 @router.post("/risk/kill-switch")
@@ -102,6 +170,58 @@ async def activate_kill_switch(user_id: str):
 async def get_risk_assessment(user_id: str):
     """Get comprehensive risk assessment"""
     return await risk_manager.get_risk_assessment(user_id)
+
+
+@router.post("/autonomy/guardrails/configure")
+async def configure_autonomy_guardrails(request: AutonomyGuardrailsConfigRequest):
+    """Configure probation policy, risk budget, and autonomy level."""
+    return await risk_manager.configure_autonomy_guardrails(
+        user_id=request.user_id,
+        probation=request.probation,
+        risk_budget=request.risk_budget,
+        level=request.level,
+    )
+
+
+@router.get("/autonomy/guardrails/{user_id}")
+async def get_autonomy_guardrails(user_id: str):
+    """Get autonomous governance and safety guardrails."""
+    return await risk_manager.get_autonomy_guardrails(user_id)
+
+
+@router.post("/autonomy/explain-before-execute")
+async def explain_before_execute(request: ExplainBeforeExecuteRequest):
+    """
+    Produce the explain-before-execute card for a prospective trade.
+    Includes deep-study context, risk posture, and guardrail decision.
+    """
+    pair = str(request.trade_params.get("pair") or "EUR/USD").strip().upper()
+    deep_study = await notification_svc.get_deep_study(pair=pair, max_headlines_per_source=3)
+    paper_summary = await paper_trading.get_paper_account_summary(request.user_id)
+    guard_passed, guard_reason, guard_context = await risk_manager.can_execute_autonomous_trade(
+        user_id=request.user_id,
+        trade_params=request.trade_params,
+        paper_summary=paper_summary,
+        deep_study=deep_study,
+    )
+    risk_assessment = await risk_manager.get_risk_assessment(request.user_id)
+    card = await risk_manager.build_explain_before_execute(
+        user_id=request.user_id,
+        trade_params=request.trade_params,
+        risk_assessment=risk_assessment,
+        deep_study=deep_study,
+        guardrail_decision={
+            **guard_context,
+            "guard_passed": guard_passed,
+            "guard_reason": guard_reason,
+        },
+    )
+    return {
+        "success": True,
+        "guard_passed": guard_passed,
+        "guard_reason": guard_reason,
+        "card": card,
+    }
 
 
 @router.get("/risk/analytics/{user_id}")
@@ -631,6 +751,8 @@ async def get_copilot_status(user_id: str):
         "copilot_active": copilot_active,
         "risk_level": risk_status.get("risk_level", "unknown"),
         "legal_compliant": legal_status.get("compliant", False),
+        "autonomy_guardrails": risk_status.get("autonomy_guardrails", {}),
+        "risk_budget": risk_status.get("risk_budget", {}),
         "features": {
             "autonomous_trading": copilot_active,
             "predictive_analysis": True,
@@ -693,6 +815,7 @@ async def get_features_status(user_id: str):
                     "active": autonomous_actions_active,
                     "risk_level": risk_assessment.get("risk_level", "moderate"),
                     "predictions": len(predictions.get("predictions", [])),
+                    "guardrails": risk_assessment.get("autonomy_guardrails", {}),
                     "status": "active" if autonomous_actions_active else "inactive",
                     "last_updated": datetime.now().isoformat()
                 }
@@ -703,7 +826,8 @@ async def get_features_status(user_id: str):
                 "risk_level": sentiment.get("risk_level", "low"),
                 "rates": sentiment.get("major_pairs", {})
             },
-            "risk": risk_assessment
+            "risk": risk_assessment,
+            "autonomy_guardrails": risk_assessment.get("autonomy_guardrails", {}),
         }
     except Exception as e:
         print(f"Error fetching features status: {e}")

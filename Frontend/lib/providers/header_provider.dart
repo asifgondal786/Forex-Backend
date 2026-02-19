@@ -49,6 +49,22 @@ class HeaderProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void incrementUnreadNotifications({int by = 1}) {
+    if (_header == null || by <= 0) {
+      return;
+    }
+
+    final currentHeader = _header!;
+    _header = HeaderData(
+      user: currentHeader.user,
+      balance: currentHeader.balance,
+      notifications: HeaderNotifications(
+        unread: currentHeader.notifications.unread + by,
+      ),
+    );
+    notifyListeners();
+  }
+
   void clearHeader() {
     _header = null;
     notifyListeners();

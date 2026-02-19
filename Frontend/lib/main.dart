@@ -83,7 +83,10 @@ class ForexCompanionApp extends StatelessWidget {
         Provider<ApiService>.value(value: apiService),
         if (firebaseService != null)
           Provider<FirebaseService>.value(value: firebaseService),
-        Provider<LiveUpdatesService>(create: (_) => LiveUpdatesService()),
+        Provider<LiveUpdatesService>(
+          create: (_) => LiveUpdatesService(),
+          dispose: (_, service) => service.dispose(),
+        ),
 
         // Theme Provider
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
