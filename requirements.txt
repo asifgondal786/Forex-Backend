@@ -23,6 +23,7 @@ python-dotenv==1.0.1
 # Validation
 pydantic==2.10.6
 pydantic-settings==2.1.0
+cryptography==44.0.2
 
 # Authentication
 email-validator==2.1.0
@@ -32,4 +33,3 @@ firebase-admin==6.5.0
 
 # Google Generative AI (Gemini)
 google-generativeai>=0.8.0
-

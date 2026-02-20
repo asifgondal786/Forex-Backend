@@ -11,15 +11,20 @@ import numpy as np
 from dataclasses import dataclass
 import json
 import os
-import google.generativeai as genai
 from dotenv import load_dotenv
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 # Load environment variables
 load_dotenv()
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
+GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
+if GEMINI_AVAILABLE:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -260,7 +265,7 @@ class ForexAIEngine:
         Generate AI-powered trading signal using Google Generative AI (Gemini)
         """
         try:
-            if not GEMINI_API_KEY:
+            if not GEMINI_AVAILABLE:
                 return self.generate_trading_signal(pair, market_condition, user_strategy)
                 
             model = genai.GenerativeModel("gemini-2.0-flash")
@@ -410,7 +415,7 @@ class ForexAIEngine:
         Use Google Generative AI (Gemini) to analyze portfolio performance
         """
         try:
-            if not GEMINI_API_KEY:
+            if not GEMINI_AVAILABLE:
                 return self._get_default_portfolio_analysis(portfolio_data)
                 
             model = genai.GenerativeModel("gemini-1.5-pro")
