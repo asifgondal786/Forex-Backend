@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../features/dashboard/screens/dashboard_screen.dart';
+import '../features/embodied_agent/embodied_agent_screen.dart';
 import '../features/auth/auth_gate.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
@@ -8,6 +8,7 @@ import '../features/ai_chat/ai_chat_screen.dart';
 import '../features/task_creation/task_creation_screen.dart';
 import '../features/task_history/task_history_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/admin/user_admin_dashboard_screen.dart';
 
 class AppRoutes {
   static const String root = '/';
@@ -28,13 +29,12 @@ class AppRoutes {
     login: (_) => LoginScreen(onLoginSuccess: () {}),
     signup: (_) => const SignupScreen(),
     verify: (_) => const VerificationScreen(),
-    dashboard: (_) => const DashboardScreen(),
+    dashboard: (_) => const EmbodiedAgentScreen(),
     createTask: (_) => const TaskCreationScreen(),
     taskHistory: (_) => const TaskHistoryScreen(),
     aiChat: (_) => const AiChatScreen(),
     settings: (_) => const SettingsScreen(),
-    // Temporary placeholders for new pages - will be implemented in future updates
-    profile: (_) => const PlaceholderScreen(title: 'Profile'),
+    profile: (_) => const UserAdminDashboardScreen(),
     security: (_) => const PlaceholderScreen(title: 'Security'),
     help: (_) => const PlaceholderScreen(title: 'Help & Support'),
   };

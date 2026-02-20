@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:forex_companion/core/models/account_connection.dart';
 import 'package:forex_companion/services/api_service.dart';
-import 'package:forex_companion/core/widgets/custom_snackbar.dart';
 
 class AccountConnectionProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   List<AccountConnection> _connections = [];
   bool _isLoading = false;
   String? _selectedAccountId;
+  String? _lastError;
 
   List<AccountConnection> get connections => _connections;
   bool get isLoading => _isLoading;
   String? get selectedAccountId => _selectedAccountId;
+  String? get lastError => _lastError;
 
   AccountConnection? get selectedAccount {
     if (_connections.isNotEmpty) {
-      if (_selectedAccountId == null) {
-        _selectedAccountId = _connections.first.id;
-      }
+      _selectedAccountId ??= _connections.first.id;
       return _connections.firstWhere(
         (conn) => conn.id == _selectedAccountId,
         orElse: () => _connections.first,
@@ -36,6 +35,7 @@ class AccountConnectionProvider extends ChangeNotifier {
 
   Future<void> loadConnections() async {
     _isLoading = true;
+    _lastError = null;
     notifyListeners();
 
     try {
@@ -52,6 +52,7 @@ class AccountConnectionProvider extends ChangeNotifier {
       // Load mock data if API fails
       _connections = _createMockConnections();
       _selectedAccountId = _connections.first.id;
+      _lastError = 'Unable to fetch live broker connections.';
       debugPrint('Failed to load account connections: $error');
     } finally {
       _isLoading = false;
@@ -61,18 +62,20 @@ class AccountConnectionProvider extends ChangeNotifier {
 
   Future<void> connectForexAccount(String username, String password) async {
     _isLoading = true;
+    _lastError = null;
     notifyListeners();
 
     try {
-      final connection = await _apiService.connectForexAccount(username, password);
+      final connection =
+          await _apiService.connectForexAccount(username, password);
       _connections.add(connection);
-      
-      if (_selectedAccountId == null) {
-        _selectedAccountId = connection.id;
-      }
-      
+
+      _selectedAccountId ??= connection.id;
+
       debugPrint('Successfully connected to Forex.com');
     } catch (error) {
+      _lastError =
+          'Broker connection failed. Verify credentials and try again.';
       debugPrint('Connection failed: $error');
     } finally {
       _isLoading = false;
@@ -82,18 +85,21 @@ class AccountConnectionProvider extends ChangeNotifier {
 
   Future<void> disconnectAccount(String accountId) async {
     _isLoading = true;
+    _lastError = null;
     notifyListeners();
 
     try {
       await _apiService.disconnectAccount(accountId);
       _connections.removeWhere((conn) => conn.id == accountId);
-      
+
       if (_selectedAccountId == accountId) {
-        _selectedAccountId = _connections.isNotEmpty ? _connections.first.id : null;
+        _selectedAccountId =
+            _connections.isNotEmpty ? _connections.first.id : null;
       }
-      
+
       debugPrint('Account disconnected');
     } catch (error) {
+      _lastError = 'Unable to disconnect this account right now.';
       debugPrint('Disconnection failed: $error');
     } finally {
       _isLoading = false;

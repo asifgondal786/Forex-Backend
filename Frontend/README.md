@@ -10,6 +10,27 @@ flutter pub get
 flutter run
 ```
 
+## Security Notes
+
+For production builds, configure secure API endpoints and disable debug auth fallbacks:
+
+```bash
+flutter build web --release \
+  --dart-define=API_BASE_URL=https://api.your-domain.com \
+  --dart-define=WS_BASE_URL=wss://api.your-domain.com \
+  --dart-define=ALLOW_DEBUG_USER_FALLBACK=false \
+  --dart-define=SKIP_AUTH_GATE=false
+```
+
+Development-only convenience flags (do not use in production):
+
+```bash
+flutter run -d chrome \
+  --dart-define=DEV_USER_ID=dev_user_001 \
+  --dart-define=ALLOW_DEBUG_USER_FALLBACK=true \
+  --dart-define=SKIP_AUTH_GATE=true
+```
+
 ### Enable Gemini AI features
 Gemini is configured via a compile-time environment variable.
 

@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
-import '../dashboard/screens/dashboard_screen.dart';
+import '../embodied_agent/embodied_agent_screen.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/header_provider.dart';
@@ -20,7 +20,8 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool _didFetch = false;
   static const bool _requirePhoneVerification = true;
-  static const bool _skipAuthGate = true; // Skip authentication to redirect to home page
+  static const bool _skipAuthGate =
+      bool.fromEnvironment('SKIP_AUTH_GATE', defaultValue: false);
   static const String _devUserId =
       String.fromEnvironment('DEV_USER_ID', defaultValue: '');
 
@@ -37,11 +38,11 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_skipAuthGate) {
+    if (_skipAuthGate && kDebugMode) {
       if (_devUserId.isNotEmpty) {
         _fetchAfterBuild(context);
       }
-      return const DashboardScreen();
+      return const EmbodiedAgentScreen();
     }
 
     return StreamBuilder<firebase_auth.User?>(
@@ -61,8 +62,8 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         final needsEmail = !(user.emailVerified);
-        final needsPhone = _requirePhoneVerification &&
-            ((user.phoneNumber ?? '').isEmpty);
+        final needsPhone =
+            _requirePhoneVerification && ((user.phoneNumber ?? '').isEmpty);
         if (needsEmail || needsPhone) {
           _didFetch = false;
           return const VerificationScreen();
@@ -70,7 +71,7 @@ class _AuthGateState extends State<AuthGate> {
 
         _fetchAfterBuild(context);
 
-        return const DashboardScreen();
+        return const EmbodiedAgentScreen();
       },
     );
   }

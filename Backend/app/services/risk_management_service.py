@@ -8,6 +8,9 @@ from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import asyncio
 import os
+import json
+import hashlib
+import secrets
 
 
 class RiskLevel(Enum):
@@ -108,9 +111,21 @@ class RiskManagementService:
         self.risk_budgets: Dict[str, RiskBudget] = {}
         self.weekly_profit_loss: Dict[str, Dict[str, float]] = {}
         self.autonomy_state: Dict[str, AutonomyState] = {}
+        self.pending_explain_tokens: Dict[str, Dict] = {}
         self.require_broker_fail_safe = (
             os.getenv("REQUIRE_BROKER_FAIL_SAFE", "true").lower() != "false"
         )
+        self.require_explain_token = (
+            os.getenv("REQUIRE_EXPLAIN_BEFORE_EXECUTE", "true").lower() != "false"
+        )
+        self.explain_token_ttl_seconds = int(
+            os.getenv("EXPLAIN_TOKEN_TTL_SECONDS", "300")
+        )
+        allow_dev_probation = os.getenv("ALLOW_DEV_PROBATION_BYPASS")
+        if allow_dev_probation is None:
+            self.allow_dev_probation_bypass = os.getenv("DEBUG", "").lower() == "true"
+        else:
+            self.allow_dev_probation_bypass = allow_dev_probation.lower() == "true"
 
     def _get_or_create_probation_policy(self, user_id: str) -> ProbationPolicy:
         if user_id not in self.probation_policy:
@@ -141,6 +156,112 @@ class RiskManagementService:
             return float(raw)
         except Exception:
             return fallback
+
+    def _normalize_trade_fingerprint_payload(self, trade_params: Dict) -> Dict:
+        """Normalize trade params to a stable payload for explain-token binding."""
+        keys = [
+            "pair",
+            "action",
+            "entry_price",
+            "stop_loss",
+            "take_profit",
+            "position_size",
+            "risk_percent",
+            "is_paper_trade",
+        ]
+        payload = {}
+        for key in keys:
+            if key not in trade_params:
+                continue
+            value = trade_params.get(key)
+            if isinstance(value, float):
+                payload[key] = round(value, 8)
+            else:
+                payload[key] = value
+        return payload
+
+    def _trade_fingerprint(self, trade_params: Dict) -> str:
+        normalized = self._normalize_trade_fingerprint_payload(trade_params)
+        serialized = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    async def issue_explain_execution_token(
+        self,
+        user_id: str,
+        trade_params: Dict,
+        guard_passed: bool,
+    ) -> Dict:
+        is_paper_trade = bool(trade_params.get("is_paper_trade", False))
+        required = self.require_explain_token and not is_paper_trade
+        if not required:
+            return {
+                "required": False,
+                "token": None,
+                "expires_at": None,
+                "ttl_seconds": 0,
+            }
+        if not guard_passed:
+            return {
+                "required": True,
+                "token": None,
+                "expires_at": None,
+                "ttl_seconds": self.explain_token_ttl_seconds,
+            }
+
+        token = secrets.token_urlsafe(24)
+        expires_at = datetime.now() + timedelta(seconds=self.explain_token_ttl_seconds)
+        self.pending_explain_tokens[token] = {
+            "user_id": user_id,
+            "fingerprint": self._trade_fingerprint(trade_params),
+            "created_at": datetime.now(),
+            "expires_at": expires_at,
+            "used": False,
+        }
+        return {
+            "required": True,
+            "token": token,
+            "expires_at": expires_at.isoformat(),
+            "ttl_seconds": self.explain_token_ttl_seconds,
+        }
+
+    async def consume_explain_execution_token(
+        self,
+        user_id: str,
+        trade_params: Dict,
+        token: Optional[str],
+    ) -> Tuple[bool, str]:
+        is_paper_trade = bool(trade_params.get("is_paper_trade", False))
+        required = self.require_explain_token and not is_paper_trade
+        if not required:
+            return True, "Explain token not required"
+
+        if not token:
+            return False, "Missing explain execution token"
+
+        token_data = self.pending_explain_tokens.get(token)
+        if not token_data:
+            return False, "Explain execution token not found"
+
+        if token_data.get("used"):
+            return False, "Explain execution token already used"
+
+        expires_at = token_data.get("expires_at")
+        if isinstance(expires_at, datetime) and datetime.now() > expires_at:
+            self.pending_explain_tokens.pop(token, None)
+            return False, "Explain execution token expired"
+
+        if token_data.get("user_id") != user_id:
+            return False, "Explain execution token user mismatch"
+
+        expected_fingerprint = token_data.get("fingerprint")
+        current_fingerprint = self._trade_fingerprint(trade_params)
+        if expected_fingerprint != current_fingerprint:
+            return False, "Trade parameters changed after explain-before-execute"
+
+        token_data["used"] = True
+        token_data["used_at"] = datetime.now()
+        self.pending_explain_tokens[token] = token_data
+        return True, "Explain execution token accepted"
 
     def _extract_paper_metrics(self, paper_summary: Dict) -> Dict[str, float]:
         statistics = paper_summary.get("statistics", {}) if isinstance(paper_summary, dict) else {}
@@ -417,14 +538,27 @@ class RiskManagementService:
             }
 
         is_paper_trade = bool(trade_params.get("is_paper_trade", False))
+        if not is_paper_trade and state.level == "manual":
+            return False, "Autonomy level is manual. Enable assisted/guarded/full mode first.", {
+                "autonomy_level": state.level,
+                "paused": state.paused,
+            }
+
         probation_result = {"passed": True, "reason": "Paper trade path"}
         if not is_paper_trade:
-            probation_result = await self.evaluate_probation(user_id, paper_summary)
-            if not probation_result.get("passed"):
-                return False, probation_result.get("reason", "Probation requirements not met"), {
-                    "probation": probation_result,
-                    "autonomy_level": state.level,
+            if self.allow_dev_probation_bypass and user_id.startswith("dev_"):
+                probation_result = {
+                    "passed": True,
+                    "reason": "Dev probation bypass enabled",
+                    "checks": {"dev_bypass": True},
                 }
+            else:
+                probation_result = await self.evaluate_probation(user_id, paper_summary)
+                if not probation_result.get("passed"):
+                    return False, probation_result.get("reason", "Probation requirements not met"), {
+                        "probation": probation_result,
+                        "autonomy_level": state.level,
+                    }
 
         risk_percent = self._to_float(trade_params.get("risk_percent"), -1.0)
         if risk_percent < 0:
@@ -544,6 +678,8 @@ class RiskManagementService:
         
         limits = self.user_limits[user_id]
         is_paper_trade = bool(trade_params.get("is_paper_trade", False))
+        action = str(trade_params.get("action", "")).upper()
+        pair = str(trade_params.get("pair", "")).upper()
 
         if self.require_broker_fail_safe and not is_paper_trade:
             if trade_params.get("broker_fail_safe_confirmed") is not True:
@@ -551,9 +687,45 @@ class RiskManagementService:
                     "Broker fail-safe protection is mandatory for live trades. "
                     "Set broker_fail_safe_confirmed=true."
                 )
-        
+
+        # Check 0: Input sanity for execution-critical fields
+        if action not in {"BUY", "SELL"}:
+            return False, "Action must be BUY or SELL"
+        if len(pair) != 7 or "/" not in pair:
+            return False, "Pair must be in XXX/YYY format"
+        if not all(part.isalpha() and len(part) == 3 for part in pair.split("/", 1)):
+            return False, "Pair must be in XXX/YYY format"
+
+        position_size = self._to_float(trade_params.get("position_size"), -1.0)
+        if position_size <= 0:
+            return False, "Position size must be greater than zero"
+
+        entry_price = self._to_float(trade_params.get("entry_price"), 0.0)
+        stop_loss = self._to_float(trade_params.get("stop_loss"), 0.0)
+        take_profit = self._to_float(trade_params.get("take_profit"), 0.0)
+        if entry_price <= 0 or stop_loss <= 0 or take_profit <= 0:
+            return False, "Entry, Stop-Loss, and Take-Profit must be greater than zero"
+
+        if action == "BUY":
+            if not (stop_loss < entry_price < take_profit):
+                return False, "For BUY trades, require stop_loss < entry_price < take_profit"
+        else:
+            if not (take_profit < entry_price < stop_loss):
+                return False, "For SELL trades, require take_profit < entry_price < stop_loss"
+
+        sl_distance = abs((entry_price - stop_loss) / entry_price) * 100 if entry_price else 0.0
+        tp_distance = abs((take_profit - entry_price) / entry_price) * 100 if entry_price else 0.0
+        if sl_distance < 0.2:
+            return False, "Stop-Loss too close to entry (0.2% minimum)"
+        if sl_distance > 5.0:
+            return False, "Stop-Loss too far from entry (5.0% maximum)"
+        if tp_distance <= 0:
+            return False, "Take-Profit distance is invalid"
+        rr_ratio = tp_distance / sl_distance if sl_distance > 0 else 0.0
+        if rr_ratio < 1.2:
+            return False, "Risk-reward ratio too low (minimum 1.2)"
+
         # Check 1: Position size limit
-        position_size = trade_params.get("position_size", 0)
         if position_size > limits.max_trade_size:
             return False, f"Position size {position_size} exceeds max {limits.max_trade_size}"
         
@@ -576,19 +748,14 @@ class RiskManagementService:
             return False, "Take-Profit is mandatory but not set"
 
         if not is_paper_trade:
+            account_id = str(trade_params.get("account_id", "")).strip()
+            if not account_id:
+                return False, "Live trade requires bound broker account_id"
             if trade_params.get("server_side_stop_loss") is False:
                 return False, "Server-side Stop-Loss protection must remain enabled"
             if trade_params.get("server_side_take_profit") is False:
                 return False, "Server-side Take-Profit protection must remain enabled"
-        
-        # Check 5: Validate Stop-Loss distance
-        entry_price = trade_params.get("entry_price", 0)
-        stop_loss = trade_params.get("stop_loss", 0)
-        if entry_price and stop_loss:
-            sl_distance = abs((entry_price - stop_loss) / entry_price) * 100
-            if sl_distance < 0.5:  # Less than 0.5% stop loss
-                return False, f"Stop-Loss too close to entry (0.5% minimum)"
-        
+
         return True, "Trade validation passed"
 
     async def execute_trade_with_safety(self, user_id: str, trade_params: Dict) -> Dict:
@@ -642,8 +809,10 @@ class RiskManagementService:
                 "action": trade.action,
                 "entry_price": trade.entry_price,
                 "position_size": trade.position_size,
-                "is_paper_trade": trade.is_paper_trade
-            }
+                "is_paper_trade": trade.is_paper_trade,
+                "account_id": trade_params.get("account_id"),
+                "broker_order_id": trade_params.get("broker_order_id"),
+            },
         }
 
     async def close_trade(self, user_id: str, trade_id: str, exit_price: float) -> Dict:

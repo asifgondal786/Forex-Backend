@@ -3,7 +3,7 @@ Advanced Features API Routes
 Integrates all autonomous trading features
 Risk Management, Explainability, Execution Intelligence, Paper Trading, NLP
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -17,6 +17,9 @@ from .services.security_compliance_service import SecurityComplianceService
 from .services.enhanced_notification_service import EnhancedNotificationService
 from .services.paper_trading_engine import PaperTradingEngine
 from .services.natural_language_service import NaturalLanguageService
+from .services.broker_execution_service import broker_execution_service
+from .services.subscription_service import subscription_service
+from .security import get_current_user_id
 
 # Initialize services (in production, use dependency injection)
 risk_manager = RiskManagementService()
@@ -28,6 +31,17 @@ paper_trading = PaperTradingEngine()
 nlp_svc = NaturalLanguageService()
 
 router = APIRouter(prefix="/api/advanced", tags=["Advanced Trading Features"])
+
+
+def _is_dev_user_allowed(user_id: str) -> bool:
+    allow_dev = os.getenv("ALLOW_DEV_USER_ID", "").lower() == "true"
+    debug_mode = os.getenv("DEBUG", "").lower() == "true"
+    return user_id.startswith("dev_") and (allow_dev or debug_mode)
+
+
+def _assert_user_scope(requested_user_id: str, current_user_id: str) -> None:
+    if requested_user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="User scope mismatch")
 
 # ============================================================================
 # RISK MANAGEMENT ENDPOINTS
@@ -80,15 +94,39 @@ async def validate_trade(user_id: str, trade_params: Dict):
 
 
 @router.post("/risk/execute-trade")
-async def execute_trade_with_risk_check(user_id: str, trade_params: Dict):
+async def execute_trade_with_risk_check(
+    user_id: str,
+    trade_params: Dict,
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Execute trade with automatic risk checks"""
+    _assert_user_scope(requested_user_id=user_id, current_user_id=current_user_id)
+    trade_payload = dict(trade_params)
+    explain_token = str(trade_payload.pop("explain_token", "")).strip() or None
+
     pair = str(trade_params.get("pair") or "EUR/USD").strip().upper()
     deep_study = await notification_svc.get_deep_study(pair=pair, max_headlines_per_source=3)
     paper_summary = await paper_trading.get_paper_account_summary(user_id)
+    is_paper_trade = bool(trade_payload.get("is_paper_trade", False))
+
+    if not is_paper_trade:
+        subscription_service.ensure_feature_access(
+            user_id=user_id,
+            feature="live_broker_execution",
+        )
+
+    if not is_paper_trade and not _is_dev_user_allowed(user_id):
+        legal_status = await security_svc.get_legal_status(user_id)
+        if not legal_status.get("compliant"):
+            return {
+                "success": False,
+                "error": "Legal compliance incomplete. Complete legal acknowledgement before live autonomous execution.",
+                "legal_status": legal_status,
+            }
 
     guard_passed, guard_reason, guard_context = await risk_manager.can_execute_autonomous_trade(
         user_id=user_id,
-        trade_params=trade_params,
+        trade_params=trade_payload,
         paper_summary=paper_summary,
         deep_study=deep_study,
     )
@@ -109,21 +147,80 @@ async def execute_trade_with_risk_check(user_id: str, trade_params: Dict):
             "guardrails": guard_context,
         }
 
-    result = await risk_manager.execute_trade_with_safety(user_id, trade_params)
+    token_ok, token_reason = await risk_manager.consume_explain_execution_token(
+        user_id=user_id,
+        trade_params=trade_payload,
+        token=explain_token,
+    )
+    if not token_ok:
+        return {
+            "success": False,
+            "error": token_reason,
+            "risk_check_failed": True,
+            "guardrails": guard_context,
+        }
+
+    broker_result = None
+    if not is_paper_trade:
+        broker_result = await broker_execution_service.execute_trade(
+            user_id=user_id,
+            trade_params=trade_payload,
+        )
+        if not broker_result.get("success"):
+            return {
+                "success": False,
+                "error": broker_result.get("error", "Broker execution failed"),
+                "risk_check_failed": True,
+                "guardrails": guard_context,
+                "broker_execution": broker_result,
+            }
+        # Bind validated broker account/order metadata into risk-managed trade record.
+        trade_payload["account_id"] = broker_result.get("account_id")
+        trade_payload["broker_order_id"] = broker_result.get("broker_order_id")
+
+    result = await risk_manager.execute_trade_with_safety(user_id, trade_payload)
     if not result.get("success"):
         result["guardrails"] = guard_context
+        if broker_result:
+            result["broker_execution"] = broker_result
         return result
 
     risk_assessment = await risk_manager.get_risk_assessment(user_id)
     explain_card = await risk_manager.build_explain_before_execute(
         user_id=user_id,
-        trade_params=trade_params,
+        trade_params=trade_payload,
         risk_assessment=risk_assessment,
         deep_study=deep_study,
         guardrail_decision=guard_context,
     )
     result["guardrails"] = guard_context
     result["explain_before_execute"] = explain_card
+    if broker_result:
+        result["broker_execution"] = broker_result
+
+    # Dispatch delivery-channel notifications (Email/SMS/WhatsApp/In-app) for executed live trade.
+    try:
+        await notification_svc.send_notification(
+            user_id=user_id,
+            template_id="trade_executed",
+            category="TRADE_EXECUTION",
+            priority="high",
+            pair=str(trade_payload.get("pair") or "UNKNOWN"),
+            action=str(trade_payload.get("action") or "BUY"),
+            price=str(
+                (broker_result or {}).get("executed_price")
+                or trade_payload.get("entry_price")
+                or "N/A"
+            ),
+            sl=str(trade_payload.get("stop_loss") or "N/A"),
+            tp=str(trade_payload.get("take_profit") or "N/A"),
+            broker_order_id=str((broker_result or {}).get("broker_order_id") or ""),
+            execution_mode=str((broker_result or {}).get("execution_mode") or ""),
+        )
+    except Exception as notification_exc:
+        # Non-blocking: trade already executed and recorded.
+        result["notification_warning"] = f"Trade notification dispatch failed: {notification_exc}"
+
     return result
 
 
@@ -173,8 +270,18 @@ async def get_risk_assessment(user_id: str):
 
 
 @router.post("/autonomy/guardrails/configure")
-async def configure_autonomy_guardrails(request: AutonomyGuardrailsConfigRequest):
+async def configure_autonomy_guardrails(
+    request: AutonomyGuardrailsConfigRequest,
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Configure probation policy, risk budget, and autonomy level."""
+    _assert_user_scope(requested_user_id=request.user_id, current_user_id=current_user_id)
+    requested_level = str(request.level or "").strip().lower()
+    if requested_level in {"full", "unleashed", "autonomous", "hands_free"}:
+        subscription_service.ensure_feature_access(
+            user_id=request.user_id,
+            feature="full_autonomy",
+        )
     return await risk_manager.configure_autonomy_guardrails(
         user_id=request.user_id,
         probation=request.probation,
@@ -216,11 +323,20 @@ async def explain_before_execute(request: ExplainBeforeExecuteRequest):
             "guard_reason": guard_reason,
         },
     )
+    token_meta = await risk_manager.issue_explain_execution_token(
+        user_id=request.user_id,
+        trade_params=request.trade_params,
+        guard_passed=guard_passed,
+    )
     return {
         "success": True,
         "guard_passed": guard_passed,
         "guard_reason": guard_reason,
         "card": card,
+        "execution_token": token_meta.get("token"),
+        "execution_token_required": token_meta.get("required", False),
+        "execution_token_expires_at": token_meta.get("expires_at"),
+        "execution_token_ttl_seconds": token_meta.get("ttl_seconds"),
     }
 
 
@@ -514,9 +630,15 @@ async def create_api_key(
     user_id: str,
     broker: str,
     scope: str = "trade_only",
-    expires_in_days: Optional[int] = 365
+    expires_in_days: Optional[int] = 365,
+    current_user_id: str = Depends(get_current_user_id),
 ):
     """Create API key for broker connection"""
+    _assert_user_scope(requested_user_id=user_id, current_user_id=current_user_id)
+    subscription_service.ensure_feature_access(
+        user_id=user_id,
+        feature="api_key_management",
+    )
     return await security_svc.create_api_key(user_id, broker, scope, expires_in_days)
 
 
