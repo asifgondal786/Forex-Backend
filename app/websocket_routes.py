@@ -4,17 +4,17 @@ Complete WebSocket Routes with Live Forex Data Integration
 import os
 import time
 from collections import defaultdict, deque
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
 
 from .enhanced_websocket_manager import ws_manager
 from .forex_data_service import forex_service
-from .security import get_current_user_id
 from .utils.firestore_client import verify_firebase_token
+from .security import resolve_dev_user
 
-router = APIRouter(prefix="/api", tags=["Live Updates"], dependencies=[Depends(get_current_user_id)])
+router = APIRouter(prefix="/api", tags=["Live Updates"])
 
 _ws_rate_limit_max = int(os.getenv("WS_CONN_MAX", "30"))
 _ws_rate_limit_window = int(os.getenv("WS_CONN_WINDOW_SECONDS", "60"))
@@ -44,14 +44,8 @@ def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
     return None
 
 
-def _extract_dev_user(websocket: WebSocket) -> Optional[str]:
-    if os.getenv("ALLOW_DEV_USER_ID", "").lower() != "true":
-        return None
-    return websocket.headers.get("x-user-id") or websocket.query_params.get("user_id")
-
-
 async def _require_ws_auth(websocket: WebSocket):
-    dev_user = _extract_dev_user(websocket)
+    dev_user = resolve_dev_user(websocket)
     if dev_user:
         return dev_user, None, True
 
@@ -64,7 +58,19 @@ async def _require_ws_auth(websocket: WebSocket):
     except Exception:
         return None, None, False
 
-    return decoded.get("uid") or decoded.get("user_id"), token, False
+    user_id = decoded.get("uid") or decoded.get("user_id")
+    if not user_id:
+        return None, None, False
+
+    requested_user = websocket.query_params.get("user_id")
+    if requested_user and requested_user != user_id:
+        return None, None, False
+
+    header_user = websocket.headers.get("x-user-id")
+    if header_user and header_user != user_id:
+        return None, None, False
+
+    return user_id, token, False
 
 
 class UpdateRequest(BaseModel):
@@ -229,6 +235,19 @@ async def get_market_sentiment():
         await forex_service.initialize()
         sentiment = await forex_service.get_market_sentiment()
         return {"status": "success", "sentiment": sentiment}
+    finally:
+        await forex_service.close()
+
+
+@router.get("/forex/forecast")
+async def get_pair_forecast(pair: str = "EUR/USD", horizon: str = "1d"):
+    """Get a structured pair forecast with horizon and confidence."""
+    try:
+        await forex_service.initialize()
+        forecast = await forex_service.get_pair_forecast(pair=pair, horizon=horizon)
+        return {"status": "success", "forecast": forecast}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     finally:
         await forex_service.close()
 

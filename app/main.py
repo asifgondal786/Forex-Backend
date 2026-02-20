@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import os
 import time
@@ -13,6 +14,24 @@ from dotenv import load_dotenv
 
 # Load environment variables from Backend/.env if present
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        parsed = int(value.strip())
+    except Exception:
+        return default
+    return parsed if parsed > 0 else default
 
 # Import routers
 from .users import router as users_router
@@ -43,6 +62,20 @@ try:
 except ImportError:
     ACCOUNTS_ROUTES_AVAILABLE = False
     print("??  Accounts routes not available")
+
+try:
+    from .subscription_routes import router as subscription_router
+    SUBSCRIPTION_ROUTES_AVAILABLE = True
+except ImportError:
+    SUBSCRIPTION_ROUTES_AVAILABLE = False
+    print("??  Subscription routes not available")
+
+try:
+    from .credential_vault_routes import router as credential_vault_router
+    CREDENTIAL_VAULT_ROUTES_AVAILABLE = True
+except ImportError:
+    CREDENTIAL_VAULT_ROUTES_AVAILABLE = False
+    print("??  Credential vault routes not available")
 
 from .enhanced_websocket_manager import ws_manager
 from .utils.firestore_client import get_firebase_config_status, init_firebase
@@ -103,8 +136,14 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    if os.getenv("ENABLE_CSP", "").lower() == "true":
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    if _env_bool("ENABLE_CSP", True):
         response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none';"
+    if _env_bool("ENABLE_HSTS", not _env_bool("DEBUG", False)):
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 # Rate limiting middleware (simple in-memory)
@@ -113,6 +152,26 @@ _rate_limit_max = int(os.getenv("RATE_LIMIT_MAX", "120"))
 _rate_limit_window = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
 _rate_limit_store = defaultdict(deque)
 _rate_limit_exempt = {"/", "/health", "/api/health", "/docs", "/openapi.json", "/redoc"}
+_max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
+
+
+@app.middleware("http")
+async def request_size_limit_middleware(request: Request, call_next):
+    if request.method in {"POST", "PUT", "PATCH"} and request.url.path.startswith("/api"):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > _max_request_body_bytes:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "Request payload too large"},
+                    )
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header"},
+                )
+    return await call_next(request)
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -155,12 +214,15 @@ async def strict_auth_middleware(request: Request, call_next):
 
 # CORS
 def _get_cors_origins():
-    if os.getenv("CORS_ALLOW_ALL", "").lower() == "true":
+    if _env_bool("CORS_ALLOW_ALL"):
         return ["*"]
     raw = os.getenv("CORS_ORIGINS", "")
     if raw:
         return [origin.strip() for origin in raw.split(",") if origin.strip()]
-    # Default to local dev origins
+    if not _env_bool("DEBUG", False):
+        # Secure default in production: require explicit CORS origins.
+        return []
+    # Local dev defaults
     return [
         "http://localhost:8080",
         "http://127.0.0.1:8080",
@@ -171,20 +233,20 @@ def _get_cors_origins():
     ]
 
 def _get_cors_origin_regex() -> str | None:
-    if os.getenv("CORS_ALLOW_ALL", "").lower() == "true":
+    if _env_bool("CORS_ALLOW_ALL"):
         return None
     explicit = os.getenv("CORS_ORIGIN_REGEX", "").strip()
     if explicit:
         return explicit
-    allow_localhost = os.getenv("CORS_ALLOW_LOCALHOST", "").lower() == "true"
-    debug = os.getenv("DEBUG", "").lower() == "true"
-    if allow_localhost or debug:
-        # Allow any localhost/127.0.0.1 port in dev
-        return r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+    # Default to allowing localhost/127.0.0.1 any port for dev tooling
+    # (Flutter web, Vite, React, etc). Can be disabled via CORS_ALLOW_LOCALHOST=false.
+    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST", True)
+    if allow_localhost:
+        return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     return None
 
-_cors_allow_all = os.getenv("CORS_ALLOW_ALL", "").lower() == "true"
-_cors_allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "").lower() == "true" and not _cors_allow_all
+_cors_allow_all = _env_bool("CORS_ALLOW_ALL")
+_cors_allow_credentials = _env_bool("CORS_ALLOW_CREDENTIALS") and not _cors_allow_all
 _cors_origin_regex = _get_cors_origin_regex()
 
 app.add_middleware(
@@ -195,6 +257,10 @@ app.add_middleware(
     allow_headers=["*"],
     allow_origin_regex=_cors_origin_regex,
 )
+
+_trusted_hosts = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
+if _trusted_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts)
 
 # Include routers
 app.include_router(users_router)
@@ -210,6 +276,10 @@ if ADVANCED_FEATURES_AVAILABLE:
     app.include_router(advanced_router)
 if ACCOUNTS_ROUTES_AVAILABLE:
     app.include_router(accounts_router)
+if SUBSCRIPTION_ROUTES_AVAILABLE:
+    app.include_router(subscription_router)
+if CREDENTIAL_VAULT_ROUTES_AVAILABLE:
+    app.include_router(credential_vault_router)
 
 
 @app.get("/")
@@ -235,6 +305,8 @@ async def root():
             "natural_language_commands": ADVANCED_FEATURES_AVAILABLE,
             "security_compliance": ADVANCED_FEATURES_AVAILABLE,
             "multi_channel_notifications": ADVANCED_FEATURES_AVAILABLE,
+            "subscription_gates": SUBSCRIPTION_ROUTES_AVAILABLE,
+            "credential_vault": CREDENTIAL_VAULT_ROUTES_AVAILABLE,
         }
     }
 
@@ -259,4 +331,3 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
-

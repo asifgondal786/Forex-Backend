@@ -4,12 +4,14 @@ from typing import Optional
 from datetime import datetime
 
 from .security import get_token_claims
+from .services.subscription_service import subscription_service
 
 # Pydantic models for data validation and response shapes
 class User(BaseModel):
     id: str
     email: EmailStr
     name: str
+    plan: str = "free"
     created_at: datetime
     preferences: Optional[dict] = None
     avatar_url: Optional[str] = None
@@ -32,6 +34,8 @@ async def get_current_user(
 
     email = claims.get("email") or ""
     name = claims.get("name") or (email.split("@")[0] if email else "User")
+    subscription = subscription_service.get_subscription(user_id)
+    plan = str(subscription.get("plan") or "free")
 
     user = users_db.get(user_id)
     if not user:
@@ -39,6 +43,7 @@ async def get_current_user(
             "id": user_id,
             "email": email,
             "name": name,
+            "plan": plan,
             "created_at": datetime.utcnow().isoformat(),
             "avatar_url": None,
             "preferences": {},
@@ -49,6 +54,7 @@ async def get_current_user(
             user["email"] = email
         if name:
             user["name"] = name
+        user["plan"] = plan
         users_db[user_id] = user
 
     return user

@@ -8,15 +8,20 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 import requests
 import os
-import google.generativeai as genai
 from dotenv import load_dotenv
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 # Load environment variables
 load_dotenv()
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
+GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
+if GEMINI_AVAILABLE:
     genai.configure(api_key=GEMINI_API_KEY)
 
 class AIAnalysisService:
@@ -47,7 +52,7 @@ class AIAnalysisService:
         Use Google Generative AI (Gemini) to analyze news impact on currency pairs
         """
         try:
-            if not GEMINI_API_KEY:
+            if not GEMINI_AVAILABLE:
                 return self._get_default_news_analysis(news, currency_pairs)
                 
             model = genai.GenerativeModel("gemini-2.0-flash")
@@ -124,7 +129,7 @@ class AIAnalysisService:
         Use Google Generative AI (Gemini) to analyze sentiment from raw news text
         """
         try:
-            if not GEMINI_API_KEY:
+            if not GEMINI_AVAILABLE:
                 return self._get_default_sentiment_analysis()
                 
             model = genai.GenerativeModel("gemini-1.5-pro")

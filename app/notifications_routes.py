@@ -21,8 +21,12 @@ class NotificationPreferences(BaseModel):
     disabled_categories: Optional[List[str]] = None
     quiet_hours_start: Optional[str] = None
     quiet_hours_end: Optional[str] = None
-    max_per_hour: int = 10
-    digest_mode: bool = False
+    max_per_hour: Optional[int] = None
+    digest_mode: Optional[bool] = None
+    autonomous_mode: Optional[bool] = None
+    autonomous_profile: Optional[str] = None
+    autonomous_min_confidence: Optional[float] = None
+    channel_settings: Optional[dict] = None
 
 
 class NotificationRequest(BaseModel):
@@ -30,6 +34,12 @@ class NotificationRequest(BaseModel):
     category: str
     priority: str = "medium"
     variables: dict = {}
+
+
+class AutonomousStudyRequest(BaseModel):
+    pair: str = "EUR/USD"
+    user_instruction: Optional[str] = None
+    priority: Optional[str] = None
 
 
 @router.get("")
@@ -61,7 +71,11 @@ async def set_notification_preferences(
         quiet_hours_start=preferences.quiet_hours_start,
         quiet_hours_end=preferences.quiet_hours_end,
         max_per_hour=preferences.max_per_hour,
-        digest_mode=preferences.digest_mode
+        digest_mode=preferences.digest_mode,
+        autonomous_mode=preferences.autonomous_mode,
+        autonomous_profile=preferences.autonomous_profile,
+        autonomous_min_confidence=preferences.autonomous_min_confidence,
+        channel_settings=preferences.channel_settings,
     )
 
 
@@ -83,6 +97,32 @@ async def send_notification(
         category=request.category,
         priority=request.priority,
         **request.variables
+    )
+
+
+@router.post("/autonomous-study")
+async def send_autonomous_study_notification(
+    request: AutonomousStudyRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    return await _get_service().send_autonomous_study_notification(
+        user_id=user_id,
+        pair=request.pair,
+        user_instruction=request.user_instruction,
+        priority=request.priority,
+    )
+
+
+@router.get("/deep-study")
+async def get_deep_study(
+    pair: str = "EUR/USD",
+    max_headlines_per_source: int = 3,
+    user_id: str = Depends(get_current_user_id),
+):
+    _ = user_id
+    return await _get_service().get_deep_study(
+        pair=pair,
+        max_headlines_per_source=max_headlines_per_source,
     )
 
 

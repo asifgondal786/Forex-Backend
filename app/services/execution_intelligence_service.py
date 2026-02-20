@@ -9,15 +9,20 @@ from typing import Dict, List, Optional, Callable
 from enum import Enum
 import asyncio
 import os
-import google.generativeai as genai
 from dotenv import load_dotenv
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 # Load environment variables
 load_dotenv()
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
+GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
+if GEMINI_AVAILABLE:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -240,10 +245,10 @@ class ExecutionIntelligenceService:
         Use Google Generative AI (Gemini) to analyze conditions and provide recommendations
         """
         try:
-            if not GEMINI_API_KEY:
+            if not GEMINI_AVAILABLE:
                 return {
                     "success": False,
-                    "message": "Gemini API key not configured",
+                    "message": "Gemini is unavailable (missing package or API key)",
                     "analysis": None
                 }
                 
@@ -304,10 +309,10 @@ class ExecutionIntelligenceService:
         Use Google Generative AI (Gemini) to generate trading conditions from natural language strategy
         """
         try:
-            if not GEMINI_API_KEY:
+            if not GEMINI_AVAILABLE:
                 return {
                     "success": False,
-                    "message": "Gemini API key not configured",
+                    "message": "Gemini is unavailable (missing package or API key)",
                     "conditions": None
                 }
                 
