@@ -9,12 +9,11 @@ from enum import Enum
 import asyncio
 import json
 import os
-import smtplib
 import aiohttp
-from email.message import EmailMessage
 
 from ..utils.firestore_client import get_firestore_client
 from .market_intelligence_service import MarketIntelligenceService
+from .mail_delivery_service import MailDeliveryService
 
 
 class NotificationChannel(Enum):
@@ -148,15 +147,9 @@ class EnhancedNotificationService:
         self.discord_configured = False
         self.x_configured = False
         self.whatsapp_configured = False
+        self.mail_delivery = MailDeliveryService()
 
-        # SMTP config (env-driven)
-        self.smtp_host = os.getenv("SMTP_HOST")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_user = os.getenv("SMTP_USER")
-        self.smtp_pass = os.getenv("SMTP_PASS")
-        self.smtp_from = os.getenv("SMTP_FROM", self.smtp_user or "")
-        self.smtp_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
-        self.email_configured = all([self.smtp_host, self.smtp_user, self.smtp_pass, self.smtp_from])
+        self.email_configured = self.mail_delivery.email_configured
 
         # Channel integration config (env-driven)
         self.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -1052,20 +1045,11 @@ class EnhancedNotificationService:
             print(f"[EMAIL] Skipped: user_id is not an email ({notification.user_id})")
             return
 
-        def _send():
-            msg = EmailMessage()
-            msg["From"] = self.smtp_from
-            msg["To"] = to_email
-            msg["Subject"] = notification.title
-            msg.set_content(notification.message)
-
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
-                if self.smtp_tls:
-                    server.starttls()
-                server.login(self.smtp_user, self.smtp_pass)
-                server.send_message(msg)
-
-        await asyncio.to_thread(_send)
+        await self.mail_delivery.send_email(
+            to_email=to_email,
+            subject=notification.title,
+            text_body=notification.message,
+        )
         print(f"[EMAIL] Sent to {to_email}")
 
     async def _send_telegram(self, notification: Notification):
