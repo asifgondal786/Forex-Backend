@@ -77,6 +77,13 @@ except ImportError:
     CREDENTIAL_VAULT_ROUTES_AVAILABLE = False
     print("??  Credential vault routes not available")
 
+try:
+    from .public_auth_routes import router as public_auth_router
+    PUBLIC_AUTH_ROUTES_AVAILABLE = True
+except ImportError:
+    PUBLIC_AUTH_ROUTES_AVAILABLE = False
+    print("??  Public auth routes not available")
+
 from .enhanced_websocket_manager import ws_manager
 from .utils.firestore_client import get_firebase_config_status, init_firebase
 from .security import verify_http_request
@@ -280,6 +287,8 @@ if SUBSCRIPTION_ROUTES_AVAILABLE:
     app.include_router(subscription_router)
 if CREDENTIAL_VAULT_ROUTES_AVAILABLE:
     app.include_router(credential_vault_router)
+if PUBLIC_AUTH_ROUTES_AVAILABLE:
+    app.include_router(public_auth_router)
 
 
 @app.get("/")
@@ -307,6 +316,7 @@ async def root():
             "multi_channel_notifications": ADVANCED_FEATURES_AVAILABLE,
             "subscription_gates": SUBSCRIPTION_ROUTES_AVAILABLE,
             "credential_vault": CREDENTIAL_VAULT_ROUTES_AVAILABLE,
+            "public_password_reset": PUBLIC_AUTH_ROUTES_AVAILABLE,
         }
     }
 
