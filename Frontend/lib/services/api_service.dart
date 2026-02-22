@@ -27,6 +27,7 @@ class ApiService {
     defaultValue: '',
   );
   static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _authTimeout = Duration(seconds: 20);
   // Use --dart-define=DEV_USER_ID=your-user-id for development
   static const String _devUserId = String.fromEnvironment(
     'DEV_USER_ID',
@@ -235,7 +236,7 @@ class ApiService {
             headers: _baseHeaders,
             body: json.encode({'email': normalizedEmail}),
           )
-          .timeout(_timeout);
+          .timeout(_authTimeout);
       return _handleResponse(response);
     } on ApiException {
       rethrow;
@@ -260,7 +261,7 @@ class ApiService {
             headers: _baseHeaders,
             body: json.encode({'email': normalizedEmail}),
           )
-          .timeout(_timeout);
+          .timeout(_authTimeout);
       return _handleResponse(response);
     } on ApiException {
       rethrow;

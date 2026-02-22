@@ -15,7 +15,7 @@ from .services.mail_delivery_service import (
     sanitize_email,
     is_valid_email,
 )
-from .utils.firestore_client import init_firebase
+from .utils.firestore_client import init_firebase, get_firebase_config_status
 
 
 router = APIRouter(prefix="/auth", tags=["Public Auth"])
@@ -57,6 +57,11 @@ def _public_reset_message() -> str:
 
 def _debug_enabled() -> bool:
     return (os.getenv("DEBUG") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _firebase_admin_credentials_available() -> bool:
+    source = (get_firebase_config_status().get("credential_source") or "").strip().lower()
+    return source in {"json_b64", "json", "path", "adc"}
 
 
 def _build_reset_email_content(reset_link: str) -> tuple[str, str, str]:
@@ -472,7 +477,10 @@ async def request_password_reset(payload: PasswordResetRequest):
 
     # Avoid user enumeration by returning a generic response for unknown users.
     try:
-        reset_link = await asyncio.to_thread(_generate_reset_link, email)
+        reset_link = await asyncio.wait_for(
+            asyncio.to_thread(_generate_reset_link, email),
+            timeout=8,
+        )
     except firebase_auth.UserNotFoundError:
         print(f"[AUTH] Password reset requested for unknown email: {email}")
         debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
@@ -554,8 +562,20 @@ async def request_email_verification(payload: EmailVerificationRequest):
     if not is_valid_email(email):
         raise HTTPException(status_code=400, detail="Invalid email.")
 
+    if not _firebase_admin_credentials_available():
+        detail = (
+            "Firebase Admin credentials are missing on backend. Configure "
+            "FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON_B64."
+        )
+        if not _debug_enabled():
+            detail = "Verification link service is not configured."
+        raise HTTPException(status_code=503, detail=detail)
+
     try:
-        verification_link = await asyncio.to_thread(_generate_verification_link, email)
+        verification_link = await asyncio.wait_for(
+            asyncio.to_thread(_generate_verification_link, email),
+            timeout=8,
+        )
     except firebase_auth.UserNotFoundError:
         print(f"[AUTH] Verification requested for unknown email: {email}")
         debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
@@ -566,6 +586,11 @@ async def request_email_verification(payload: EmailVerificationRequest):
         )
     except Exception as exc:
         print(f"[AUTH] Verification link generation failed for {email}: {exc}")
+        if isinstance(exc, asyncio.TimeoutError):
+            raise HTTPException(
+                status_code=504,
+                detail="Verification link generation timed out on backend.",
+            )
         if _is_too_many_attempts_error(exc):
             raise HTTPException(
                 status_code=429,
