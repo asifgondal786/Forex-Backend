@@ -48,6 +48,9 @@ class ApiService {
     'DEV_AUTH_SHARED_SECRET',
     defaultValue: '',
   );
+  static final RegExp _invisibleChars = RegExp(
+    r'[\u0000-\u001F\u007F\u00A0\u1680\u180E\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]',
+  );
 
   // Default dev user ID for local development when no Firebase auth
   static const String _defaultDevUserId = 'dev_user_001';
@@ -81,6 +84,14 @@ class ApiService {
       return value.substring(0, value.length - 1);
     }
     return value;
+  }
+
+  static String _normalizeEmail(String rawEmail) {
+    return rawEmail
+        .replaceAll(_invisibleChars, '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .trim()
+        .toLowerCase();
   }
 
   Map<String, String> get _baseHeaders => {
@@ -176,18 +187,88 @@ class ApiService {
       debugPrint('Response body: ${response.body}');
     }
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) return {};
-      return json.decode(utf8.decode(response.bodyBytes));
-    } else {
-      throw ApiException(
-        'API Error: ${response.statusCode} - ${response.reasonPhrase}',
-        response.statusCode,
-      );
+    dynamic decoded;
+    if (response.body.isNotEmpty) {
+      try {
+        decoded = json.decode(utf8.decode(response.bodyBytes));
+      } catch (_) {
+        decoded = null;
+      }
     }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (decoded == null) return {};
+      return decoded;
+    }
+
+    var message = 'API Error: ${response.statusCode} - ${response.reasonPhrase}';
+    if (decoded is Map<String, dynamic>) {
+      final detail = decoded['detail'] ?? decoded['message'] ?? decoded['error'];
+      if (detail is String && detail.trim().isNotEmpty) {
+        message = detail.trim();
+      } else if (detail != null) {
+        message = detail.toString();
+      }
+    } else if (response.body.isNotEmpty) {
+      final plain = utf8.decode(response.bodyBytes).trim();
+      if (plain.isNotEmpty) {
+        message = plain;
+      }
+    }
+    throw ApiException(message, response.statusCode);
   }
 
   // ========== USER ENDPOINTS ==========
+
+  Future<Map<String, dynamic>> requestPasswordReset({
+    required String email,
+  }) async {
+    final normalizedEmail = _normalizeEmail(email);
+    if (normalizedEmail.isEmpty) {
+      throw ApiException('Email is required for password reset.');
+    }
+
+    try {
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl/auth/password-reset'),
+            headers: _baseHeaders,
+            body: json.encode({'email': normalizedEmail}),
+          )
+          .timeout(_timeout);
+      return _handleResponse(response);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Error requesting password reset: $e');
+      throw ApiException('Error requesting password reset: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> requestEmailVerification({
+    required String email,
+  }) async {
+    final normalizedEmail = _normalizeEmail(email);
+    if (normalizedEmail.isEmpty) {
+      throw ApiException('Email is required for verification.');
+    }
+
+    try {
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl/auth/email-verification'),
+            headers: _baseHeaders,
+            body: json.encode({'email': normalizedEmail}),
+          )
+          .timeout(_timeout);
+      return _handleResponse(response);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Error requesting verification email: $e');
+      throw ApiException('Error requesting verification email: $e');
+    }
+  }
 
   Future<User> getCurrentUser() async {
     try {
@@ -325,6 +406,8 @@ class ApiService {
     bool? autonomousMode,
     String? autonomousProfile,
     double? autonomousMinConfidence,
+    bool? autonomousStageAlerts,
+    int? autonomousStageIntervalSeconds,
     Map<String, dynamic>? channelSettings,
   }) async {
     try {
@@ -343,6 +426,12 @@ class ApiService {
       }
       if (autonomousMinConfidence != null) {
         body['autonomous_min_confidence'] = autonomousMinConfidence;
+      }
+      if (autonomousStageAlerts != null) {
+        body['autonomous_stage_alerts'] = autonomousStageAlerts;
+      }
+      if (autonomousStageIntervalSeconds != null) {
+        body['autonomous_stage_interval_seconds'] = autonomousStageIntervalSeconds;
       }
       if (channelSettings != null) body['channel_settings'] = channelSettings;
 
@@ -418,6 +507,75 @@ class ApiService {
     } catch (e) {
       debugPrint('Error sending autonomous study alert: $e');
       throw ApiException('Error sending autonomous study alert: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> sendAutonomousAwarenessAlert({
+    required String stage,
+    String pair = 'EUR/USD',
+    String? userInstruction,
+    String? priority,
+    String? stageContext,
+    bool force = false,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'stage': stage.trim().toLowerCase(),
+        'pair': pair.trim().toUpperCase(),
+        'force': force,
+      };
+      if (userInstruction != null && userInstruction.trim().isNotEmpty) {
+        body['user_instruction'] = userInstruction.trim();
+      }
+      if (priority != null && priority.trim().isNotEmpty) {
+        body['priority'] = priority.trim().toLowerCase();
+      }
+      if (stageContext != null && stageContext.trim().isNotEmpty) {
+        body['stage_context'] = stageContext.trim();
+      }
+
+      final headers = await _buildHeaders();
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl/api/notifications/autonomous-awareness'),
+            headers: headers,
+            body: json.encode(body),
+          )
+          .timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error sending autonomous awareness alert: $e');
+      throw ApiException('Error sending autonomous awareness alert: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getDeepMarketStudy({
+    String pair = 'EUR/USD',
+    int maxHeadlinesPerSource = 3,
+  }) async {
+    try {
+      final headers = await _buildHeaders();
+      final uri = Uri.parse('$baseUrl/api/notifications/deep-study').replace(
+        queryParameters: {
+          'pair': pair.trim().toUpperCase(),
+          'max_headlines_per_source': '$maxHeadlinesPerSource',
+        },
+      );
+      final response =
+          await _client.get(uri, headers: headers).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error fetching deep market study: $e');
+      return {
+        'pair': pair.trim().toUpperCase(),
+        'confidence_band': 'low',
+        'recommendation': 'wait_for_confirmation',
+        'source_coverage': {
+          'requested': 0,
+          'analyzed': 0,
+          'coverage_ratio': 0.0,
+        },
+      };
     }
   }
 

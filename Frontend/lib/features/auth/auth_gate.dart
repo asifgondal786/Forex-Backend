@@ -19,7 +19,10 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _didFetch = false;
-  static const bool _requirePhoneVerification = true;
+  static const bool _requirePhoneVerification = bool.fromEnvironment(
+    'REQUIRE_PHONE_VERIFICATION',
+    defaultValue: false,
+  );
   static const bool _skipAuthGate =
       bool.fromEnvironment('SKIP_AUTH_GATE', defaultValue: false);
   static const String _devUserId =

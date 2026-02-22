@@ -26,6 +26,8 @@ class NotificationPreferences(BaseModel):
     autonomous_mode: Optional[bool] = None
     autonomous_profile: Optional[str] = None
     autonomous_min_confidence: Optional[float] = None
+    autonomous_stage_alerts: Optional[bool] = None
+    autonomous_stage_interval_seconds: Optional[int] = None
     channel_settings: Optional[dict] = None
 
 
@@ -40,6 +42,15 @@ class AutonomousStudyRequest(BaseModel):
     pair: str = "EUR/USD"
     user_instruction: Optional[str] = None
     priority: Optional[str] = None
+
+
+class AutonomousAwarenessRequest(BaseModel):
+    stage: str
+    pair: str = "EUR/USD"
+    user_instruction: Optional[str] = None
+    priority: Optional[str] = None
+    stage_context: Optional[str] = None
+    force: bool = False
 
 
 @router.get("")
@@ -75,6 +86,8 @@ async def set_notification_preferences(
         autonomous_mode=preferences.autonomous_mode,
         autonomous_profile=preferences.autonomous_profile,
         autonomous_min_confidence=preferences.autonomous_min_confidence,
+        autonomous_stage_alerts=preferences.autonomous_stage_alerts,
+        autonomous_stage_interval_seconds=preferences.autonomous_stage_interval_seconds,
         channel_settings=preferences.channel_settings,
     )
 
@@ -110,6 +123,22 @@ async def send_autonomous_study_notification(
         pair=request.pair,
         user_instruction=request.user_instruction,
         priority=request.priority,
+    )
+
+
+@router.post("/autonomous-awareness")
+async def send_autonomous_awareness_notification(
+    request: AutonomousAwarenessRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    return await _get_service().send_autonomous_stage_notification(
+        user_id=user_id,
+        stage=request.stage,
+        pair=request.pair,
+        user_instruction=request.user_instruction,
+        priority=request.priority,
+        stage_context=request.stage_context,
+        force=request.force,
     )
 
 

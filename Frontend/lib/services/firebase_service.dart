@@ -9,6 +9,17 @@ class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final storage.FirebaseStorage _storage = storage.FirebaseStorage.instance;
+  static final RegExp _invisibleChars = RegExp(
+    r'[\u0000-\u001F\u007F\u00A0\u1680\u180E\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]',
+  );
+
+  String _normalizeEmail(String email) {
+    return email
+        .replaceAll(_invisibleChars, '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .trim()
+        .toLowerCase();
+  }
 
   // Get current Firebase Auth user
   firebase_auth.User? get currentFirebaseUser => _auth.currentUser;
@@ -80,33 +91,49 @@ class FirebaseService {
 
   // Sign in with email and password
   Future<firebase_auth.User?> signInWithEmail(String email, String password) async {
+    final normalizedEmail = _normalizeEmail(email);
     try {
       final credential = await _auth.signInWithEmailAndPassword(
-        email: email,
+        email: normalizedEmail,
         password: password,
       );
       return credential.user;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint('Sign-in rejected (${e.code}): ${e.message}');
+      }
+      rethrow;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error signing in: $e');
+        debugPrint('Unexpected sign-in error: $e');
       }
-      return null;
+      throw Exception('Unable to sign in right now.');
     }
   }
 
   // Sign up with email and password
   Future<firebase_auth.User?> signUpWithEmail(String email, String password) async {
+    final normalizedEmail = _normalizeEmail(email);
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
-        email: email,
+        email: normalizedEmail,
         password: password,
       );
       return credential.user;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        if (e.code == 'email-already-in-use') {
+          debugPrint('Signup rejected (email already in use): ${e.code}');
+        } else {
+          debugPrint('Signup rejected (${e.code}): ${e.message}');
+        }
+      }
+      rethrow;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error signing up: $e');
+        debugPrint('Unexpected signup error: $e');
       }
-      return null;
+      throw Exception('Unable to create account right now.');
     }
   }
 

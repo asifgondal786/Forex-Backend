@@ -2,6 +2,7 @@
   "dependencies": {
     "cline": "^2.2.1",
     "firebase": "^12.7.0",
-    "g": "^2.0.1"
+    "g": "^2.0.1",
+    "node-mailjet": "^6.0.11"
   }
 }

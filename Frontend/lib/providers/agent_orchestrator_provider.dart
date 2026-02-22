@@ -352,9 +352,19 @@ class AgentOrchestratorProvider extends ChangeNotifier {
   }
 
   Future<void> executeAutonomousCycle() async {
+    final pair = _suggestPair();
     if (_isKillSwitchEngaged || _autonomyMode == AgentAutonomyMode.manual) {
       _addSystemMessage(
         'Autonomous execution blocked. Switch to Assisted/Semi-Auto mode first.',
+      );
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: 'paused',
+          pair: pair,
+          priority: 'high',
+          stageContext:
+              'Autonomous execution blocked because mode is manual or kill switch is active.',
+        ),
       );
       return;
     }
@@ -362,14 +372,29 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     _setProcessing(true);
     _visualState = AgentVisualState.analyzing;
     notifyListeners();
+    unawaited(
+      _sendAutonomyStageAwareness(
+        stage: 'analyzing',
+        pair: pair,
+        stageContext: 'Autonomous cycle started. Evaluating guardrails.',
+      ),
+    );
 
     try {
       if (_offlineMode) {
-        _runOfflineAutonomousCycle();
+        _runOfflineAutonomousCycle(pair: pair);
+        unawaited(
+          _sendAutonomyStageAwareness(
+            stage: 'executed',
+            pair: pair,
+            priority: 'medium',
+            stageContext:
+                'Offline simulation cycle completed with local guardrails.',
+          ),
+        );
         return;
       }
 
-      final pair = _suggestPair();
       final tradeParams = _buildTradeParams(pair: pair);
       final explain = await apiService.explainBeforeExecute(
         tradeParams: tradeParams,
@@ -389,6 +414,14 @@ class AgentOrchestratorProvider extends ChangeNotifier {
           state: AgentVisualState.paused,
           blockedByGuardrails: true,
         );
+        unawaited(
+          _sendAutonomyStageAwareness(
+            stage: 'risk_lock',
+            pair: pair,
+            priority: 'critical',
+            stageContext: 'Trade blocked by guardrails: $guardReason',
+          ),
+        );
         return;
       }
 
@@ -404,11 +437,28 @@ class AgentOrchestratorProvider extends ChangeNotifier {
           state: AgentVisualState.paused,
           blockedByGuardrails: true,
         );
+        unawaited(
+          _sendAutonomyStageAwareness(
+            stage: 'risk_lock',
+            pair: pair,
+            priority: 'critical',
+            stageContext:
+                'Trade blocked because backend explain-before-execute token is missing.',
+          ),
+        );
         return;
       }
 
       _visualState = AgentVisualState.trading;
       notifyListeners();
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: 'trading',
+          pair: pair,
+          priority: 'high',
+          stageContext: 'Guardrails passed. Sending execution request.',
+        ),
+      );
 
       final result = await apiService.executeAutonomousTrade(
         tradeParams: tradeParams,
@@ -427,8 +477,26 @@ class AgentOrchestratorProvider extends ChangeNotifier {
         rationale: 'Guardrails passed. $resultMessage',
         state: AgentVisualState.trading,
       );
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: success ? 'executed' : 'paused',
+          pair: pair,
+          priority: success ? 'high' : 'critical',
+          stageContext: resultMessage,
+          userInstruction: (tradeParams['reason'] ?? '').toString(),
+        ),
+      );
     } catch (e) {
-      _setError('Autonomous cycle failed: ${_safeErrorText(e)}');
+      final errorText = _safeErrorText(e);
+      _setError('Autonomous cycle failed: $errorText');
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: 'risk_lock',
+          pair: pair,
+          priority: 'critical',
+          stageContext: 'Autonomous cycle failed: $errorText',
+        ),
+      );
     } finally {
       _simulateCognitionUpdate();
       _visualState = _isKillSwitchEngaged
@@ -466,6 +534,15 @@ class AgentOrchestratorProvider extends ChangeNotifier {
           rationale: 'Emergency override executed in offline simulation mode.',
           state: AgentVisualState.paused,
         );
+        unawaited(
+          _sendAutonomyStageAwareness(
+            stage: 'paused',
+            pair: _preferredAwarenessPair(),
+            priority: 'critical',
+            stageContext: 'Kill switch activated in offline simulation mode.',
+            force: true,
+          ),
+        );
         return;
       }
 
@@ -490,6 +567,15 @@ class AgentOrchestratorProvider extends ChangeNotifier {
         rationale:
             'Emergency override requested by user or system-level safety rule.',
         state: AgentVisualState.paused,
+      );
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: 'paused',
+          pair: _preferredAwarenessPair(),
+          priority: 'critical',
+          stageContext: 'Kill switch activated. Autonomous trading paused.',
+          force: true,
+        ),
       );
     } catch (e) {
       _setError('Kill switch activation failed: ${_safeErrorText(e)}');
@@ -728,6 +814,15 @@ class AgentOrchestratorProvider extends ChangeNotifier {
               'Backend unavailable, policy change applied to local simulation controls.',
           state: AgentVisualState.monitoring,
         );
+        unawaited(
+          _sendAutonomyStageAwareness(
+            stage: 'monitoring',
+            pair: _preferredAwarenessPair(),
+            stageContext:
+                'Autonomy updated to ${mode.label} in offline simulation mode with risk ${riskPerTradePercent.toStringAsFixed(2)}%.',
+            force: true,
+          ),
+        );
         return;
       }
 
@@ -764,6 +859,16 @@ class AgentOrchestratorProvider extends ChangeNotifier {
             'Capital-preservation limits were synchronized before execution rights changed.',
         state: AgentVisualState.monitoring,
       );
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: 'monitoring',
+          pair: _preferredAwarenessPair(),
+          priority: 'high',
+          stageContext:
+              'Autonomy set to ${mode.label} with risk ${riskPerTradePercent.toStringAsFixed(2)}% and daily loss cap ${dailyLossLimitPercent.toStringAsFixed(2)}%.',
+          force: true,
+        ),
+      );
     } catch (e) {
       _offlineMode = true;
       _setError(
@@ -774,8 +879,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     }
   }
 
-  void _runOfflineAutonomousCycle() {
-    final pair = _suggestPair();
+  void _runOfflineAutonomousCycle({required String pair}) {
     final blocked = _draftRiskPerTradePercent > 2.5 || _isKillSwitchEngaged;
     if (blocked) {
       _visualState = AgentVisualState.paused;
@@ -835,6 +939,64 @@ class AgentOrchestratorProvider extends ChangeNotifier {
   String _suggestPair() {
     final pairs = <String>['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/PKR'];
     return pairs[_random.nextInt(pairs.length)];
+  }
+
+  String _preferredStudyPair(Map<String, double> rates) {
+    if (rates.containsKey('USD/PKR')) {
+      return 'USD/PKR';
+    }
+    if (rates.isNotEmpty) {
+      final sortedPairs = rates.keys.toList()..sort();
+      return sortedPairs.first;
+    }
+    return _preferredAwarenessPair();
+  }
+
+  String _preferredAwarenessPair() {
+    if (_lastRatesSnapshot.containsKey('USD/PKR')) {
+      return 'USD/PKR';
+    }
+    if (_lastRatesSnapshot.isNotEmpty) {
+      final sortedPairs = _lastRatesSnapshot.keys.toList()..sort();
+      return sortedPairs.first;
+    }
+    return 'EUR/USD';
+  }
+
+  String _briefingPriorityFromRisk(String riskLevel) {
+    final normalizedRisk = riskLevel.trim().toLowerCase();
+    if (normalizedRisk == 'high' || normalizedRisk == 'extreme') {
+      return 'high';
+    }
+    if (normalizedRisk == 'low') {
+      return 'low';
+    }
+    return 'medium';
+  }
+
+  Future<void> _sendAutonomyStageAwareness({
+    required String stage,
+    required String pair,
+    String? userInstruction,
+    String? priority,
+    String? stageContext,
+    bool force = false,
+  }) async {
+    if (_offlineMode) {
+      return;
+    }
+    try {
+      await apiService.sendAutonomousAwarenessAlert(
+        stage: stage,
+        pair: pair,
+        userInstruction: userInstruction,
+        priority: priority,
+        stageContext: stageContext,
+        force: force,
+      );
+    } catch (_) {
+      // Awareness broadcasting should not block UI flow.
+    }
   }
 
   void _simulateCognitionUpdate() {
@@ -1073,6 +1235,19 @@ class AgentOrchestratorProvider extends ChangeNotifier {
           }
         }
       }
+      if (rates.isEmpty) {
+        final sentimentPairs = sentimentPayload['sentiment'] is Map<String, dynamic>
+            ? (sentimentPayload['sentiment'] as Map<String, dynamic>)['major_pairs']
+            : null;
+        if (sentimentPairs is Map<String, dynamic>) {
+          for (final entry in sentimentPairs.entries) {
+            final value = entry.value;
+            if (value is num) {
+              rates[entry.key] = value.toDouble();
+            }
+          }
+        }
+      }
 
       final sentimentMap = sentimentPayload['sentiment'] is Map<String, dynamic>
           ? sentimentPayload['sentiment'] as Map<String, dynamic>
@@ -1090,6 +1265,23 @@ class AgentOrchestratorProvider extends ChangeNotifier {
                   'No major headline')
               .toString())
           : 'No major headline';
+      final studyPair = _preferredStudyPair(rates);
+      final deepStudy = await apiService.getDeepMarketStudy(pair: studyPair);
+      final confidenceBand =
+          (deepStudy['confidence_band'] ?? 'medium').toString();
+      final recommendation =
+          (deepStudy['recommendation'] ?? 'watch_and_prepare').toString();
+      final sourceCoverage = deepStudy['source_coverage'] is Map<String, dynamic>
+          ? deepStudy['source_coverage'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+      final analyzed = _asInt(sourceCoverage['analyzed'], 0);
+      final requested = _asInt(sourceCoverage['requested'], 0);
+      final deepStudyLine = _localizedDeepStudyLine(
+        pair: studyPair,
+        confidenceBand: confidenceBand,
+        recommendation: recommendation,
+        coverageText: '$analyzed/$requested',
+      );
 
       final moverSummary = _summarizeFluctuations(rates);
       _marketBias = trend.toUpperCase();
@@ -1102,14 +1294,29 @@ class AgentOrchestratorProvider extends ChangeNotifier {
         movers: moverSummary,
         headline: headline,
       );
-      _addSystemMessage(message, speak: isWelcome || forceSpeak);
+      _addSystemMessage(
+        '$message $deepStudyLine',
+        speak: isWelcome || forceSpeak,
+      );
       _addDecision(
         summary: isWelcome
             ? 'Welcome briefing delivered.'
             : 'Real-time market fluctuation briefing updated.',
         rationale:
-            'Trend: $trend, volatility: $volatility, risk: $riskLevel. Movers: $moverSummary.',
+            'Trend: $trend, volatility: $volatility, risk: $riskLevel. Movers: $moverSummary. '
+            'Deep-study confidence: $confidenceBand, recommendation: $recommendation, source coverage: $analyzed/$requested.',
         state: AgentVisualState.analyzing,
+      );
+      unawaited(
+        _sendAutonomyStageAwareness(
+          stage: 'briefing',
+          pair: studyPair,
+          priority: _briefingPriorityFromRisk(riskLevel),
+          stageContext:
+              'Trend $trend, volatility $volatility, risk $riskLevel. $moverSummary. $deepStudyLine',
+          userInstruction:
+              isWelcome ? 'welcome_market_briefing' : 'periodic_market_briefing',
+        ),
       );
     } catch (_) {
       if (isWelcome || forceSpeak) {
@@ -1472,6 +1679,9 @@ class AgentOrchestratorProvider extends ChangeNotifier {
 
       await apiService.setNotificationPreferences(
         enabledChannels: channels.toList(),
+        autonomousMode: true,
+        autonomousStageAlerts: true,
+        autonomousStageIntervalSeconds: briefingIntervalSeconds,
         channelSettings: channelSettings,
       );
 
@@ -1904,6 +2114,21 @@ class AgentOrchestratorProvider extends ChangeNotifier {
       default:
         return 'Today\'s forex update: trend $trend, volatility $volatility, risk $risk. '
             'Top fluctuations: $movers. Key headline: $headline. Tell me how you want to proceed.';
+    }
+  }
+
+  String _localizedDeepStudyLine({
+    required String pair,
+    required String confidenceBand,
+    required String recommendation,
+    required String coverageText,
+  }) {
+    final readableRecommendation = recommendation.replaceAll('_', ' ');
+    switch (_languageCode) {
+      case 'ur':
+        return 'Deep study ($pair): confidence $confidenceBand, recommendation $readableRecommendation, source coverage $coverageText.';
+      default:
+        return 'Deep study ($pair): confidence $confidenceBand, recommendation $readableRecommendation, source coverage $coverageText.';
     }
   }
 

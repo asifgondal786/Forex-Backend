@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "git clone https://github.com/flutter/flutter.git --depth 1 -b stable .flutter-sdk && ./.flutter-sdk/bin/flutter config --enable-web && cd Frontend && ../.flutter-sdk/bin/flutter pub get",
+  "buildCommand": "cd Frontend && ../.flutter-sdk/bin/flutter build web --release",
+  "outputDirectory": "Frontend/build/web",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

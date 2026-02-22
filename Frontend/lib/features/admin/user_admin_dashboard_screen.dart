@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/theme.dart';
+import '../../core/models/app_notification.dart';
 import '../../core/widgets/app_background.dart';
 import '../../providers/account_connection_provider.dart';
 import '../../providers/agent_orchestrator_provider.dart';
@@ -31,6 +32,8 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
   final _emailAlert = TextEditingController();
   final _mobile = TextEditingController();
   final _whatsapp = TextEditingController();
+  final _smsWebhook = TextEditingController();
+  final _whatsappWebhook = TextEditingController();
   final _unlockPhrase = TextEditingController();
 
   _Mode _mode = _Mode.rule;
@@ -47,9 +50,14 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
   bool _unlocked = false;
   bool _riskAcknowledged = false;
   bool _premiumPreview = false;
+  bool _autonomousStageAlerts = true;
+  int _stageAlertIntervalSeconds = 45;
+  bool _loadingTimeline = false;
+  bool _testingChannel = false;
   bool _syncedUser = false;
   String? _notice;
   DateTime? _lastSync;
+  List<AppNotification> _stageTimeline = const <AppNotification>[];
 
   @override
   void initState() {
@@ -69,6 +77,8 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
     _emailAlert.dispose();
     _mobile.dispose();
     _whatsapp.dispose();
+    _smsWebhook.dispose();
+    _whatsappWebhook.dispose();
     _unlockPhrase.dispose();
     super.dispose();
   }
@@ -83,6 +93,7 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
       await accounts.loadConnections();
     }
     await _loadPreferences();
+    await _loadStageTimeline();
   }
 
   Future<void> _loadPreferences() async {
@@ -98,12 +109,17 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
         _emailAlert.text = _asText(settings['email_to']);
         _mobile.text = _asText(settings['phone_number']);
         _whatsapp.text = _asText(settings['whatsapp_number']);
+        _smsWebhook.text = _asText(settings['sms_webhook_url']);
+        _whatsappWebhook.text = _asText(settings['whatsapp_webhook_url']);
       }
       final autonomous = prefs['autonomous_mode'] == true;
       final profile = _asText(prefs['autonomous_profile']).toLowerCase();
       _mode = autonomous && profile.contains('aggressive')
           ? _Mode.unleashed
           : _Mode.rule;
+      _autonomousStageAlerts = prefs['autonomous_stage_alerts'] != false;
+      _stageAlertIntervalSeconds =
+          _asInt(prefs['autonomous_stage_interval_seconds'], 45).clamp(15, 300);
       _lastSync = DateTime.now();
     } catch (_) {
       _notice = 'Preference sync unavailable. Working in local-safe mode.';
@@ -140,14 +156,19 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
         enabledChannels: channels,
         autonomousMode: _mode == _Mode.unleashed,
         autonomousProfile: _mode == _Mode.unleashed ? 'aggressive' : 'balanced',
+        autonomousStageAlerts: _autonomousStageAlerts,
+        autonomousStageIntervalSeconds: _stageAlertIntervalSeconds,
         channelSettings: <String, dynamic>{
           'email_to': _emailAlert.text.trim(),
           'phone_number': _mobile.text.trim(),
           'whatsapp_number': _whatsapp.text.trim(),
+          'sms_webhook_url': _smsWebhook.text.trim(),
+          'whatsapp_webhook_url': _whatsappWebhook.text.trim(),
         },
       );
       _lastSync = DateTime.now();
       _snack('Contact channels synced.', true);
+      await _loadStageTimeline(silent: true);
     } catch (_) {
       _snack('Could not sync channels.', false);
     } finally {
@@ -155,6 +176,84 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
         setState(() => _savingChannels = false);
       }
     }
+  }
+
+  Future<void> _sendChannelTest(String channelLabel) async {
+    setState(() => _testingChannel = true);
+    try {
+      final api = context.read<ApiService>();
+      final channels = <String>['in_app'];
+      if (_emailAlert.text.trim().isNotEmpty) channels.add('email');
+      if (_mobile.text.trim().isNotEmpty) channels.add('sms');
+      if (_whatsapp.text.trim().isNotEmpty) channels.add('whatsapp');
+
+      await api.setNotificationPreferences(
+        enabledChannels: channels,
+        autonomousMode: _mode == _Mode.unleashed,
+        autonomousProfile: _mode == _Mode.unleashed ? 'aggressive' : 'balanced',
+        autonomousStageAlerts: _autonomousStageAlerts,
+        autonomousStageIntervalSeconds: _stageAlertIntervalSeconds,
+        channelSettings: <String, dynamic>{
+          'email_to': _emailAlert.text.trim(),
+          'phone_number': _mobile.text.trim(),
+          'whatsapp_number': _whatsapp.text.trim(),
+          'sms_webhook_url': _smsWebhook.text.trim(),
+          'whatsapp_webhook_url': _whatsappWebhook.text.trim(),
+        },
+      );
+
+      await api.sendAutonomousAwarenessAlert(
+            stage: 'monitoring',
+            pair: _pair,
+            priority: 'high',
+            stageContext:
+                'Connectivity test for $channelLabel requested from User/Admin dashboard.',
+            userInstruction: 'channel_test:$channelLabel',
+            force: true,
+          );
+      _snack('Test alert queued for $channelLabel.', true);
+      await _loadStageTimeline(silent: true);
+    } catch (_) {
+      _snack('Could not send $channelLabel test alert.', false);
+    } finally {
+      if (mounted) {
+        setState(() => _testingChannel = false);
+      }
+    }
+  }
+
+  Future<void> _loadStageTimeline({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _loadingTimeline = true);
+    }
+    try {
+      final notifications =
+          await context.read<ApiService>().getNotifications(limit: 100);
+      final stageEvents = notifications.where(_isStageEvent).toList()
+        ..sort((a, b) =>
+            (b.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0))
+                .compareTo(a.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0)));
+      if (mounted) {
+        setState(() {
+          _stageTimeline = stageEvents;
+        });
+      }
+    } catch (_) {
+      // Timeline load is best-effort.
+    } finally {
+      if (!silent && mounted) {
+        setState(() => _loadingTimeline = false);
+      }
+    }
+  }
+
+  bool _isStageEvent(AppNotification notification) {
+    final rich = notification.richData;
+    if (rich['stage'] != null || rich['stage_label'] != null) {
+      return true;
+    }
+    final title = notification.title.toLowerCase();
+    return title.contains('agent stage:');
   }
 
   Future<void> _connectBroker() async {
@@ -221,6 +320,18 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
   }
 
   String _asText(dynamic value) => value == null ? '' : value.toString().trim();
+  int _asInt(dynamic value, int fallback) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value) ?? fallback;
+    }
+    return fallback;
+  }
   String _mask(String input) => input.length < 7
       ? '***'
       : '${input.substring(0, 3)}***${input.substring(input.length - 3)}';
@@ -474,7 +585,7 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    _sectionTitle('4) Contacts (Email, Mobile, WhatsApp)'),
+                    _sectionTitle('4) Comms Setup & Live Tests'),
                     _field('Email', _emailAlert,
                         type: TextInputType.emailAddress),
                     const SizedBox(height: 8),
@@ -482,6 +593,40 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
                     const SizedBox(height: 8),
                     _field('WhatsApp', _whatsapp, type: TextInputType.phone),
                     const SizedBox(height: 8),
+                    _field('SMS Webhook URL (optional)', _smsWebhook,
+                        type: TextInputType.url),
+                    const SizedBox(height: 8),
+                    _field('WhatsApp Webhook URL (optional)', _whatsappWebhook,
+                        type: TextInputType.url),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: _autonomousStageAlerts,
+                        activeThumbColor: const Color(0xFF10B981),
+                        title: const Text('Autonomous stage alerts',
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 11)),
+                        subtitle: const Text(
+                            'Push stage-by-stage awareness updates to configured channels.',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 10)),
+                        onChanged: (v) =>
+                            setState(() => _autonomousStageAlerts = v)),
+                    const SizedBox(height: 2),
+                    Text(
+                        'Stage alert interval: $_stageAlertIntervalSeconds seconds',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 10)),
+                    Slider(
+                      value: _stageAlertIntervalSeconds.toDouble(),
+                      min: 15,
+                      max: 300,
+                      divisions: 19,
+                      onChanged: (value) => setState(
+                          () => _stageAlertIntervalSeconds = value.round()),
+                    ),
+                    const SizedBox(height: 4),
                     SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -499,6 +644,52 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
                             style: AppTheme.glassElevatedButtonStyle(
                                 tintColor: const Color(0xFF10B981),
                                 foregroundColor: Colors.white))),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      OutlinedButton.icon(
+                          onPressed:
+                              _testingChannel ? null : () => _sendChannelTest('email'),
+                          icon: _testingChannel
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.email_outlined),
+                          label: const Text('Test Email'),
+                          style: AppTheme.glassOutlinedButtonStyle(
+                              tintColor: const Color(0xFF3B82F6),
+                              foregroundColor: const Color(0xFFBFDBFE))),
+                      OutlinedButton.icon(
+                          onPressed:
+                              _testingChannel ? null : () => _sendChannelTest('sms'),
+                          icon: _testingChannel
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.sms_outlined),
+                          label: const Text('Test SMS'),
+                          style: AppTheme.glassOutlinedButtonStyle(
+                              tintColor: const Color(0xFFF59E0B),
+                              foregroundColor: const Color(0xFFFDE68A))),
+                      OutlinedButton.icon(
+                          onPressed: _testingChannel
+                              ? null
+                              : () => _sendChannelTest('whatsapp'),
+                          icon: _testingChannel
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.chat_outlined),
+                          label: const Text('Test WhatsApp'),
+                          style: AppTheme.glassOutlinedButtonStyle(
+                              tintColor: const Color(0xFF10B981),
+                              foregroundColor: const Color(0xFFBBF7D0))),
+                    ]),
                     if (_lastSync != null)
                       Padding(
                           padding: const EdgeInsets.only(top: 6),
@@ -511,7 +702,51 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    _sectionTitle('5) Security Shield'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _sectionTitle(
+                              '5) Autonomous Stage Timeline (Admin View)'),
+                        ),
+                        IconButton(
+                          tooltip: 'Refresh timeline',
+                          onPressed:
+                              _loadingTimeline ? null : _loadStageTimeline,
+                          icon: _loadingTimeline
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.refresh, color: Colors.white70),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Shows latest stage events with channel delivery status.',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 10),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_stageTimeline.isEmpty)
+                      Text(
+                        'No stage events yet. Run a briefing or autonomy cycle to populate timeline.',
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11),
+                      )
+                    else
+                      ..._stageTimeline
+                          .take(12)
+                          .map((notification) => _timelineTile(notification)),
+                  ])),
+              _card(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    _sectionTitle('6) Security Shield'),
                     SwitchListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
@@ -561,7 +796,7 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    _sectionTitle('6) Subscription Rollout'),
+                    _sectionTitle('7) Subscription Rollout'),
                     Text('Current: ${user?.plan.displayName ?? 'Free Plan'}',
                         style: const TextStyle(
                             color: Colors.white,
@@ -622,6 +857,100 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withValues(alpha: 0.12))),
       child: child);
+
+  Widget _timelineTile(AppNotification notification) {
+    final rich = notification.richData;
+    final stage = _asText(rich['stage_label']).isNotEmpty
+        ? _asText(rich['stage_label'])
+        : _asText(rich['stage']).replaceAll('_', ' ').trim();
+    final pair = _asText(rich['pair']).isNotEmpty
+        ? _asText(rich['pair'])
+        : _asText(rich['study_pair']);
+    final context = _asText(rich['stage_context']);
+    final confidence = _asText(rich['confidence']);
+    final recommendation = _asText(rich['recommendation']);
+    final statusMap = notification.deliveryStatus;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${stage.isEmpty ? 'Stage Update' : stage}${pair.isEmpty ? '' : ' • $pair'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                _formatTime(notification.timestamp),
+                style: const TextStyle(color: Colors.white54, fontSize: 10),
+              ),
+            ],
+          ),
+          if (confidence.isNotEmpty || recommendation.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Confidence: ${confidence.isEmpty ? 'n/a' : confidence}% | Signal: ${recommendation.isEmpty ? 'n/a' : recommendation}',
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
+          ],
+          if (context.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              context,
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: statusMap.isEmpty
+                ? [const _DeliveryChip(label: 'No channel status', color: Colors.grey)]
+                : statusMap.entries
+                    .map((entry) => _DeliveryChip(
+                          label: '${entry.key}: ${entry.value}',
+                          color: _deliveryColor(entry.value),
+                        ))
+                    .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime? timestamp) {
+    if (timestamp == null) {
+      return 'n/a';
+    }
+    return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+  }
+
+  Color _deliveryColor(String status) {
+    final value = status.toLowerCase();
+    if (value.contains('sent')) {
+      return const Color(0xFF10B981);
+    }
+    if (value.contains('failed')) {
+      return const Color(0xFFEF4444);
+    }
+    return const Color(0xFFF59E0B);
+  }
 
   Widget _field(String label, TextEditingController c,
           {TextInputType type = TextInputType.text,
@@ -691,4 +1020,34 @@ class _UserAdminDashboardScreenState extends State<UserAdminDashboardScreen> {
               .toList(),
         ),
       );
+}
+
+class _DeliveryChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _DeliveryChip({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
 }
