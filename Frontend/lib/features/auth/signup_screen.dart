@@ -226,9 +226,15 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   String _resolveEmailContinueUrl() {
-    final fromEnv = (dotenv.env['APP_WEB_URL'] ?? '').trim();
-    if (fromEnv.isNotEmpty) {
-      final normalized = _normalizeBaseUrl(fromEnv);
+    const fromDefine =
+        String.fromEnvironment('APP_WEB_URL', defaultValue: '');
+    String fromEnv = '';
+    try {
+      fromEnv = (dotenv.env['APP_WEB_URL'] ?? '').trim();
+    } catch (_) {}
+    final raw = fromDefine.trim().isNotEmpty ? fromDefine.trim() : fromEnv;
+    if (raw.isNotEmpty) {
+      final normalized = _normalizeBaseUrl(raw);
       if (!normalized.startsWith('https://') && !kDebugMode) {
         throw StateError('APP_WEB_URL must use HTTPS in production.');
       }

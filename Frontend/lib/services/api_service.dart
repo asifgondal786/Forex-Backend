@@ -63,7 +63,10 @@ class ApiService {
       return _normalizeBaseUrl(fromDefine);
     }
 
-    final fromEnv = (dotenv.env['API_BASE_URL'] ?? '').trim();
+    String fromEnv = '';
+    try {
+      fromEnv = (dotenv.env['API_BASE_URL'] ?? '').trim();
+    } catch (_) {}
     if (fromEnv.isNotEmpty) {
       return _normalizeBaseUrl(fromEnv);
     }
