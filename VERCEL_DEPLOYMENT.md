@@ -71,6 +71,16 @@ In Firebase Console -> Authentication -> Settings -> Authorized domains:
 
 `vercel.json` rewrites all paths to `index.html` for Flutter SPA routes.
 
+### Canonical Config (Single Source)
+
+- Keep only one Vercel config file at repo root: `vercel.json`
+- Do not keep a second `Frontend/vercel.json`
+- In Vercel project settings, set **Root Directory** to repository root (`.`) so root `vercel.json` is used
+- Auth email links are emitted as Flutter hash-routes (for example `/#/reset?...`) to avoid path-based 404s.
+- CI guard enforces this policy on every push/PR:
+  - Workflow: `.github/workflows/vercel-config-guard.yml`
+  - Script: `scripts/check_vercel_config.ps1`
+
 Deep-link smoke test:
 
 ```powershell

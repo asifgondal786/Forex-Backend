@@ -37,8 +37,26 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     super.dispose();
   }
 
+  Map<String, String> _extractActionParams() {
+    final directParams = Uri.base.queryParameters;
+    if (directParams.isNotEmpty) {
+      return directParams;
+    }
+
+    // Flutter web hash routing keeps query parameters inside the URL fragment:
+    // https://app/#/reset?mode=resetPassword&oobCode=...
+    final fragment = Uri.base.fragment.trim();
+    if (fragment.isEmpty) {
+      return const <String, String>{};
+    }
+    final normalizedFragment = fragment.startsWith('/')
+        ? fragment
+        : '/$fragment';
+    return Uri.parse(normalizedFragment).queryParameters;
+  }
+
   Future<void> _resolveResetCode() async {
-    final params = Uri.base.queryParameters;
+    final params = _extractActionParams();
     final mode = (params['mode'] ?? '').trim();
     final code = (params['oobCode'] ?? '').trim();
 
@@ -126,6 +144,14 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       });
       _passwordController.clear();
       _confirmPasswordController.clear();
+      Future<void>.delayed(const Duration(milliseconds: 1200), () {
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.dashboard,
+          (_) => false,
+        );
+      });
     } on firebase_auth.FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() {

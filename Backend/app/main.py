@@ -14,8 +14,9 @@ from collections import defaultdict, deque
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
-# Load environment variables from Backend/.env if present
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
+# Load environment variables from Backend/.env if present.
+# override=True ensures local .env values win over accidental shell-level vars.
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -89,6 +90,14 @@ def _startup_snapshot() -> dict:
         "has_firebase_api_key": bool((os.getenv("FIREBASE_API_KEY") or "").strip()),
         "firebase_project_id": (os.getenv("FIREBASE_PROJECT_ID") or "").strip(),
         "api_base_url_hint": _normalize_url(os.getenv("API_BASE_URL") or ""),
+        "firebase_auth_domain_check_enabled": _env_bool(
+            "FIREBASE_AUTH_DOMAIN_CHECK_ENABLED",
+            True,
+        ),
+        "firebase_auth_domain_check_fail_fast": _env_bool(
+            "FIREBASE_AUTH_DOMAIN_CHECK_FAIL_FAST",
+            not _env_bool("DEBUG", False),
+        ),
         "redacted_service_account_path": _redact(
             os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "",
             keep=8,
@@ -169,7 +178,12 @@ except ImportError:
     print("??  Public auth routes not available")
 
 from .enhanced_websocket_manager import ws_manager
-from .utils.firestore_client import get_firebase_config_status, init_firebase
+from .forex_data_service import forex_service
+from .utils.firestore_client import (
+    check_firebase_authorized_domain,
+    get_firebase_config_status,
+    init_firebase,
+)
 from .security import verify_http_request
 
 
@@ -199,12 +213,17 @@ async def lifespan(app: FastAPI):
     )
 
     # Firebase Admin SDK startup health check
+    firebase_initialized = False
     try:
         status = get_firebase_config_status()
         if status["credential_source"] != "none":
             init_firebase()
             status = get_firebase_config_status()
-            print(f"[Firebase] Initialized via {status['credential_source']} (project_id={status['project_id']})")
+            firebase_initialized = True
+            print(
+                f"[Firebase] Initialized via {status['credential_source']} "
+                f"(project_id={status['project_id']})"
+            )
         else:
             print("[Firebase] Not configured (no credentials found).")
             if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
@@ -213,15 +232,64 @@ async def lifespan(app: FastAPI):
         print(f"[Firebase] Startup check failed: {exc}")
         if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
             raise
+
+    # Optional startup guard for Firebase Auth Authorized Domains.
+    if firebase_initialized and _env_bool("FIREBASE_AUTH_DOMAIN_CHECK_ENABLED", True):
+        frontend_host = _parse_host(os.getenv("FRONTEND_APP_URL") or "")
+        if frontend_host:
+            check_fail_fast = _env_bool(
+                "FIREBASE_AUTH_DOMAIN_CHECK_FAIL_FAST",
+                not _env_bool("DEBUG", False),
+            )
+            check_timeout = _env_int("FIREBASE_AUTH_DOMAIN_CHECK_TIMEOUT_SECONDS", 10)
+            try:
+                domain_check = check_firebase_authorized_domain(
+                    frontend_host,
+                    timeout_seconds=check_timeout,
+                )
+                log_payload = {
+                    "event": "firebase_authorized_domain_check",
+                    "project_id": domain_check.get("project_id"),
+                    "domain": domain_check.get("domain"),
+                    "authorized": bool(domain_check.get("authorized")),
+                    "authorized_domain_count": len(
+                        domain_check.get("authorized_domains") or []
+                    ),
+                    "fail_fast": check_fail_fast,
+                }
+                if _env_bool("DEBUG", False):
+                    log_payload["authorized_domains"] = (
+                        domain_check.get("authorized_domains") or []
+                    )
+                print(json.dumps(log_payload))
+
+                if not domain_check.get("authorized"):
+                    message = (
+                        f"Firebase Auth domain '{frontend_host}' is not allowlisted. "
+                        "Add it in Firebase Console -> Authentication -> Settings -> "
+                        "Authorized domains."
+                    )
+                    if check_fail_fast:
+                        raise RuntimeError(message)
+                    print(f"[Firebase] WARNING: {message}")
+            except Exception as exc:
+                if check_fail_fast:
+                    raise
+                print(f"[Firebase] WARNING: Authorized-domain check skipped: {exc}")
     
     forex_stream_enabled = os.getenv("FOREX_STREAM_ENABLED", "true").lower() == "true"
+    forex_stream_interval = _env_int("FOREX_STREAM_INTERVAL", 10)
     if forex_stream_enabled:
-        await ws_manager.start_forex_stream(interval=10)
+        await ws_manager.start_forex_stream(interval=forex_stream_interval)
 
     yield
 
     if forex_stream_enabled:
         ws_manager.stop_forex_stream()
+    try:
+        await forex_service.close()
+    except Exception:
+        pass
     print("? Shutdown complete")
 
 
@@ -389,15 +457,23 @@ def _get_cors_origin_regex() -> str | None:
     if _env_bool("CORS_ALLOW_ALL"):
         return None
     explicit = os.getenv("CORS_ORIGIN_REGEX", "").strip()
+    debug_mode = _env_bool("DEBUG", False)
+    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST", True)
+    localhost_pattern = r"^https?://(localhost|127[.]0[.]0[.]1)(:[0-9]+)?$"
+
     if explicit:
+        if debug_mode and allow_localhost:
+            # In local development, always allow localhost random dev ports even when
+            # an explicit regex is provided.
+            return f"(?:{explicit})|(?:{localhost_pattern})"
         return explicit
-    if not _env_bool("DEBUG", False):
+
+    if not debug_mode:
         return None
     # Default to allowing localhost/127.0.0.1 any port for dev tooling
     # (Flutter web, Vite, React, etc). Can be disabled via CORS_ALLOW_LOCALHOST=false.
-    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST", True)
     if allow_localhost:
-        return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+        return localhost_pattern
     return None
 
 _cors_allow_all = _env_bool("CORS_ALLOW_ALL")

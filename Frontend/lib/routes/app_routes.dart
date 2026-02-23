@@ -4,6 +4,7 @@ import '../features/auth/auth_gate.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/auth/verification_screen.dart';
+import '../features/auth/password_reset_screen.dart';
 import '../features/ai_chat/ai_chat_screen.dart';
 import '../features/task_creation/task_creation_screen.dart';
 import '../features/task_history/task_history_screen.dart';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String signup = '/signup';
   static const String verify = '/verify';
+  static const String reset = '/reset';
   static const String profile = '/profile';
   static const String security = '/security';
   static const String help = '/help';
@@ -29,6 +31,7 @@ class AppRoutes {
     login: (_) => LoginScreen(onLoginSuccess: () {}),
     signup: (_) => const SignupScreen(),
     verify: (_) => const VerificationScreen(),
+    reset: (_) => const PasswordResetScreen(),
     dashboard: (_) => const EmbodiedAgentScreen(),
     createTask: (_) => const TaskCreationScreen(),
     taskHistory: (_) => const TaskHistoryScreen(),

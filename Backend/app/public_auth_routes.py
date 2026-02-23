@@ -114,6 +114,11 @@ def _allow_http_redirects() -> bool:
     return _is_debug_mode()
 
 
+def _frontend_use_hash_routes() -> bool:
+    value = (os.getenv("FRONTEND_USE_HASH_ROUTES") or "true").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def _allowed_redirect_hosts() -> set[str]:
     hosts: set[str] = set()
     for key in ("FRONTEND_APP_URL",):
@@ -178,6 +183,7 @@ def _log_redirect_event(*, event: str, flow: str, continue_url: str, action_link
         parsed = urlparse(action_link)
         payload["action_link_host"] = parsed.hostname
         payload["action_link_path"] = parsed.path or "/"
+        payload["action_link_fragment"] = parsed.fragment or ""
     print(json.dumps(payload))
 
 
@@ -237,6 +243,35 @@ def _build_frontend_action_url(
         passthrough["apiKey"] = api_key
     if lang:
         passthrough["lang"] = lang
+
+    if _frontend_use_hash_routes():
+        frontend_base = _normalize_base_url(os.getenv("FRONTEND_APP_URL") or "")
+        if not frontend_base:
+            raise RuntimeError("FRONTEND_APP_URL must be configured for hash-route action links.")
+
+        validated = _assert_allowed_redirect_url(
+            f"{frontend_base}{expected_path}",
+            flow=flow,
+            expected_path=expected_path,
+        )
+        frontend_parsed = urlparse(frontend_base)
+        fragment_query = urlencode(passthrough, doseq=True)
+        fragment_value = expected_path
+        if fragment_query:
+            fragment_value = f"{expected_path}?{fragment_query}"
+        app_link = frontend_parsed._replace(
+            path=frontend_parsed.path or "/",
+            query="",
+            fragment=fragment_value,
+        ).geturl()
+        _log_redirect_event(
+            event="frontend_action_link_built",
+            flow=flow,
+            continue_url=validated,
+            action_link=app_link,
+        )
+        return app_link
+
     merged_query = parse_qs(base_parsed.query or "")
     for key, value in passthrough.items():
         merged_query[key] = [value]
@@ -296,8 +331,85 @@ def _is_too_many_attempts_error(exc: Exception) -> bool:
     return any(marker in reason for marker in markers)
 
 
+def _is_unauthorized_domain_error(exc: Exception) -> bool:
+    reason = f"{getattr(exc, 'code', '')} {str(exc)}".lower()
+    markers = [
+        "unauthorized_domain",
+        "unauthorized domain",
+        "domain not allowlisted by project",
+        "unauthorized-continue-uri",
+    ]
+    return any(marker in reason for marker in markers)
+
+
+def _is_insufficient_permission_error(exc: Exception) -> bool:
+    reason = f"{getattr(exc, 'code', '')} {str(exc)}".lower()
+    markers = [
+        "insufficient_permission",
+        "permission_denied",
+        "insufficient permission",
+        "caller does not have permission",
+    ]
+    return any(marker in reason for marker in markers)
+
+
+def _build_unauthorized_domain_error(
+    *,
+    flow: str,
+    continue_url: str,
+    exc: Exception,
+) -> HTTPException:
+    host = (urlparse(continue_url or "").hostname or "").strip().lower() or "unknown"
+    detail = (
+        f"Unable to generate {flow} link right now. Firebase Auth rejected continue URL domain "
+        f"'{host}'. Add this domain under Firebase Console > Authentication > Settings > "
+        "Authorized domains and retry."
+    )
+    if _debug_enabled():
+        detail = f"{detail} ({exc})"
+    return HTTPException(status_code=503, detail=detail)
+
+
+def _build_insufficient_permission_error(*, flow: str, exc: Exception) -> HTTPException:
+    detail = (
+        f"Unable to generate {flow} link right now due to insufficient Firebase permissions. "
+        "Verify Firebase Auth is enabled, API key restrictions allow Identity Toolkit, and "
+        "service account has Firebase Admin access."
+    )
+    if _debug_enabled():
+        detail = f"{detail} ({exc})"
+    return HTTPException(status_code=503, detail=detail)
+
+
 def _firebase_api_key() -> str:
     return (os.getenv("FIREBASE_API_KEY") or os.getenv("FIREBASE_WEB_API_KEY") or "").strip()
+
+
+def _firebase_api_key_valid(value: str) -> bool:
+    candidate = (value or "").strip()
+    if not candidate:
+        return False
+    if candidate.lower().startswith("replace_with_"):
+        return False
+    # Firebase web API keys are expected to look like AIza...
+    return candidate.startswith("AIza") and len(candidate) >= 30
+
+
+def _auth_link_timeout_seconds() -> float:
+    raw = (os.getenv("AUTH_LINK_TIMEOUT_SECONDS") or "").strip()
+    if not raw:
+        return 15.0
+    try:
+        parsed = float(raw)
+    except Exception:
+        return 15.0
+    if parsed <= 0:
+        return 15.0
+    return parsed
+
+
+def _has_password_reset_link_generator() -> bool:
+    return _firebase_admin_credentials_available() or _firebase_api_key_valid(_firebase_api_key())
 
 
 def _mail_delivery_http_error(exc: Exception, *, flow: str) -> HTTPException:
@@ -336,8 +448,8 @@ def _mail_delivery_http_error(exc: Exception, *, flow: str) -> HTTPException:
 
 async def _generate_reset_link_via_rest(email: str) -> str:
     api_key = _firebase_api_key()
-    if not api_key:
-        raise RuntimeError("FIREBASE_API_KEY missing for REST fallback.")
+    if not _firebase_api_key_valid(api_key):
+        raise RuntimeError("FIREBASE_API_KEY missing or invalid for REST fallback.")
 
     payload: Dict[str, Any] = {
         "requestType": "PASSWORD_RESET",
@@ -475,11 +587,20 @@ async def request_password_reset(payload: PasswordResetRequest):
     if not is_valid_email(email):
         raise HTTPException(status_code=400, detail="Invalid email.")
 
+    if not _has_password_reset_link_generator():
+        detail = (
+            "Password reset link service is not configured. Set Firebase Admin credentials "
+            "or a valid FIREBASE_API_KEY."
+        )
+        if not _debug_enabled():
+            detail = "Password reset service is not configured."
+        raise HTTPException(status_code=503, detail=detail)
+
     # Avoid user enumeration by returning a generic response for unknown users.
     try:
         reset_link = await asyncio.wait_for(
             asyncio.to_thread(_generate_reset_link, email),
-            timeout=8,
+            timeout=_auth_link_timeout_seconds(),
         )
     except firebase_auth.UserNotFoundError:
         print(f"[AUTH] Password reset requested for unknown email: {email}")
@@ -490,17 +611,52 @@ async def request_password_reset(payload: PasswordResetRequest):
             debug=debug_payload,
         )
     except Exception as exc:
-        print(f"[AUTH] Password reset link generation failed for {email}: {exc}")
+        print(f"[AUTH] Password reset link generation failed for {email}: {exc!r}")
+        if isinstance(exc, asyncio.TimeoutError):
+            # Firebase Admin can be intermittently slow; try REST fallback before failing.
+            print("[AUTH] Password reset admin link timed out; attempting REST fallback.")
+        elif _is_unauthorized_domain_error(exc):
+            continue_url = _resolve_reset_continue_url()
+            raise _build_unauthorized_domain_error(
+                flow="password reset",
+                continue_url=continue_url,
+                exc=exc,
+            )
+        elif _is_insufficient_permission_error(exc):
+            raise _build_insufficient_permission_error(flow="password reset", exc=exc)
         try:
             reset_link = await _generate_reset_link_via_rest(email)
             print("[AUTH] Password reset link generated via REST fallback.")
         except Exception as rest_exc:
+            reason = str(rest_exc).lower()
+            if _is_unauthorized_domain_error(rest_exc):
+                continue_url = _resolve_reset_continue_url()
+                raise _build_unauthorized_domain_error(
+                    flow="password reset",
+                    continue_url=continue_url,
+                    exc=rest_exc,
+                )
+            if _is_insufficient_permission_error(rest_exc):
+                raise _build_insufficient_permission_error(
+                    flow="password reset",
+                    exc=rest_exc,
+                )
+            if (
+                "api key not valid" in reason
+                or "api_key_invalid" in reason
+                or "missing or invalid for rest fallback" in reason
+            ):
+                detail = (
+                    "FIREBASE_API_KEY is missing/invalid for password reset REST fallback."
+                )
+                if not _debug_enabled():
+                    detail = "Password reset service is not configured."
+                raise HTTPException(status_code=503, detail=detail)
             if _is_too_many_attempts_error(rest_exc):
                 raise HTTPException(
                     status_code=429,
                     detail="Too many password reset attempts. Please wait a few minutes and try again.",
                 )
-            reason = str(rest_exc).lower()
             if "email_not_found" in reason or "user-not-found" in reason:
                 debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
                 return PasswordResetResponse(
@@ -591,10 +747,26 @@ async def request_email_verification(payload: EmailVerificationRequest):
                 status_code=504,
                 detail="Verification link generation timed out on backend.",
             )
+        if _is_unauthorized_domain_error(exc):
+            continue_url = _resolve_verification_continue_url()
+            raise _build_unauthorized_domain_error(
+                flow="email verification",
+                continue_url=continue_url,
+                exc=exc,
+            )
+        if _is_insufficient_permission_error(exc):
+            raise _build_insufficient_permission_error(flow="email verification", exc=exc)
         if _is_too_many_attempts_error(exc):
-            raise HTTPException(
-                status_code=429,
-                detail="Too many verification attempts. Please wait a few minutes and try again.",
+            # Keep UX smooth and avoid leaking operational details: if Firebase reports
+            # too-many-attempts, treat it as a successful "already recently sent" outcome.
+            debug_payload = {"result": "rate_limited"} if _debug_enabled() else None
+            return EmailVerificationResponse(
+                success=True,
+                message=(
+                    "A verification email was recently sent. "
+                    "Please check inbox/spam and wait a few minutes before retrying."
+                ),
+                debug=debug_payload,
             )
         raise HTTPException(
             status_code=500,

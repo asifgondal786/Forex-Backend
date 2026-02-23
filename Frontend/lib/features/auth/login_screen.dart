@@ -79,66 +79,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final controller = TextEditingController(text: _emailController.text.trim());
-    final parentContext = context;
-    final messenger = ScaffoldMessenger.of(parentContext);
-    final parentNavigator = Navigator.of(parentContext, rootNavigator: true);
-    await showDialog(
+    final message = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Reset Password'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              hintText: 'you@example.com',
-            ),
-            keyboardType: TextInputType.emailAddress,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final email = _normalizeEmail(controller.text);
-                controller.text = email;
-                if (!_isValidEmail(email)) {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Enter a valid email')),
-                  );
-                  return;
-                }
-                try {
-                  final response = await _apiService.requestPasswordReset(
-                    email: email,
-                  );
-                  final message =
-                      (response['message'] as String?) ??
-                      'If an account exists for this email, reset instructions have been sent.';
-                  if (mounted) {
-                    if (parentNavigator.canPop()) {
-                      parentNavigator.pop();
-                    }
-                    messenger.showSnackBar(SnackBar(content: Text(message)));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text('Reset failed: $e')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Send'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => _ForgotPasswordDialog(
+        apiService: _apiService,
+        initialEmail: _emailController.text.trim(),
+        normalizeEmail: _normalizeEmail,
+        isValidEmail: _isValidEmail,
+      ),
     );
-    controller.dispose();
+
+    if (!mounted || message == null || message.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   bool _validateInputs() {
@@ -618,6 +570,116 @@ class _LoginScreenState extends State<LoginScreen> {
               vertical: 14,
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final ApiService apiService;
+  final String initialEmail;
+  final String Function(String) normalizeEmail;
+  final bool Function(String) isValidEmail;
+
+  const _ForgotPasswordDialog({
+    required this.apiService,
+    required this.initialEmail,
+    required this.normalizeEmail,
+    required this.isValidEmail,
+  });
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  late final TextEditingController _controller;
+  bool _isSubmitting = false;
+  String? _inlineError;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = widget.normalizeEmail(_controller.text);
+    _controller.text = email;
+    if (!widget.isValidEmail(email)) {
+      setState(() => _inlineError = 'Enter a valid email');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _inlineError = null;
+    });
+
+    try {
+      final response = await widget.apiService.requestPasswordReset(email: email);
+      final message =
+          (response['message'] as String?) ??
+          'If an account exists for this email, reset instructions have been sent.';
+      if (!mounted) return;
+      Navigator.of(context).pop(message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _inlineError = 'Reset failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset Password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              hintText: 'you@example.com',
+            ),
+            keyboardType: TextInputType.emailAddress,
+            enabled: !_isSubmitting,
+          ),
+          if (_inlineError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _inlineError!,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Send'),
         ),
       ],
     );

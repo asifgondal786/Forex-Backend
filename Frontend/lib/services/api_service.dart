@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
@@ -27,7 +28,7 @@ class ApiService {
     defaultValue: '',
   );
   static const Duration _timeout = Duration(seconds: 10);
-  static const Duration _authTimeout = Duration(seconds: 20);
+  static const Duration _authTimeout = Duration(seconds: 45);
   // Use --dart-define=DEV_USER_ID=your-user-id for development
   static const String _devUserId = String.fromEnvironment(
     'DEV_USER_ID',
@@ -240,6 +241,14 @@ class ApiService {
       return _handleResponse(response);
     } on ApiException {
       rethrow;
+    } on TimeoutException {
+      // Keep reset UX resilient: backend may complete email delivery after client timeout.
+      return {
+        'success': true,
+        'message':
+            'If an account exists for this email, password reset instructions have been sent.',
+        'debug': {'result': 'client_timeout_optimistic'},
+      };
     } catch (e) {
       debugPrint('Error requesting password reset: $e');
       throw ApiException('Error requesting password reset: $e');
