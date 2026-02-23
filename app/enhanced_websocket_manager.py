@@ -254,16 +254,7 @@ class EnhancedWebSocketManager:
         async def stream_callback(forex_data):
             await self.send_forex_update(forex_data)
 
-        def should_poll() -> bool:
-            return bool(self.all_connections)
-
-        task = asyncio.create_task(
-            forex_service.stream_live_data(
-                stream_callback,
-                interval,
-                should_poll=should_poll,
-            )
-        )
+        task = asyncio.create_task(forex_service.stream_live_data(stream_callback, interval))
         self.streaming_tasks["forex_stream"] = task
         print(f"Started forex data stream (interval: {interval}s)")
 

@@ -21,6 +21,7 @@ class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
     preferences: Optional[dict] = None
 
+<<<<<<< HEAD
 # In-memory user store (replace with Firestore or DB in production)
 users_db = {}
 
@@ -58,6 +59,20 @@ async def get_current_user(
         users_db[user_id] = user
 
     return user
+=======
+# This is a dummy user database for demonstration.
+# In a real application, you would fetch this from a database.
+mock_users = {
+    "user_123": {
+        "id": "user-123",
+        "email": "demo@forexcompanion.com",
+        "name": "Demo User",
+        "created_at": "2026-01-17T00:00:00",
+        "avatarUrl": "https://i.pravatar.cc/150",
+        "preferences": {},
+    }
+}
+>>>>>>> 6ea3e47c (AI task button files)
 
 router = APIRouter(
     prefix="/api/users",
