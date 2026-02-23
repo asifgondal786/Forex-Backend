@@ -1,11 +1,15 @@
 """
 AI-Powered Forex Trading Engine
 Autonomous trading system that works while you sleep
+<<<<<<< HEAD
 Integrates with Google Generative AI (Gemini) for intelligent decision-making
+=======
+>>>>>>> 6ea3e47c (AI task button files)
 """
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta
+<<<<<<< HEAD
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 from dataclasses import dataclass
@@ -26,6 +30,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
 if GEMINI_AVAILABLE:
     genai.configure(api_key=GEMINI_API_KEY)
+=======
+from typing import Dict, List, Optional, Tuple
+import numpy as np
+from dataclasses import dataclass
+import json
+>>>>>>> 6ea3e47c (AI task button files)
 
 
 @dataclass
@@ -254,6 +264,7 @@ class ForexAIEngine:
     # AI TRADING SIGNALS
     # ========================================================================
     
+<<<<<<< HEAD
     async def generate_trading_signal_with_gemini(
         self,
         pair: str,
@@ -336,13 +347,19 @@ class ForexAIEngine:
             print(f"Gemini signal generation failed: {e}")
             return self.generate_trading_signal(pair, market_condition, user_strategy)
 
+=======
+>>>>>>> 6ea3e47c (AI task button files)
     async def generate_trading_signal(
         self,
         pair: str,
         market_condition: MarketCondition,
         user_strategy: Dict
     ) -> TradingSignal:
+<<<<<<< HEAD
         """Generate AI-powered trading signal (fallback method)"""
+=======
+        """Generate AI-powered trading signal"""
+>>>>>>> 6ea3e47c (AI task button files)
         
         action = "HOLD"
         confidence = 0.0
@@ -409,6 +426,7 @@ class ForexAIEngine:
             reason=reason,
             timestamp=datetime.now()
         )
+<<<<<<< HEAD
 
     async def analyze_portfolio_performance(self, portfolio_data: Dict) -> Dict[str, Any]:
         """
@@ -466,6 +484,8 @@ class ForexAIEngine:
             "recommendations": ["Review trading strategy", "Monitor key pairs"],
             "next_steps": ["Continue monitoring", "Consider adjustments"]
         }
+=======
+>>>>>>> 6ea3e47c (AI task button files)
     
     # ========================================================================
     # AUTOMATED TRADING
@@ -604,4 +624,8 @@ class ForexAIEngine:
 
 
 # Global AI engine instance
+<<<<<<< HEAD
 ai_engine = ForexAIEngine()
+=======
+ai_engine = ForexAIEngine()
+>>>>>>> 6ea3e47c (AI task button files)

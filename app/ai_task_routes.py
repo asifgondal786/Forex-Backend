@@ -2,15 +2,23 @@
 AI Task Processing Routes
 Handles "Assign New Task" functionality with full AI capabilities
 """
+<<<<<<< HEAD
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict
 from datetime import datetime, timezone
+=======
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from typing import Optional, List, Dict
+from datetime import datetime
+>>>>>>> 6ea3e47c (AI task button files)
 import uuid
 import asyncio
 
 from .ai_forex_engine import ai_engine
 from .enhanced_websocket_manager import ws_manager
+<<<<<<< HEAD
 from .security import get_current_user_id
 from .services.task_service import TaskService
 
@@ -152,15 +160,23 @@ async def _require_task_owner(task_id: str, user_id: str) -> Dict:
         raise HTTPException(status_code=403, detail="Forbidden")
     return data
 
+=======
+
+router = APIRouter(prefix="/api/tasks", tags=["AI Tasks"])
+
+>>>>>>> 6ea3e47c (AI task button files)
 
 # ============================================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================================
 
 class TaskCreateRequest(BaseModel):
+<<<<<<< HEAD
     model_config = ConfigDict(populate_by_name=True)
 
     user_id: Optional[str] = Field(default=None, alias="userId")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
     title: str
     description: str
     task_type: str  # "market_analysis", "auto_trade", "forecast", "portfolio_monitor"
@@ -183,6 +199,7 @@ class TaskResponse(BaseModel):
     description: str
     status: str
     priority: str
+<<<<<<< HEAD
     createdAt: str
     startTime: Optional[str]
     currentStep: int
@@ -192,6 +209,14 @@ class TaskResponse(BaseModel):
     
     class Config:
         populate_by_name = True  # Allow snake_case or camelCase from JSON
+=======
+    created_at: str
+    start_time: Optional[str]
+    current_step: int
+    total_steps: int
+    steps: List[Dict]
+    result_file_url: Optional[str]
+>>>>>>> 6ea3e47c (AI task button files)
 
 
 # ============================================================================
@@ -205,7 +230,10 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
     """
     
     try:
+<<<<<<< HEAD
         await _update_task(task_id, status="running", startTime=_now())
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         # Step 1: Fetch live market data
         await ws_manager.send_task_progress(
             task_id=task_id,
@@ -217,7 +245,10 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
         await ai_engine.initialize()
         rates = await ai_engine.fetch_live_rates()
         calendar = await ai_engine.fetch_economic_calendar()
+<<<<<<< HEAD
         await _complete_step(task_id, "Fetch Data")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         
         # Step 2: Analyze each currency pair
         await ws_manager.send_task_progress(
@@ -276,6 +307,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
                 task_id=task_id,
                 message=f"✅ Analyzed {pair}: {signal.action} signal with {signal.confidence:.0%} confidence",
                 update_type="info",
+<<<<<<< HEAD
                 data=analysis_results[pair],
                 user_id=params.user_id
             )
@@ -283,6 +315,11 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
         await _complete_step(task_id, "Analyze Markets")
         await _complete_step(task_id, "Generate Signals")
 
+=======
+                data=analysis_results[pair]
+            )
+        
+>>>>>>> 6ea3e47c (AI task button files)
         # Step 3: Generate comprehensive report
         await ws_manager.send_task_progress(
             task_id=task_id,
@@ -292,12 +329,18 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
         )
         
         await asyncio.sleep(2)  # Simulate report generation
+<<<<<<< HEAD
         await _complete_step(task_id, "Create Report")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         
         # Step 4: Complete
         await ws_manager.send_task_complete(
             task_id=task_id,
+<<<<<<< HEAD
             user_id=params.user_id,
+=======
+>>>>>>> 6ea3e47c (AI task button files)
             result={
                 "summary": f"Analysis complete for {len(params.currency_pairs)} pairs",
                 "file_url": f"/downloads/{task_id}_market_analysis.pdf",
@@ -306,6 +349,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
                 "timestamp": datetime.now().isoformat()
             }
         )
+<<<<<<< HEAD
         await _update_task(
             task_id,
             status="completed",
@@ -321,6 +365,11 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
     except Exception as e:
         await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         await _update_task(task_id, status="failed", endTime=_now())
+=======
+        
+    except Exception as e:
+        await ws_manager.send_error(task_id, str(e))
+>>>>>>> 6ea3e47c (AI task button files)
     finally:
         await ai_engine.close()
 
@@ -332,7 +381,10 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
     """
     
     try:
+<<<<<<< HEAD
         await _update_task(task_id, status="running", startTime=_now())
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         await ai_engine.initialize()
         
         await ws_manager.send_task_progress(
@@ -341,7 +393,10 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             progress=0.1,
             message="Setting up autonomous trading engine..."
         )
+<<<<<<< HEAD
         await _complete_step(task_id, "Initialize Engine")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         
         # Validate user limits
         if not params.user_limits:
@@ -353,7 +408,10 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             progress=0.3,
             message=f"AI is now monitoring {len(params.currency_pairs)} pairs 24/7..."
         )
+<<<<<<< HEAD
         await _complete_step(task_id, "Monitor Markets")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         
         # Continuous monitoring loop (simplified for demo)
         for i in range(5):  # In production, this runs indefinitely
@@ -392,10 +450,15 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                             task_id=task_id,
                             message=f"🤖 AUTO-TRADE: {signal.action} {pair} at {signal.entry_price:.4f}",
                             update_type="success",
+<<<<<<< HEAD
                             data=trade_result,
                             user_id=params.user_id
                         )
                         await _complete_step(task_id, "Execute Trades")
+=======
+                            data=trade_result
+                        )
+>>>>>>> 6ea3e47c (AI task button files)
             
             # Monitor open positions
             closed_trades = await ai_engine.monitor_positions(rates)
@@ -406,10 +469,15 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                     task_id=task_id,
                     message=f"{profit_emoji} Position closed: {trade['pair']} | Profit: ${trade['profit']:.2f}",
                     update_type="success" if trade["profit"] > 0 else "warning",
+<<<<<<< HEAD
                     data=trade,
                     user_id=params.user_id
                 )
                 await _complete_step(task_id, "Manage Positions")
+=======
+                    data=trade
+                )
+>>>>>>> 6ea3e47c (AI task button files)
             
             # Update progress
             await ws_manager.send_task_progress(
@@ -424,7 +492,10 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
         # Task completion
         await ws_manager.send_task_complete(
             task_id=task_id,
+<<<<<<< HEAD
             user_id=params.user_id,
+=======
+>>>>>>> 6ea3e47c (AI task button files)
             result={
                 "summary": "Auto-trading session completed",
                 "trades_executed": 5,
@@ -432,6 +503,7 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                 "file_url": f"/downloads/{task_id}_trading_report.pdf"
             }
         )
+<<<<<<< HEAD
         await _update_task(
             task_id,
             status="completed",
@@ -447,6 +519,11 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
     except Exception as e:
         await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         await _update_task(task_id, status="failed", endTime=_now())
+=======
+        
+    except Exception as e:
+        await ws_manager.send_error(task_id, str(e))
+>>>>>>> 6ea3e47c (AI task button files)
     finally:
         await ai_engine.close()
 
@@ -458,7 +535,10 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
     """
     
     try:
+<<<<<<< HEAD
         await _update_task(task_id, status="running", startTime=_now())
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         await ai_engine.initialize()
         
         await ws_manager.send_task_progress(
@@ -469,7 +549,10 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
         )
         
         rates = await ai_engine.fetch_live_rates()
+<<<<<<< HEAD
         await _complete_step(task_id, "Collect Historical Data")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         forecasts = {}
         
         await ws_manager.send_task_progress(
@@ -478,7 +561,10 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
             progress=0.5,
             message="AI is analyzing patterns and predicting future movements..."
         )
+<<<<<<< HEAD
         await _complete_step(task_id, "Train AI Model")
+=======
+>>>>>>> 6ea3e47c (AI task button files)
         
         for pair in params.currency_pairs:
             # Simulate historical prices
@@ -498,6 +584,7 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
                 task_id=task_id,
                 message=f"📊 {pair}: Predicted {forecast['expected_change_percent']:+.2f}% change in next {params.forecast_horizon_hours}h",
                 update_type="info",
+<<<<<<< HEAD
                 data=forecast,
                 user_id=params.user_id
             )
@@ -507,12 +594,20 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
         await ws_manager.send_task_complete(
             task_id=task_id,
             user_id=params.user_id,
+=======
+                data=forecast
+            )
+        
+        await ws_manager.send_task_complete(
+            task_id=task_id,
+>>>>>>> 6ea3e47c (AI task button files)
             result={
                 "summary": f"Forecasts generated for {len(params.currency_pairs)} pairs",
                 "forecasts": forecasts,
                 "file_url": f"/downloads/{task_id}_forecasts.pdf"
             }
         )
+<<<<<<< HEAD
         await _complete_step(task_id, "Create Forecast Report")
         await _update_task(
             task_id,
@@ -529,6 +624,11 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
     except Exception as e:
         await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         await _update_task(task_id, status="failed", endTime=_now())
+=======
+        
+    except Exception as e:
+        await ws_manager.send_error(task_id, str(e))
+>>>>>>> 6ea3e47c (AI task button files)
     finally:
         await ai_engine.close()
 
@@ -540,8 +640,12 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
 @router.post("/create", response_model=TaskResponse)
 async def create_task(
     task: TaskCreateRequest,
+<<<<<<< HEAD
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user_id),
+=======
+    background_tasks: BackgroundTasks
+>>>>>>> 6ea3e47c (AI task button files)
 ):
     """
     Create and execute an AI-powered forex task
@@ -554,12 +658,15 @@ async def create_task(
     """
     
     task_id = str(uuid.uuid4())
+<<<<<<< HEAD
     task = task.model_copy(update={"user_id": user_id})
     await _log_activity(
         user_id=user_id,
         message=f"Task created: {task.title}",
         activity_type="monitor",
     )
+=======
+>>>>>>> 6ea3e47c (AI task button files)
     
     # Define task steps based on type
     steps_map = {
@@ -584,6 +691,7 @@ async def create_task(
     }
     
     steps = steps_map.get(task.task_type, steps_map["market_analysis"])
+<<<<<<< HEAD
 
     now = _now()
     task_data = {
@@ -608,6 +716,23 @@ async def create_task(
     service = _get_task_service()
     await asyncio.to_thread(service.create_task, task_id, task_data)
     task_response = TaskResponse(**_normalize_task(task_id, task_data))
+=======
+    
+    # Create task response
+    task_response = TaskResponse(
+        id=task_id,
+        title=task.title,
+        description=task.description,
+        status="running",
+        priority=task.priority,
+        created_at=datetime.now().isoformat(),
+        start_time=datetime.now().isoformat(),
+        current_step=0,
+        total_steps=len(steps),
+        steps=steps,
+        result_file_url=None
+    )
+>>>>>>> 6ea3e47c (AI task button files)
     
     # Execute task in background based on type
     if task.task_type == "market_analysis":
@@ -620,6 +745,7 @@ async def create_task(
     return task_response
 
 
+<<<<<<< HEAD
 @router.get("/")
 async def list_tasks(user_id: Optional[str] = None, current_user_id: str = Depends(get_current_user_id)):
     """List tasks (Firestore-backed)"""
@@ -702,6 +828,29 @@ async def delete_task(task_id: str, user_id: str = Depends(get_current_user_id))
     service = _get_task_service()
     await asyncio.to_thread(service.delete_task, task_id)
     return {"message": "Task deleted", "id": task_id}
+=======
+@router.get("/{task_id}")
+async def get_task(task_id: str):
+    """Get task status and details"""
+    # In production, fetch from database
+    return {
+        "id": task_id,
+        "status": "running",
+        "message": "Task is executing. Connect to WebSocket for live updates."
+    }
+
+
+@router.post("/{task_id}/stop")
+async def stop_task(task_id: str):
+    """Stop a running task"""
+    await ws_manager.send_update(
+        task_id=task_id,
+        message="Task stopped by user",
+        update_type="warning"
+    )
+    
+    return {"message": "Task stopped", "task_id": task_id}
+>>>>>>> 6ea3e47c (AI task button files)
 
 
 @router.get("/market/live-rates")
@@ -726,4 +875,8 @@ async def get_economic_calendar():
     
     return {
         "events": calendar
+<<<<<<< HEAD
     }
+=======
+    }
+>>>>>>> 6ea3e47c (AI task button files)

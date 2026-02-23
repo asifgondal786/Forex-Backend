@@ -4,16 +4,17 @@ Sends smart, contextual notifications via multiple channels
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from enum import Enum
 import asyncio
 import json
 import os
+import smtplib
 import aiohttp
+from email.message import EmailMessage
 
 from ..utils.firestore_client import get_firestore_client
 from .market_intelligence_service import MarketIntelligenceService
-from .mail_delivery_service import MailDeliveryService
 
 
 class NotificationChannel(Enum):
@@ -63,8 +64,6 @@ class NotificationPreference:
     autonomous_mode: bool = False
     autonomous_profile: str = "balanced"  # conservative, balanced, aggressive
     autonomous_min_confidence: float = 0.62
-    autonomous_stage_alerts: bool = True
-    autonomous_stage_interval_seconds: int = 45
     channel_settings: Dict[str, str] = field(default_factory=dict)
 
 
@@ -119,7 +118,6 @@ class EnhancedNotificationService:
         self.user_preferences: Dict[str, NotificationPreference] = {}
         self.notifications: List[Notification] = []
         self.notification_queue: asyncio.Queue = asyncio.Queue()
-        self._last_stage_alert_sent: Dict[Tuple[str, str, str], datetime] = {}
         self.templates: Dict[str, NotificationTemplate] = {}
         self._initialize_templates()
         self.market_intelligence = MarketIntelligenceService()
@@ -147,9 +145,15 @@ class EnhancedNotificationService:
         self.discord_configured = False
         self.x_configured = False
         self.whatsapp_configured = False
-        self.mail_delivery = MailDeliveryService()
 
-        self.email_configured = self.mail_delivery.email_configured
+        # SMTP config (env-driven)
+        self.smtp_host = os.getenv("SMTP_HOST")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_user = os.getenv("SMTP_USER")
+        self.smtp_pass = os.getenv("SMTP_PASS")
+        self.smtp_from = os.getenv("SMTP_FROM", self.smtp_user or "")
+        self.smtp_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
+        self.email_configured = all([self.smtp_host, self.smtp_user, self.smtp_pass, self.smtp_from])
 
         # Channel integration config (env-driven)
         self.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -196,19 +200,6 @@ class EnhancedNotificationService:
             if value_str:
                 normalized[key] = value_str
         return normalized
-
-    def _serialize_delivery_status(self, status_map: Dict[NotificationChannel, str]) -> Dict[str, str]:
-        serialized: Dict[str, str] = {}
-        for key, value in status_map.items():
-            channel = key.value if isinstance(key, NotificationChannel) else str(key)
-            serialized[channel] = str(value)
-        return serialized
-
-    def _serialize_channels(self, channels: List[NotificationChannel]) -> List[str]:
-        return [
-            channel.value if isinstance(channel, NotificationChannel) else str(channel)
-            for channel in channels
-        ]
 
     def _normalize_autonomous_profile(self, raw: Optional[str]) -> str:
         value = (raw or "").strip().lower()
@@ -345,11 +336,6 @@ class EnhancedNotificationService:
                     data.get("autonomous_min_confidence"),
                     0.62,
                 ),
-                autonomous_stage_alerts=bool(data.get("autonomous_stage_alerts", True)),
-                autonomous_stage_interval_seconds=max(
-                    15,
-                    int(data.get("autonomous_stage_interval_seconds") or 45),
-                ),
                 channel_settings=self._normalize_channel_settings(data.get("channel_settings")),
             )
         except Exception:
@@ -371,8 +357,6 @@ class EnhancedNotificationService:
                     "autonomous_mode": preferences.autonomous_mode,
                     "autonomous_profile": preferences.autonomous_profile,
                     "autonomous_min_confidence": preferences.autonomous_min_confidence,
-                    "autonomous_stage_alerts": preferences.autonomous_stage_alerts,
-                    "autonomous_stage_interval_seconds": preferences.autonomous_stage_interval_seconds,
                     "channel_settings": preferences.channel_settings,
                     "updated_at": datetime.utcnow(),
                 },
@@ -438,19 +422,6 @@ class EnhancedNotificationService:
                 short_message_template="P&L: {pnl} ({win_rate}%)",
                 priority=NotificationPriority.LOW
             ),
-            "autonomous_stage_update": NotificationTemplate(
-                template_id="autonomous_stage_update",
-                category=NotificationCategory.SYSTEM_UPDATE,
-                name="Autonomous Stage Update",
-                title_template="Agent Stage: {stage_label} ({pair})",
-                message_template=(
-                    "Jarvis-style assistant update for {pair}. Stage: {stage_label}. "
-                    "Confidence: {confidence}%. Signal: {recommendation}. "
-                    "Sources analyzed: {source_count}. Context: {stage_context}"
-                ),
-                short_message_template="{pair} {stage_label}: {confidence}% | {recommendation}",
-                priority=NotificationPriority.MEDIUM,
-            ),
         }
 
     async def set_notification_preferences(
@@ -465,8 +436,6 @@ class EnhancedNotificationService:
         autonomous_mode: Optional[bool] = None,
         autonomous_profile: Optional[str] = None,
         autonomous_min_confidence: Optional[float] = None,
-        autonomous_stage_alerts: Optional[bool] = None,
-        autonomous_stage_interval_seconds: Optional[int] = None,
         channel_settings: Optional[Dict[str, str]] = None,
     ) -> Dict:
         """Set user's notification preferences"""
@@ -540,21 +509,6 @@ class EnhancedNotificationService:
                 else (existing.autonomous_min_confidence if existing else 0.62),
                 0.62,
             ),
-            autonomous_stage_alerts=(
-                autonomous_stage_alerts
-                if autonomous_stage_alerts is not None
-                else (existing.autonomous_stage_alerts if existing else True)
-            ),
-            autonomous_stage_interval_seconds=max(
-                15,
-                int(
-                    autonomous_stage_interval_seconds
-                    if autonomous_stage_interval_seconds is not None
-                    else (
-                        existing.autonomous_stage_interval_seconds if existing else 45
-                    )
-                ),
-            ),
             channel_settings=merged_channel_settings,
         )
         
@@ -572,8 +526,6 @@ class EnhancedNotificationService:
                 "autonomous_mode": preferences.autonomous_mode,
                 "autonomous_profile": preferences.autonomous_profile,
                 "autonomous_min_confidence": preferences.autonomous_min_confidence,
-                "autonomous_stage_alerts": preferences.autonomous_stage_alerts,
-                "autonomous_stage_interval_seconds": preferences.autonomous_stage_interval_seconds,
                 "channel_settings": preferences.channel_settings,
             }
         }
@@ -706,7 +658,6 @@ class EnhancedNotificationService:
         
         # Process delivery
         await self._deliver_notification(notification)
-        await self._persist_delivery_metadata(notification)
         
         return {
             "success": True,
@@ -724,21 +675,6 @@ class EnhancedNotificationService:
             },
             "autonomous_policy": autonomous_decision,
         }
-
-    async def _persist_delivery_metadata(self, notification: Notification) -> None:
-        try:
-            db = self._get_firestore()
-            db.collection("notifications").document(notification.notification_id).set(
-                {
-                    "channelsToSend": self._serialize_channels(notification.channels_to_send),
-                    "deliveryStatus": self._serialize_delivery_status(notification.delivery_status),
-                    "deliveryUpdatedAt": datetime.utcnow(),
-                },
-                merge=True,
-            )
-        except Exception:
-            # Best-effort persistence only.
-            pass
 
     async def get_deep_study(self, pair: str = "EUR/USD", max_headlines_per_source: int = 3) -> Dict:
         return await self.market_intelligence.build_deep_study(
@@ -783,141 +719,6 @@ class EnhancedNotificationService:
             user_instruction=(user_instruction or "").strip(),
             recommendation=recommendation,
         )
-
-    def _stage_key(self, stage: str) -> str:
-        normalized = (stage or "monitoring").strip().lower().replace("-", "_")
-        if not normalized:
-            return "monitoring"
-        return normalized
-
-    def _stage_label(self, stage: str) -> str:
-        key = self._stage_key(stage)
-        mapping = {
-            "monitoring": "Monitoring",
-            "analyzing": "Analyzing",
-            "trading": "Trading",
-            "risk_lock": "Risk Lock",
-            "paused": "Paused",
-            "briefing": "Briefing",
-            "executed": "Executed",
-        }
-        return mapping.get(key, key.replace("_", " ").title())
-
-    def _can_emit_stage_alert(
-        self,
-        *,
-        user_id: str,
-        pair: str,
-        stage: str,
-        min_interval_seconds: int,
-    ) -> bool:
-        key = (user_id, pair.upper(), self._stage_key(stage))
-        last_sent = self._last_stage_alert_sent.get(key)
-        if not last_sent:
-            return True
-        elapsed = (datetime.now() - last_sent).total_seconds()
-        return elapsed >= max(15, min_interval_seconds)
-
-    def _mark_stage_alert_sent(self, *, user_id: str, pair: str, stage: str) -> None:
-        key = (user_id, pair.upper(), self._stage_key(stage))
-        self._last_stage_alert_sent[key] = datetime.now()
-
-    async def send_autonomous_stage_notification(
-        self,
-        user_id: str,
-        stage: str,
-        pair: str = "EUR/USD",
-        user_instruction: Optional[str] = None,
-        priority: Optional[str] = None,
-        stage_context: Optional[str] = None,
-        force: bool = False,
-    ) -> Dict:
-        normalized_pair = (pair or "EUR/USD").strip().upper()
-        normalized_stage = self._stage_key(stage)
-        stage_label = self._stage_label(stage)
-
-        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_firestore(user_id)
-        if not prefs:
-            await self.set_notification_preferences(user_id=user_id)
-            prefs = self.user_preferences.get(user_id)
-        if not prefs:
-            return {"success": False, "reason": "Notification preferences unavailable"}
-        self.user_preferences[user_id] = prefs
-
-        if not force and not prefs.autonomous_stage_alerts:
-            return {
-                "success": False,
-                "reason": "Autonomous stage alerts disabled by user preference",
-            }
-
-        if not force and not self._can_emit_stage_alert(
-            user_id=user_id,
-            pair=normalized_pair,
-            stage=normalized_stage,
-            min_interval_seconds=prefs.autonomous_stage_interval_seconds,
-        ):
-            return {
-                "success": False,
-                "reason": "Stage alert suppressed by cadence guard",
-                "cadence_seconds": prefs.autonomous_stage_interval_seconds,
-            }
-
-        deep_study = await self.market_intelligence.build_deep_study(pair=normalized_pair)
-        confidence_pct = round(float(deep_study.get("consensus_score", 0.0) or 0.0) * 100, 1)
-        coverage = deep_study.get("source_coverage", {})
-        analyzed = int(coverage.get("analyzed", 0) or 0)
-        requested = int(coverage.get("requested", 0) or 0)
-        recommendation = str(
-            deep_study.get("recommendation", "wait_for_confirmation")
-        ).replace("_", " ")
-        market_risk = str(
-            deep_study.get("chart_analysis", {}).get("risk_level", "unknown")
-        ).lower()
-        evidence_summary = str(deep_study.get("evidence_summary", "")).strip()
-
-        inferred_priority = (priority or "").strip().lower()
-        valid_priorities = {member.value for member in NotificationPriority}
-        if inferred_priority not in valid_priorities:
-            if normalized_stage in {"risk_lock", "paused"}:
-                inferred_priority = NotificationPriority.CRITICAL.value
-            elif normalized_stage in {"trading", "executed"}:
-                inferred_priority = NotificationPriority.HIGH.value
-            elif market_risk in {"high", "extreme"}:
-                inferred_priority = NotificationPriority.HIGH.value
-            else:
-                inferred_priority = NotificationPriority.MEDIUM.value
-
-        context_line = (
-            stage_context.strip()
-            if stage_context and stage_context.strip()
-            else evidence_summary
-            if evidence_summary
-            else "Stage transition acknowledged."
-        )
-
-        response = await self.send_notification(
-            user_id=user_id,
-            template_id="autonomous_stage_update",
-            category=NotificationCategory.SYSTEM_UPDATE.value,
-            priority=inferred_priority,
-            pair=normalized_pair,
-            stage=normalized_stage,
-            stage_label=stage_label,
-            confidence=confidence_pct,
-            source_count=f"{analyzed}/{requested}",
-            recommendation=recommendation,
-            stage_context=context_line,
-            user_instruction=(user_instruction or "").strip(),
-            market_risk=market_risk,
-        )
-
-        if response.get("success") is True:
-            self._mark_stage_alert_sent(
-                user_id=user_id,
-                pair=normalized_pair,
-                stage=normalized_stage,
-            )
-        return response
 
     async def send_smart_alert(
         self,
@@ -1045,11 +846,20 @@ class EnhancedNotificationService:
             print(f"[EMAIL] Skipped: user_id is not an email ({notification.user_id})")
             return
 
-        await self.mail_delivery.send_email(
-            to_email=to_email,
-            subject=notification.title,
-            text_body=notification.message,
-        )
+        def _send():
+            msg = EmailMessage()
+            msg["From"] = self.smtp_from
+            msg["To"] = to_email
+            msg["Subject"] = notification.title
+            msg.set_content(notification.message)
+
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
+                if self.smtp_tls:
+                    server.starttls()
+                server.login(self.smtp_user, self.smtp_pass)
+                server.send_message(msg)
+
+        await asyncio.to_thread(_send)
         print(f"[EMAIL] Sent to {to_email}")
 
     async def _send_telegram(self, notification: Notification):
@@ -1212,8 +1022,6 @@ class EnhancedNotificationService:
                     "read": notification.read,
                     "actionUrl": notification.action_url,
                     "richData": notification.rich_data,
-                    "channelsToSend": self._serialize_channels(notification.channels_to_send),
-                    "deliveryStatus": self._serialize_delivery_status(notification.delivery_status),
                     "createdAt": datetime.utcnow(),
                 },
                 merge=True,
@@ -1336,8 +1144,6 @@ class EnhancedNotificationService:
                         "read": bool(read),
                         "clicked": bool(data.get("clicked") or False),
                         "rich_data": data.get("richData") or data.get("rich_data") or {},
-                        "channels_to_send": data.get("channelsToSend") or data.get("channels_to_send") or [],
-                        "delivery_status": data.get("deliveryStatus") or data.get("delivery_status") or {},
                         "_sort_ts": sort_dt,
                     }
                 )
@@ -1366,8 +1172,6 @@ class EnhancedNotificationService:
                     "read": n.read,
                     "clicked": n.clicked,
                     "rich_data": n.rich_data,
-                    "channels_to_send": self._serialize_channels(n.channels_to_send),
-                    "delivery_status": self._serialize_delivery_status(n.delivery_status),
                 }
                 for n in notifications
             ]
@@ -1437,8 +1241,6 @@ class EnhancedNotificationService:
             "autonomous_mode": prefs.autonomous_mode,
             "autonomous_profile": prefs.autonomous_profile,
             "autonomous_min_confidence": prefs.autonomous_min_confidence,
-            "autonomous_stage_alerts": prefs.autonomous_stage_alerts,
-            "autonomous_stage_interval_seconds": prefs.autonomous_stage_interval_seconds,
             "channel_settings": prefs.channel_settings,
         }
 
