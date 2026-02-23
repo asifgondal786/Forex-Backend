@@ -9,11 +9,14 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import os
 import time
+import json
 from collections import defaultdict, deque
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
-# Load environment variables from Backend/.env if present
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
+# Load environment variables from Backend/.env if present.
+# override=True ensures local .env values win over accidental shell-level vars.
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -32,6 +35,96 @@ def _env_int(name: str, default: int) -> int:
     except Exception:
         return default
     return parsed if parsed > 0 else default
+
+
+def _normalize_url(value: str) -> str:
+    candidate = (value or "").strip()
+    if not candidate:
+        return ""
+    if not candidate.startswith("http://") and not candidate.startswith("https://"):
+        candidate = f"https://{candidate}"
+    return candidate.rstrip("/")
+
+
+def _parse_host(value: str) -> str:
+    parsed = urlparse(_normalize_url(value))
+    return (parsed.hostname or "").lower()
+
+
+def _is_local_host(host: str) -> bool:
+    return host in {"localhost", "127.0.0.1"}
+
+
+def _is_local_origin(origin: str) -> bool:
+    return _is_local_host(_parse_host(origin))
+
+
+def _is_https_url(value: str) -> bool:
+    parsed = urlparse(_normalize_url(value))
+    return (parsed.scheme or "").lower() == "https"
+
+
+def _redact(value: str, *, keep: int = 4) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if len(raw) <= keep:
+        return "*" * len(raw)
+    return f"{raw[:keep]}***"
+
+
+def _startup_snapshot() -> dict:
+    return {
+        "debug": _env_bool("DEBUG", False),
+        "email_provider": (os.getenv("EMAIL_PROVIDER") or "auto").strip().lower(),
+        "frontend_app_url": _normalize_url(os.getenv("FRONTEND_APP_URL") or ""),
+        "password_reset_continue_url": _normalize_url(
+            os.getenv("PASSWORD_RESET_CONTINUE_URL") or ""
+        ),
+        "email_verification_continue_url": _normalize_url(
+            os.getenv("EMAIL_VERIFICATION_CONTINUE_URL") or ""
+        ),
+        "cors_origins": _get_cors_origins(),
+        "has_brevo_api_key": bool((os.getenv("BREVO_API_KEY") or "").strip()),
+        "has_mailjet_api_key": bool((os.getenv("MAILJET_API_KEY") or "").strip()),
+        "has_firebase_api_key": bool((os.getenv("FIREBASE_API_KEY") or "").strip()),
+        "firebase_project_id": (os.getenv("FIREBASE_PROJECT_ID") or "").strip(),
+        "api_base_url_hint": _normalize_url(os.getenv("API_BASE_URL") or ""),
+        "firebase_auth_domain_check_enabled": _env_bool(
+            "FIREBASE_AUTH_DOMAIN_CHECK_ENABLED",
+            True,
+        ),
+        "firebase_auth_domain_check_fail_fast": _env_bool(
+            "FIREBASE_AUTH_DOMAIN_CHECK_FAIL_FAST",
+            not _env_bool("DEBUG", False),
+        ),
+        "redacted_service_account_path": _redact(
+            os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "",
+            keep=8,
+        ),
+    }
+
+
+def _validate_env_urls() -> None:
+    if _env_bool("DEBUG", False):
+        return
+
+    for key in [
+        "FRONTEND_APP_URL",
+        "PASSWORD_RESET_CONTINUE_URL",
+        "EMAIL_VERIFICATION_CONTINUE_URL",
+    ]:
+        value = (os.getenv(key) or "").strip()
+        if not value:
+            raise RuntimeError(f"{key} must be configured in production.")
+        if not _is_https_url(value):
+            raise RuntimeError(f"{key} must use HTTPS in production.")
+
+    for origin in _get_cors_origins():
+        if _is_local_origin(origin):
+            raise RuntimeError("CORS_ORIGINS must not include localhost in production.")
+        if not _is_https_url(origin):
+            raise RuntimeError(f"CORS origin must use HTTPS in production: {origin}")
 
 # Import routers
 from .users import router as users_router
@@ -85,7 +178,12 @@ except ImportError:
     print("??  Public auth routes not available")
 
 from .enhanced_websocket_manager import ws_manager
-from .utils.firestore_client import get_firebase_config_status, init_firebase
+from .forex_data_service import forex_service
+from .utils.firestore_client import (
+    check_firebase_authorized_domain,
+    get_firebase_config_status,
+    init_firebase,
+)
 from .security import verify_http_request
 
 
@@ -101,13 +199,31 @@ async def lifespan(app: FastAPI):
     print(f"?? Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
     print("=" * 60)
 
+    # Fail fast on invalid production URL configuration.
+    _validate_env_urls()
+
+    # Startup checklist (no secrets / redacted).
+    print(
+        json.dumps(
+            {
+                "event": "startup_checklist",
+                **_startup_snapshot(),
+            }
+        )
+    )
+
     # Firebase Admin SDK startup health check
+    firebase_initialized = False
     try:
         status = get_firebase_config_status()
         if status["credential_source"] != "none":
             init_firebase()
             status = get_firebase_config_status()
-            print(f"[Firebase] Initialized via {status['credential_source']} (project_id={status['project_id']})")
+            firebase_initialized = True
+            print(
+                f"[Firebase] Initialized via {status['credential_source']} "
+                f"(project_id={status['project_id']})"
+            )
         else:
             print("[Firebase] Not configured (no credentials found).")
             if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
@@ -116,15 +232,64 @@ async def lifespan(app: FastAPI):
         print(f"[Firebase] Startup check failed: {exc}")
         if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
             raise
+
+    # Optional startup guard for Firebase Auth Authorized Domains.
+    if firebase_initialized and _env_bool("FIREBASE_AUTH_DOMAIN_CHECK_ENABLED", True):
+        frontend_host = _parse_host(os.getenv("FRONTEND_APP_URL") or "")
+        if frontend_host:
+            check_fail_fast = _env_bool(
+                "FIREBASE_AUTH_DOMAIN_CHECK_FAIL_FAST",
+                not _env_bool("DEBUG", False),
+            )
+            check_timeout = _env_int("FIREBASE_AUTH_DOMAIN_CHECK_TIMEOUT_SECONDS", 10)
+            try:
+                domain_check = check_firebase_authorized_domain(
+                    frontend_host,
+                    timeout_seconds=check_timeout,
+                )
+                log_payload = {
+                    "event": "firebase_authorized_domain_check",
+                    "project_id": domain_check.get("project_id"),
+                    "domain": domain_check.get("domain"),
+                    "authorized": bool(domain_check.get("authorized")),
+                    "authorized_domain_count": len(
+                        domain_check.get("authorized_domains") or []
+                    ),
+                    "fail_fast": check_fail_fast,
+                }
+                if _env_bool("DEBUG", False):
+                    log_payload["authorized_domains"] = (
+                        domain_check.get("authorized_domains") or []
+                    )
+                print(json.dumps(log_payload))
+
+                if not domain_check.get("authorized"):
+                    message = (
+                        f"Firebase Auth domain '{frontend_host}' is not allowlisted. "
+                        "Add it in Firebase Console -> Authentication -> Settings -> "
+                        "Authorized domains."
+                    )
+                    if check_fail_fast:
+                        raise RuntimeError(message)
+                    print(f"[Firebase] WARNING: {message}")
+            except Exception as exc:
+                if check_fail_fast:
+                    raise
+                print(f"[Firebase] WARNING: Authorized-domain check skipped: {exc}")
     
     forex_stream_enabled = os.getenv("FOREX_STREAM_ENABLED", "true").lower() == "true"
+    forex_stream_interval = _env_int("FOREX_STREAM_INTERVAL", 10)
     if forex_stream_enabled:
-        await ws_manager.start_forex_stream(interval=10)
+        await ws_manager.start_forex_stream(interval=forex_stream_interval)
 
     yield
 
     if forex_stream_enabled:
         ws_manager.stop_forex_stream()
+    try:
+        await forex_service.close()
+    except Exception:
+        pass
     print("? Shutdown complete")
 
 
@@ -151,6 +316,10 @@ async def security_headers_middleware(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith("/api"):
         response.headers["Cache-Control"] = "no-store"
+    if request.method == "OPTIONS":
+        response.headers["Access-Control-Max-Age"] = str(
+            _env_int("CORS_MAX_AGE_SECONDS", 86400)
+        )
     return response
 
 # Rate limiting middleware (simple in-memory)
@@ -158,8 +327,19 @@ _rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 _rate_limit_max = int(os.getenv("RATE_LIMIT_MAX", "120"))
 _rate_limit_window = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
 _rate_limit_store = defaultdict(deque)
-_rate_limit_exempt = {"/", "/health", "/api/health", "/docs", "/openapi.json", "/redoc"}
+_rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
+
+_auth_rate_limit_enabled = _env_bool("AUTH_RATE_LIMIT_ENABLED", True)
+_auth_rate_limit_max = _env_int("AUTH_RATE_LIMIT_MAX", 10)
+_auth_rate_limit_window = _env_int("AUTH_RATE_LIMIT_WINDOW_SECONDS", 300)
+_auth_rate_limit_store = defaultdict(deque)
+_auth_rate_limited_paths = {
+    "/auth/password-reset",
+    "/auth/email-verification",
+    "/auth/login",
+    "/auth/signup",
+}
 
 
 @app.middleware("http")
@@ -179,6 +359,36 @@ async def request_size_limit_middleware(request: Request, call_next):
                     content={"detail": "Invalid Content-Length header"},
                 )
     return await call_next(request)
+
+
+@app.middleware("http")
+async def auth_rate_limit_middleware(request: Request, call_next):
+    if not _auth_rate_limit_enabled:
+        return await call_next(request)
+
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    path = request.url.path
+    if path not in _auth_rate_limited_paths:
+        return await call_next(request)
+
+    client_host = request.client.host if request.client else "unknown"
+    key = f"{client_host}:{path}"
+    now = time.time()
+    window_start = now - _auth_rate_limit_window
+    bucket = _auth_rate_limit_store[key]
+    while bucket and bucket[0] <= window_start:
+        bucket.popleft()
+    if len(bucket) >= _auth_rate_limit_max:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many auth requests. Please wait and retry."},
+            headers={"Retry-After": str(_auth_rate_limit_window)},
+        )
+    bucket.append(now)
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -224,9 +434,13 @@ def _get_cors_origins():
     if _env_bool("CORS_ALLOW_ALL"):
         return ["*"]
     raw = os.getenv("CORS_ORIGINS", "")
+    debug_mode = _env_bool("DEBUG", False)
     if raw:
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
-    if not _env_bool("DEBUG", False):
+        origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        if not debug_mode:
+            origins = [origin for origin in origins if not _is_local_origin(origin)]
+        return origins
+    if not debug_mode:
         # Secure default in production: require explicit CORS origins.
         return []
     # Local dev defaults
@@ -243,13 +457,23 @@ def _get_cors_origin_regex() -> str | None:
     if _env_bool("CORS_ALLOW_ALL"):
         return None
     explicit = os.getenv("CORS_ORIGIN_REGEX", "").strip()
+    debug_mode = _env_bool("DEBUG", False)
+    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST", True)
+    localhost_pattern = r"^https?://(localhost|127[.]0[.]0[.]1)(:[0-9]+)?$"
+
     if explicit:
+        if debug_mode and allow_localhost:
+            # In local development, always allow localhost random dev ports even when
+            # an explicit regex is provided.
+            return f"(?:{explicit})|(?:{localhost_pattern})"
         return explicit
+
+    if not debug_mode:
+        return None
     # Default to allowing localhost/127.0.0.1 any port for dev tooling
     # (Flutter web, Vite, React, etc). Can be disabled via CORS_ALLOW_LOCALHOST=false.
-    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST", True)
     if allow_localhost:
-        return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+        return localhost_pattern
     return None
 
 _cors_allow_all = _env_bool("CORS_ALLOW_ALL")
@@ -263,6 +487,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     allow_origin_regex=_cors_origin_regex,
+    max_age=_env_int("CORS_MAX_AGE_SECONDS", 86400),
 )
 
 _trusted_hosts = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -329,6 +554,14 @@ async def health():
         "ai_engine": "active" if AI_ROUTES_AVAILABLE else "disabled",
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
+    }
+
+
+@app.get("/healthz")
+async def healthz():
+    return {
+        "status": "ok",
+        "service": "forex-companion-backend",
     }
 
 

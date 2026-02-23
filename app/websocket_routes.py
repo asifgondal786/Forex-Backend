@@ -209,47 +209,32 @@ async def stop_forex_stream():
 @router.get("/forex/rates")
 async def get_forex_rates():
     """Get current forex exchange rates."""
-    try:
-        await forex_service.initialize()
-        rates = await forex_service.get_currency_rates()
-        return {"status": "success", "rates": rates}
-    finally:
-        await forex_service.close()
+    rates = await forex_service.get_currency_rates()
+    return {"status": "success", "rates": rates}
 
 
 @router.get("/forex/news")
 async def get_forex_news():
     """Get latest forex news and economic calendar."""
-    try:
-        await forex_service.initialize()
-        news = await forex_service.get_forex_factory_news()
-        return {"status": "success", "news": news}
-    finally:
-        await forex_service.close()
+    news = await forex_service.get_forex_factory_news()
+    return {"status": "success", "news": news}
 
 
 @router.get("/forex/sentiment")
 async def get_market_sentiment():
     """Get current market sentiment analysis."""
-    try:
-        await forex_service.initialize()
-        sentiment = await forex_service.get_market_sentiment()
-        return {"status": "success", "sentiment": sentiment}
-    finally:
-        await forex_service.close()
+    sentiment = await forex_service.get_market_sentiment()
+    return {"status": "success", "sentiment": sentiment}
 
 
 @router.get("/forex/forecast")
 async def get_pair_forecast(pair: str = "EUR/USD", horizon: str = "1d"):
     """Get a structured pair forecast with horizon and confidence."""
     try:
-        await forex_service.initialize()
         forecast = await forex_service.get_pair_forecast(pair=pair, horizon=horizon)
         return {"status": "success", "forecast": forecast}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    finally:
-        await forex_service.close()
 
 
 # ============================================================================
