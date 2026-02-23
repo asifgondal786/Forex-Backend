@@ -7,6 +7,7 @@ import aiohttp
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import os
+import time
 from dotenv import load_dotenv
 
 try:
@@ -33,11 +34,29 @@ class ForexDataService:
         self._latest_rates: Dict[str, float] = {}
         self._latest_usd_base_rates: Dict[str, float] = {}
         self._price_history: Dict[str, List[float]] = {}
+        self._last_rates_fetch_monotonic = 0.0
+        self._rate_failure_streak = 0
+        self._next_rates_retry_monotonic = 0.0
+        self._last_rates_error_log_monotonic = 0.0
+        self._last_rates_error_text = ""
+        try:
+            self._min_rates_fetch_interval_seconds = max(
+                1,
+                int(os.getenv("FOREX_RATES_MIN_FETCH_INTERVAL_SECONDS", "3")),
+            )
+        except Exception:
+            self._min_rates_fetch_interval_seconds = 3
 
     async def initialize(self):
         """Initialize the HTTP session"""
         if not self.session or self.session.closed:
-            self.session = aiohttp.ClientSession()
+            connector = aiohttp.TCPConnector(
+                limit=20,
+                ttl_dns_cache=300,
+                enable_cleanup_closed=True,
+            )
+            timeout = aiohttp.ClientTimeout(total=12, connect=5, sock_connect=5, sock_read=10)
+            self.session = aiohttp.ClientSession(connector=connector, timeout=timeout)
 
     async def close(self):
         """Close the HTTP session"""
@@ -82,6 +101,16 @@ class ForexDataService:
         Fetch real-time currency exchange rates
         Using exchangerate-api.com (free tier)
         """
+        now = time.monotonic()
+        if (
+            self._latest_rates
+            and (now - self._last_rates_fetch_monotonic) < self._min_rates_fetch_interval_seconds
+        ):
+            return dict(self._latest_rates)
+
+        if now < self._next_rates_retry_monotonic and self._latest_rates:
+            return dict(self._latest_rates)
+
         try:
             # Free API - no key required for basic usage
             url = "https://api.exchangerate-api.com/v4/latest/USD"
@@ -89,7 +118,7 @@ class ForexDataService:
             if not self.session:
                 await self.initialize()
 
-            async with self.session.get(url, timeout=10) as response:
+            async with self.session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
                     rates = data.get("rates", {})
@@ -118,9 +147,16 @@ class ForexDataService:
                     if clean_rates:
                         self._latest_rates = dict(clean_rates)
                         self._update_price_history(clean_rates)
+                        self._last_rates_fetch_monotonic = now
+                        self._rate_failure_streak = 0
+                        self._next_rates_retry_monotonic = 0.0
                     return clean_rates
+
+                self._record_rates_fetch_error(
+                    f"HTTP {response.status} from exchangerate-api.com"
+                )
         except Exception as e:
-            print(f"Error fetching currency rates: {e}")
+            self._record_rates_fetch_error(str(e))
             if self._latest_rates:
                 return dict(self._latest_rates)
             return {
@@ -133,6 +169,37 @@ class ForexDataService:
                 "NZD/USD": 0.60,
                 "USD/PKR": 279.0,
             }
+
+        if self._latest_rates:
+            return dict(self._latest_rates)
+        return {
+            "EUR/USD": 1.08,
+            "GBP/USD": 1.27,
+            "USD/JPY": 154.0,
+            "USD/CHF": 0.78,
+            "AUD/USD": 0.66,
+            "USD/CAD": 1.37,
+            "NZD/USD": 0.60,
+            "USD/PKR": 279.0,
+        }
+
+    def _record_rates_fetch_error(self, error_text: str) -> None:
+        now = time.monotonic()
+        self._rate_failure_streak += 1
+        backoff_seconds = float(min(90, 2 ** min(self._rate_failure_streak, 6)))
+        self._next_rates_retry_monotonic = now + backoff_seconds
+
+        should_log = (
+            error_text != self._last_rates_error_text
+            or (now - self._last_rates_error_log_monotonic) >= 30
+        )
+        if should_log:
+            print(
+                f"Error fetching currency rates: {error_text}. "
+                f"Retry backoff: {int(backoff_seconds)}s"
+            )
+            self._last_rates_error_text = error_text
+            self._last_rates_error_log_monotonic = now
 
     def _normalize_pair(self, pair: str) -> str:
         cleaned = str(pair or "").strip().upper().replace("-", "/").replace(" ", "")
@@ -468,20 +535,24 @@ class ForexDataService:
                 "prediction": None
             }
 
-    async def get_market_sentiment(self) -> Dict[str, any]:
+    async def get_market_sentiment(
+        self,
+        rates: Optional[Dict[str, float]] = None,
+        news: Optional[List[Dict]] = None,
+    ) -> Dict[str, any]:
         """
         Get market sentiment analysis
         """
         try:
-            rates = await self.get_currency_rates()
-            news = await self.get_forex_factory_news()
-            
-            return await self.analyze_market_with_gemini(rates, news)
+            effective_rates = rates if rates is not None else await self.get_currency_rates()
+            effective_news = news if news is not None else await self.get_forex_factory_news()
+
+            return await self.analyze_market_with_gemini(effective_rates, effective_news)
         except Exception as e:
             print(f"Error getting market sentiment: {e}")
             return {}
 
-    async def stream_live_data(self, callback, interval: int = 10):
+    async def stream_live_data(self, callback, interval: int = 10, should_poll=None):
         """
         Stream live forex data at specified interval (seconds)
 
@@ -490,29 +561,47 @@ class ForexDataService:
             interval: Update interval in seconds
         """
         self.running = True
+        safe_interval = max(2, int(interval))
         await self.initialize()
 
         try:
             while self.running:
-                # Fetch all data types
-                rates = await self.get_currency_rates()
-                news = await self.get_forex_factory_news()
-                sentiment = await self.get_market_sentiment()
+                if should_poll is not None:
+                    try:
+                        if not bool(should_poll()):
+                            await asyncio.sleep(safe_interval)
+                            continue
+                    except Exception:
+                        await asyncio.sleep(safe_interval)
+                        continue
 
-                # Prepare update package
-                update_data = {
-                    "timestamp": datetime.now().isoformat(),
-                    "rates": rates,
-                    "news": news[:3],  # Top 3 news items
-                    "sentiment": sentiment,
-                    "type": "live_update"
-                }
+                try:
+                    # Fetch once per cycle and reuse for sentiment to avoid duplicate upstream calls.
+                    rates = await self.get_currency_rates()
+                    news = await self.get_forex_factory_news()
+                    sentiment = await self.get_market_sentiment(rates=rates, news=news)
 
-                # Send to callback
-                await callback(update_data)
+                    # Prepare update package
+                    update_data = {
+                        "timestamp": datetime.now().isoformat(),
+                        "rates": rates,
+                        "news": news[:3],  # Top 3 news items
+                        "sentiment": sentiment,
+                        "type": "live_update"
+                    }
 
-                # Wait for next update
-                await asyncio.sleep(interval)
+                    # Send to callback
+                    await callback(update_data)
+                except Exception as e:
+                    print(f"Live data stream iteration error: {e}")
+
+                adaptive_sleep = safe_interval
+                if self._rate_failure_streak > 0:
+                    adaptive_sleep = max(
+                        adaptive_sleep,
+                        int(min(90, 2 ** min(self._rate_failure_streak, 6))),
+                    )
+                await asyncio.sleep(adaptive_sleep)
 
         except asyncio.CancelledError:
             print("Live data stream cancelled")
