@@ -1,10 +1,14 @@
-﻿import base64
+import base64
 import json
 import os
 from typing import Optional
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import Request as UrlRequest, urlopen
 
 import firebase_admin
-from firebase_admin import credentials, auth, firestore
+from firebase_admin import auth, credentials, firestore
+from google.auth.transport.requests import Request as GoogleAuthRequest
 
 
 _firebase_initialized = False
@@ -84,4 +88,71 @@ def get_firebase_config_status() -> dict:
         "credential_source": _get_credential_source(),
         "project_id": _get_project_id(),
         "initialized": bool(firebase_admin._apps),
+    }
+
+
+def get_firebase_auth_project_config(timeout_seconds: int = 10) -> dict:
+    init_firebase()
+    project_id = _get_project_id()
+    if not project_id:
+        raise RuntimeError("FIREBASE_PROJECT_ID is not configured.")
+
+    app = firebase_admin.get_app()
+    google_cred = app.credential.get_credential()
+    google_cred.refresh(GoogleAuthRequest())
+
+    url = f"https://identitytoolkit.googleapis.com/admin/v2/projects/{project_id}/config"
+    req = UrlRequest(
+        url=url,
+        headers={
+            "Authorization": f"Bearer {google_cred.token}",
+            "Content-Type": "application/json",
+        },
+        method="GET",
+    )
+
+    try:
+        with urlopen(req, timeout=timeout_seconds) as response:
+            payload = response.read().decode("utf-8")
+            return json.loads(payload)
+    except HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode("utf-8")
+        except Exception:
+            body = str(exc)
+        raise RuntimeError(
+            f"Firebase Auth config fetch failed ({exc.code}): {body[:300]}"
+        ) from exc
+    except URLError as exc:
+        raise RuntimeError(f"Firebase Auth config fetch failed: {exc}") from exc
+
+
+def get_firebase_authorized_domains(timeout_seconds: int = 10) -> list[str]:
+    config = get_firebase_auth_project_config(timeout_seconds=timeout_seconds)
+    raw_domains = config.get("authorizedDomains") or []
+    domains: list[str] = []
+    for item in raw_domains:
+        value = str(item or "").strip().lower()
+        if value and value not in domains:
+            domains.append(value)
+    return domains
+
+
+def check_firebase_authorized_domain(domain: str, timeout_seconds: int = 10) -> dict:
+    candidate = str(domain or "").strip().lower()
+    if not candidate:
+        raise ValueError("Domain is required for Firebase authorized-domain check.")
+
+    if "://" in candidate:
+        candidate = (urlparse(candidate).hostname or "").strip().lower()
+    if not candidate:
+        raise ValueError("Invalid domain for Firebase authorized-domain check.")
+
+    authorized_domains = get_firebase_authorized_domains(timeout_seconds=timeout_seconds)
+    return {
+        "project_id": _get_project_id(),
+        "domain": candidate,
+        "authorized": candidate in authorized_domains,
+        "authorized_domains": authorized_domains,
     }
