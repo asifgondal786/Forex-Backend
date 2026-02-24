@@ -8,7 +8,6 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 import requests
 import os
-<<<<<<< HEAD
 from dotenv import load_dotenv
 
 try:
@@ -24,8 +23,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
 if GEMINI_AVAILABLE:
     genai.configure(api_key=GEMINI_API_KEY)
-=======
->>>>>>> 6ea3e47c (AI task button files)
 
 class AIAnalysisService:
     """
@@ -50,7 +47,6 @@ class AIAnalysisService:
         except Exception as e:
             print(f"Model loading error: {e}")
     
-<<<<<<< HEAD
     async def analyze_news_impact(self, news: List[Dict], currency_pairs: List[str]) -> Dict[str, Any]:
         """
         Use Google Generative AI (Gemini) to analyze news impact on currency pairs
@@ -183,9 +179,6 @@ class AIAnalysisService:
             "risk": "moderate",
             "recommendation": "hold"
         }
-
-=======
->>>>>>> 6ea3e47c (AI task button files)
     def is_healthy(self) -> bool:
         """Check if service is operational"""
         return True
@@ -692,8 +685,4 @@ class AIAnalysisService:
         if action == "buy":
             return round(bb_middle + (3 * atr), 5)
         else:
-<<<<<<< HEAD
             return round(bb_middle - (3 * atr), 5)
-=======
-            return round(bb_middle - (3 * atr), 5)
->>>>>>> 6ea3e47c (AI task button files)
