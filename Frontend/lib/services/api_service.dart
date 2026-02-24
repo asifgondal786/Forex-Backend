@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/models/task.dart';
 import '../core/models/user.dart';
 import '../core/models/header_model.dart';
@@ -61,14 +60,6 @@ class ApiService {
     final fromDefine = _baseUrlFromDefine.trim();
     if (fromDefine.isNotEmpty) {
       return _normalizeBaseUrl(fromDefine);
-    }
-
-    String fromEnv = '';
-    try {
-      fromEnv = (dotenv.env['API_BASE_URL'] ?? '').trim();
-    } catch (_) {}
-    if (fromEnv.isNotEmpty) {
-      return _normalizeBaseUrl(fromEnv);
     }
 
     if (!kDebugMode) {

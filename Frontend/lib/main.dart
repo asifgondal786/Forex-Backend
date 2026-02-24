@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'routes/app_routes.dart';
 import 'core/config/firebase_config.dart';
 import 'services/api_service.dart';
@@ -48,21 +47,13 @@ void _validateUrlConfigOnBoot() {
   if (kDebugMode) return;
 
   final apiFromDefine = const String.fromEnvironment('API_BASE_URL', defaultValue: '').trim();
-  String apiFromEnv = '';
-  try {
-    apiFromEnv = (dotenv.env['API_BASE_URL'] ?? '').trim();
-  } catch (_) {}
-  final apiBaseUrl = _normalizeBaseUrl(apiFromDefine.isNotEmpty ? apiFromDefine : apiFromEnv);
+  final apiBaseUrl = _normalizeBaseUrl(apiFromDefine);
   if (apiBaseUrl.isEmpty || !apiBaseUrl.startsWith('https://')) {
     throw StateError('API_BASE_URL must be configured with HTTPS in production.');
   }
 
   final appFromDefine = _appWebUrlFromDefine.trim();
-  String appFromEnv = '';
-  try {
-    appFromEnv = (dotenv.env['APP_WEB_URL'] ?? '').trim();
-  } catch (_) {}
-  final appWebUrl = _normalizeBaseUrl(appFromDefine.isNotEmpty ? appFromDefine : appFromEnv);
+  final appWebUrl = _normalizeBaseUrl(appFromDefine);
   if (appWebUrl.isEmpty || !appWebUrl.startsWith('https://')) {
     throw StateError('APP_WEB_URL must be configured with HTTPS in production.');
   }
@@ -70,21 +61,6 @@ void _validateUrlConfigOnBoot() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // .env is optional in deployed builds; prefer --dart-define in production.
-  if (!kIsWeb) {
-    try {
-      await dotenv.load(fileName: ".env");
-    } catch (_) {
-      if (kDebugMode) {
-        debugPrint('.env not found; relying on --dart-define/environment defaults.');
-      }
-    }
-  } else if (kDebugMode) {
-    debugPrint(
-      'Web build: skipping .env asset load; relying on --dart-define/environment defaults.',
-    );
-  }
   _validateUrlConfigOnBoot();
 
   // Initialize Firebase if enabled

@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_service.dart';
 import '../../core/models/user.dart' as app_user;
@@ -226,15 +225,10 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   String _resolveEmailContinueUrl() {
-    const fromDefine =
-        String.fromEnvironment('APP_WEB_URL', defaultValue: '');
-    String fromEnv = '';
-    try {
-      fromEnv = (dotenv.env['APP_WEB_URL'] ?? '').trim();
-    } catch (_) {}
-    final raw = fromDefine.trim().isNotEmpty ? fromDefine.trim() : fromEnv;
-    if (raw.isNotEmpty) {
-      final normalized = _normalizeBaseUrl(raw);
+    const raw = String.fromEnvironment('APP_WEB_URL', defaultValue: '');
+    final trimmedRaw = raw.trim();
+    if (trimmedRaw.isNotEmpty) {
+      final normalized = _normalizeBaseUrl(trimmedRaw);
       if (!normalized.startsWith('https://') && !kDebugMode) {
         throw StateError('APP_WEB_URL must use HTTPS in production.');
       }
