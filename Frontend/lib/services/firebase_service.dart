@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_storage/firebase_storage.dart' as storage;
 import 'package:flutter/foundation.dart';
@@ -6,9 +7,46 @@ import '../core/models/user.dart' as app_user;
 import '../core/models/task.dart' as task_model;
 
 class FirebaseService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
-  final storage.FirebaseStorage _storage = storage.FirebaseStorage.instance;
+  final FirebaseFirestore? _firestore;
+  final firebase_auth.FirebaseAuth? _auth;
+  final storage.FirebaseStorage? _storage;
+
+  FirebaseService()
+      : _firestore = _hasFirebaseApps ? FirebaseFirestore.instance : null,
+        _auth = _hasFirebaseApps ? firebase_auth.FirebaseAuth.instance : null,
+        _storage = _hasFirebaseApps ? storage.FirebaseStorage.instance : null;
+
+  static bool get _hasFirebaseApps {
+    try {
+      return Firebase.apps.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  firebase_auth.FirebaseAuth get _requireAuth {
+    final auth = _auth;
+    if (auth == null) {
+      throw StateError('Firebase is not initialized.');
+    }
+    return auth;
+  }
+
+  FirebaseFirestore get _requireFirestore {
+    final firestore = _firestore;
+    if (firestore == null) {
+      throw StateError('Firebase is not initialized.');
+    }
+    return firestore;
+  }
+
+  storage.FirebaseStorage get _requireStorage {
+    final storageInstance = _storage;
+    if (storageInstance == null) {
+      throw StateError('Firebase is not initialized.');
+    }
+    return storageInstance;
+  }
   static final RegExp _invisibleChars = RegExp(
     r'[\u0000-\u001F\u007F\u00A0\u1680\u180E\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]',
   );
@@ -22,15 +60,18 @@ class FirebaseService {
   }
 
   // Get current Firebase Auth user
-  firebase_auth.User? get currentFirebaseUser => _auth.currentUser;
+  firebase_auth.User? get currentFirebaseUser => _auth?.currentUser;
 
   // Get current app user
   Future<app_user.User?> getCurrentUser() async {
-    final firebaseUser = _auth.currentUser;
+    final firebaseUser = _auth?.currentUser;
     if (firebaseUser == null) return null;
 
     try {
-      final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+      final doc = await _requireFirestore
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
       if (doc.exists) {
         return app_user.User.fromJson({
           'id': doc.id,
@@ -49,7 +90,7 @@ class FirebaseService {
   // Update user profile
   Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection('users').doc(userId).update(data);
+      await _requireFirestore.collection('users').doc(userId).update(data);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error updating user profile: $e');
@@ -61,7 +102,7 @@ class FirebaseService {
   // Create user document
   Future<void> createUserDocument(app_user.User user) async {
     try {
-      await _firestore.collection('users').doc(user.id).set(user.toJson());
+      await _requireFirestore.collection('users').doc(user.id).set(user.toJson());
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error creating user document: $e');
@@ -73,7 +114,7 @@ class FirebaseService {
   // Get user by ID
   Future<app_user.User?> getUserById(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+      final doc = await _requireFirestore.collection('users').doc(userId).get();
       if (doc.exists) {
         return app_user.User.fromJson({
           'id': doc.id,
@@ -93,7 +134,7 @@ class FirebaseService {
   Future<firebase_auth.User?> signInWithEmail(String email, String password) async {
     final normalizedEmail = _normalizeEmail(email);
     try {
-      final credential = await _auth.signInWithEmailAndPassword(
+      final credential = await _requireAuth.signInWithEmailAndPassword(
         email: normalizedEmail,
         password: password,
       );
@@ -115,7 +156,7 @@ class FirebaseService {
   Future<firebase_auth.User?> signUpWithEmail(String email, String password) async {
     final normalizedEmail = _normalizeEmail(email);
     try {
-      final credential = await _auth.createUserWithEmailAndPassword(
+      final credential = await _requireAuth.createUserWithEmailAndPassword(
         email: normalizedEmail,
         password: password,
       );
@@ -140,7 +181,7 @@ class FirebaseService {
   // Sign out
   Future<void> signOut() async {
     try {
-      await _auth.signOut();
+      await _requireAuth.signOut();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error signing out: $e');
@@ -152,7 +193,7 @@ class FirebaseService {
   // Upload file to Firebase Storage
   Future<String?> uploadFile(String path, List<int> data) async {
     try {
-      final ref = _storage.ref().child(path);
+      final ref = _requireStorage.ref().child(path);
       await ref.putData(Uint8List.fromList(data));
       final url = await ref.getDownloadURL();
       return url;
@@ -167,7 +208,7 @@ class FirebaseService {
   // Delete file from Firebase Storage
   Future<void> deleteFile(String path) async {
     try {
-      final ref = _storage.ref().child(path);
+      final ref = _requireStorage.ref().child(path);
       await ref.delete();
     } catch (e) {
       if (kDebugMode) {
@@ -187,11 +228,11 @@ class FirebaseService {
   /// Fetches all tasks for a specific user.
   Future<List<task_model.Task>> getUserTasks() async {
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _auth?.currentUser?.uid;
       if (userId == null) {
         return []; // Not logged in, return empty list
       }
-      final snapshot = await _firestore
+      final snapshot = await _requireFirestore
           .collection('tasks')
           .where('userId', isEqualTo: userId)
           .orderBy('createdAt', descending: true)
@@ -208,7 +249,7 @@ class FirebaseService {
   /// Fetches a single task by its ID.
   Future<task_model.Task> getTask(String taskId) async {
     try {
-      final doc = await _firestore.collection('tasks').doc(taskId).get();
+      final doc = await _requireFirestore.collection('tasks').doc(taskId).get();
       if (doc.exists) {
         return task_model.Task.fromFirestore(doc.data()!, doc.id);
       }
@@ -228,7 +269,7 @@ class FirebaseService {
     required task_model.TaskPriority priority,
   }) async {
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _auth?.currentUser?.uid;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
@@ -248,7 +289,9 @@ class FirebaseService {
       );
 
       // Add to Firestore
-      final docRef = await _firestore.collection('tasks').add(task.toFirestore());
+      final docRef = await _requireFirestore
+          .collection('tasks')
+          .add(task.toFirestore());
       
       // Return task with the generated ID
       return task.copyWith(id: docRef.id);
@@ -263,7 +306,10 @@ class FirebaseService {
   /// Updates an existing task in Firestore (accepts Task object)
   Future<void> updateTask(String taskId, task_model.Task task) async {
     try {
-      await _firestore.collection('tasks').doc(taskId).update(task.toFirestore());
+      await _requireFirestore
+          .collection('tasks')
+          .doc(taskId)
+          .update(task.toFirestore());
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error updating task: $e');
@@ -275,7 +321,7 @@ class FirebaseService {
   /// Updates task fields (accepts Map)
   Future<void> updateTaskFields(String taskId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection('tasks').doc(taskId).update(data);
+      await _requireFirestore.collection('tasks').doc(taskId).update(data);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error updating task fields: $e');
@@ -287,7 +333,7 @@ class FirebaseService {
   /// Deletes a task from Firestore.
   Future<void> deleteTask(String taskId) async {
     try {
-      await _firestore.collection('tasks').doc(taskId).delete();
+      await _requireFirestore.collection('tasks').doc(taskId).delete();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error deleting task: $e');
@@ -298,7 +344,11 @@ class FirebaseService {
 
   /// Provides a stream for real-time updates on a single task.
   Stream<task_model.Task> listenToTask(String taskId) {
-    return _firestore.collection('tasks').doc(taskId).snapshots().map((snapshot) {
+    return _requireFirestore
+        .collection('tasks')
+        .doc(taskId)
+        .snapshots()
+        .map((snapshot) {
       if (snapshot.exists) {
         return task_model.Task.fromFirestore(snapshot.data()!, snapshot.id);
       }

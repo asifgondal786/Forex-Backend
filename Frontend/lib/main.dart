@@ -72,12 +72,18 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // .env is optional in deployed builds; prefer --dart-define in production.
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (_) {
-    if (kDebugMode) {
-      debugPrint('.env not found; relying on --dart-define/environment defaults.');
+  if (!kIsWeb) {
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (_) {
+      if (kDebugMode) {
+        debugPrint('.env not found; relying on --dart-define/environment defaults.');
+      }
     }
+  } else if (kDebugMode) {
+    debugPrint(
+      'Web build: skipping .env asset load; relying on --dart-define/environment defaults.',
+    );
   }
   _validateUrlConfigOnBoot();
 

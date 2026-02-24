@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 import '../../core/widgets/app_background.dart';
@@ -14,7 +15,6 @@ class PasswordResetScreen extends StatefulWidget {
 class _PasswordResetScreenState extends State<PasswordResetScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _auth = firebase_auth.FirebaseAuth.instance;
 
   String? _oobCode;
   String? _accountEmail;
@@ -23,6 +23,17 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   bool _isBusy = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  firebase_auth.FirebaseAuth? get _auth {
+    try {
+      if (Firebase.apps.isEmpty) {
+        return null;
+      }
+      return firebase_auth.FirebaseAuth.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -73,6 +84,15 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       return;
     }
 
+    final auth = _auth;
+    if (auth == null) {
+      setState(() {
+        _errorMessage =
+            'Firebase authentication is unavailable. Configure Firebase and retry.';
+      });
+      return;
+    }
+
     setState(() {
       _isBusy = true;
       _errorMessage = null;
@@ -80,7 +100,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     });
 
     try {
-      final email = await _auth.verifyPasswordResetCode(code);
+      final email = await auth.verifyPasswordResetCode(code);
       if (!mounted) return;
       setState(() {
         _oobCode = code;
@@ -136,8 +156,20 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       _infoMessage = null;
     });
 
+    final auth = _auth;
+    if (auth == null) {
+      if (mounted) {
+        setState(() {
+          _isBusy = false;
+          _errorMessage =
+              'Firebase authentication is unavailable. Configure Firebase and retry.';
+        });
+      }
+      return;
+    }
+
     try {
-      await _auth.confirmPasswordReset(code: code, newPassword: password);
+      await auth.confirmPasswordReset(code: code, newPassword: password);
       if (!mounted) return;
       setState(() {
         _infoMessage = 'Password reset successful. Please sign in with your new password.';

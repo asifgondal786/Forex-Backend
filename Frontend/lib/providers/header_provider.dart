@@ -16,6 +16,14 @@ class HeaderProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  firebase_auth.User? _currentFirebaseUserOrNull() {
+    try {
+      return firebase_auth.FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> fetchHeader() async {
     _isLoading = true;
     _error = null;
@@ -23,8 +31,8 @@ class HeaderProvider with ChangeNotifier {
 
     try {
       const devUserId = String.fromEnvironment('DEV_USER_ID', defaultValue: '');
-      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (firebaseUser == null && devUserId.isEmpty) {
+      final firebaseUser = _currentFirebaseUserOrNull();
+      if (firebaseUser == null && devUserId.isEmpty && !kDebugMode) {
         _isLoading = false;
         _error = null;
         notifyListeners();

@@ -18,6 +18,14 @@ class UserProvider with ChangeNotifier {
   String? get error => _error;
   bool get isAuthenticated => _user != null;
 
+  firebase_auth.User? _currentFirebaseUserOrNull() {
+    try {
+      return firebase_auth.FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // Fetch current user
   Future<void> fetchUser() async {
     _isLoading = true;
@@ -26,8 +34,8 @@ class UserProvider with ChangeNotifier {
 
     try {
       const devUserId = String.fromEnvironment('DEV_USER_ID', defaultValue: '');
-      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (firebaseUser == null && devUserId.isEmpty) {
+      final firebaseUser = _currentFirebaseUserOrNull();
+      if (firebaseUser == null && devUserId.isEmpty && !kDebugMode) {
         _isLoading = false;
         _error = null;
         notifyListeners();

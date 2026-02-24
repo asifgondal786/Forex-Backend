@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -20,7 +21,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
   final ApiService _apiService = ApiService();
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
-  final _auth = firebase_auth.FirebaseAuth.instance;
   firebase_auth.ConfirmationResult? _confirmationResult;
   Timer? _autoRefreshTimer;
   Timer? _emailCooldownTimer;
@@ -35,7 +35,18 @@ class _VerificationScreenState extends State<VerificationScreen> {
     defaultValue: false,
   );
 
-  firebase_auth.User? get _user => _auth.currentUser;
+  firebase_auth.FirebaseAuth? get _auth {
+    try {
+      if (Firebase.apps.isEmpty) {
+        return null;
+      }
+      return firebase_auth.FirebaseAuth.instance;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  firebase_auth.User? get _user => _auth?.currentUser;
 
   bool get _emailVerified => _user?.emailVerified ?? false;
   bool get _phoneVerified => (_user?.phoneNumber ?? '').isNotEmpty;
@@ -43,7 +54,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
   void initState() {
     super.initState();
-    _startAutoRefresh();
+    if (_auth != null) {
+      _startAutoRefresh();
+    } else {
+      _errorMessage = 'Firebase authentication is unavailable in this build.';
+    }
   }
 
   @override
@@ -82,6 +97,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   Future<void> _refreshUser({bool silent = false}) async {
+    if (_auth == null) {
+      if (!silent && mounted) {
+        setState(() {
+          _errorMessage = 'Firebase authentication is unavailable.';
+          _isRefreshing = false;
+        });
+      }
+      return;
+    }
+
     if (!silent) {
       setState(() {
         _isRefreshing = true;
@@ -302,7 +327,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     );
                   }
                 } else {
-                  await firebase_auth.FirebaseAuth.instance.verifyPhoneNumber(
+                  final auth = _auth;
+                  if (auth == null) {
+                    safeSetModal(
+                      () => dialogError = 'Firebase authentication is unavailable.',
+                    );
+                    return;
+                  }
+                  await auth.verifyPhoneNumber(
                     phoneNumber: phone,
                     verificationCompleted: (credential) async {
                       try {
