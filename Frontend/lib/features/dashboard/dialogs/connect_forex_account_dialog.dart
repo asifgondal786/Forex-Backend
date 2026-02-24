@@ -41,14 +41,18 @@ class _ConnectForexAccountDialogState extends State<ConnectForexAccountDialog> {
         _passwordController.text.trim(),
       );
 
+      if (!mounted) return;
       CustomSnackbar.success(context, 'Successfully connected to Forex.com');
       Navigator.of(context).pop(true);
     } catch (error) {
+      if (!mounted) return;
       CustomSnackbar.error(context, 'Connection failed: $error');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

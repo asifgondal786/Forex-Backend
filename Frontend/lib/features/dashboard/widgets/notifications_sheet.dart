@@ -51,6 +51,9 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           timestamp: notificationUpdate.timestamp,
           read: notificationUpdate.read,
           clicked: false,
+          richData: notificationUpdate.richData,
+          channelsToSend: const <String>[],
+          deliveryStatus: const <String, String>{},
         );
 
         setState(() {
@@ -143,10 +146,11 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
       });
       _showSnack('Unable to mark all notifications as read.');
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _markingAll = false;
-      });
+      if (mounted) {
+        setState(() {
+          _markingAll = false;
+        });
+      }
     }
   }
 

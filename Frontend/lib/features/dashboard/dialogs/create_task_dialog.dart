@@ -70,7 +70,7 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
               
               // Priority dropdown
               DropdownButtonFormField<TaskPriority>(
-                value: _priority,
+                initialValue: _priority,
                 decoration: const InputDecoration(
                   labelText: 'Priority',
                   border: OutlineInputBorder(),
