@@ -226,10 +226,18 @@ except ImportError:
     OPS_ROUTES_AVAILABLE = False
     print("[WARN] Ops routes not available")
 
+try:
+    from .monitoring_routes import router as monitoring_router
+    MONITORING_ROUTES_AVAILABLE = True
+except ImportError:
+    MONITORING_ROUTES_AVAILABLE = False
+    print("[WARN] Monitoring routes not available")
+
 from .enhanced_websocket_manager import ws_manager
 from .forex_data_service import forex_service
 from .services.task_queue_service import task_queue_service
 from .services.redis_store import redis_store
+from .services.observability import health_checker
 from .utils.firestore_client import (
     check_firebase_authorized_domain,
     get_firebase_config_status,
@@ -289,6 +297,21 @@ async def lifespan(app: FastAPI):
         print(f"[Firebase] Startup check failed: {exc}")
         if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
             raise
+    
+    # Register health checks (Phase 6: Observability)
+    async def check_firebase() -> bool:
+        return firebase_initialized
+    
+    async def check_redis() -> bool:
+        return redis_store.is_connected() or not redis_store.is_enabled()
+    
+    async def check_firestore() -> bool:
+        # Firestore health check would go here
+        return True
+    
+    health_checker.register_check("firebase", check_firebase)
+    health_checker.register_check("redis", check_redis)
+    health_checker.register_check("firestore", check_firestore)
 
     # Optional startup guard for Firebase Auth Authorized Domains.
     if firebase_initialized and _env_bool("FIREBASE_AUTH_DOMAIN_CHECK_ENABLED", True):
@@ -715,6 +738,19 @@ _trusted_hosts = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") i
 if _trusted_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts)
 
+# Phase 6: Add observability middleware
+try:
+    from .middleware.observability_middleware import (
+        DistributedTracingMiddleware,
+        ErrorTrackingMiddleware,
+        MetricsMiddleware,
+    )
+    app.add_middleware(MetricsMiddleware)
+    app.add_middleware(ErrorTrackingMiddleware)
+    app.add_middleware(DistributedTracingMiddleware)
+except Exception as exc:
+    print(f"[WARN] Could not load observability middleware: {exc}")
+
 # Include routers
 app.include_router(users_router)
 app.include_router(websocket_router)
@@ -737,6 +773,11 @@ if PUBLIC_AUTH_ROUTES_AVAILABLE:
     app.include_router(public_auth_router)
 if OPS_ROUTES_AVAILABLE:
     app.include_router(ops_router)
+if MONITORING_ROUTES_AVAILABLE:
+    app.include_router(monitoring_router)
+
+if MONITORING_ROUTES_AVAILABLE:
+    app.include_router(monitoring_router)
 
 
 @app.get("/")
