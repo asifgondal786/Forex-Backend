@@ -13,6 +13,7 @@ from .ai_forex_engine import ai_engine
 from .enhanced_websocket_manager import ws_manager
 from .security import get_current_user_id
 from .services.task_service import TaskService
+from .services.task_queue_service import task_queue_service
 
 router = APIRouter(prefix="/api/tasks", tags=["AI Tasks"])
 
@@ -20,6 +21,7 @@ _task_service = None
 
 
 _activity_logger = None
+_queue_handlers_registered = False
 
 async def _log_activity(user_id: str, message: str, activity_type: str = "monitor", emoji: str = None, color: str = None):
     if not user_id:
@@ -153,6 +155,33 @@ async def _require_task_owner(task_id: str, user_id: str) -> Dict:
     return data
 
 
+async def _enqueue_or_fallback(
+    *,
+    background_tasks: BackgroundTasks,
+    task_type: str,
+    task_id: str,
+    params: "TaskCreateRequest",
+) -> str:
+    _ensure_task_queue_handlers_registered()
+    handler_map = {
+        "market_analysis": _queue_execute_market_analysis_task,
+        "auto_trade": _queue_execute_auto_trading_task,
+        "forecast": _queue_execute_forecast_task,
+    }
+    handler = handler_map.get(task_type)
+    if handler is None:
+        return "unsupported_task_type"
+
+    params_payload = params.model_dump(mode="json", by_alias=True)
+    queue_key = f"{task_type}:{task_id}"
+    queued = await task_queue_service.enqueue(queue_key, handler, task_id, params_payload)
+    if queued:
+        return "queued"
+
+    background_tasks.add_task(handler, task_id, params_payload)
+    return "background_task"
+
+
 # ============================================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================================
@@ -178,6 +207,8 @@ class TaskCreateRequest(BaseModel):
 
 
 class TaskResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     title: str
     description: str
@@ -189,9 +220,6 @@ class TaskResponse(BaseModel):
     totalSteps: int
     steps: List[Dict]
     resultFileUrl: Optional[str]
-    
-    class Config:
-        populate_by_name = True  # Allow snake_case or camelCase from JSON
 
 
 # ============================================================================
@@ -533,6 +561,31 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
         await ai_engine.close()
 
 
+def _ensure_task_queue_handlers_registered() -> None:
+    global _queue_handlers_registered
+    if _queue_handlers_registered:
+        return
+    task_queue_service.register_handler("market_analysis", _queue_execute_market_analysis_task)
+    task_queue_service.register_handler("auto_trade", _queue_execute_auto_trading_task)
+    task_queue_service.register_handler("forecast", _queue_execute_forecast_task)
+    _queue_handlers_registered = True
+
+
+async def _queue_execute_market_analysis_task(task_id: str, params_payload: Dict):
+    params = TaskCreateRequest(**(params_payload or {}))
+    await execute_market_analysis_task(task_id, params)
+
+
+async def _queue_execute_auto_trading_task(task_id: str, params_payload: Dict):
+    params = TaskCreateRequest(**(params_payload or {}))
+    await execute_auto_trading_task(task_id, params)
+
+
+async def _queue_execute_forecast_task(task_id: str, params_payload: Dict):
+    params = TaskCreateRequest(**(params_payload or {}))
+    await execute_forecast_task(task_id, params)
+
+
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
@@ -609,13 +662,23 @@ async def create_task(
     await asyncio.to_thread(service.create_task, task_id, task_data)
     task_response = TaskResponse(**_normalize_task(task_id, task_data))
     
-    # Execute task in background based on type
-    if task.task_type == "market_analysis":
-        background_tasks.add_task(execute_market_analysis_task, task_id, task)
-    elif task.task_type == "auto_trade":
-        background_tasks.add_task(execute_auto_trading_task, task_id, task)
-    elif task.task_type == "forecast":
-        background_tasks.add_task(execute_forecast_task, task_id, task)
+    dispatch_mode = await _enqueue_or_fallback(
+        background_tasks=background_tasks,
+        task_type=task.task_type,
+        task_id=task_id,
+        params=task,
+    )
+    if dispatch_mode == "unsupported_task_type":
+        raise HTTPException(status_code=400, detail=f"Unsupported task type: {task.task_type}")
+
+    if dispatch_mode == "queued":
+        await ws_manager.send_update(
+            task_id=task_id,
+            message="Task accepted in queue",
+            update_type="info",
+            user_id=user_id,
+            data={"dispatch": "queued", "task_type": task.task_type},
+        )
     
     return task_response
 
@@ -702,6 +765,12 @@ async def delete_task(task_id: str, user_id: str = Depends(get_current_user_id))
     service = _get_task_service()
     await asyncio.to_thread(service.delete_task, task_id)
     return {"message": "Task deleted", "id": task_id}
+
+
+@router.get("/queue/status")
+async def get_task_queue_status(_user_id: str = Depends(get_current_user_id)):
+    """Get in-memory background task queue status."""
+    return task_queue_service.get_stats()
 
 
 @router.get("/market/live-rates")

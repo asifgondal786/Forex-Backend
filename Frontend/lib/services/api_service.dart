@@ -192,13 +192,55 @@ class ApiService {
       }
     }
 
+    bool isApiEnvelope(Map<String, dynamic> payload) {
+      return payload.containsKey('status') &&
+          payload.containsKey('message') &&
+          payload.containsKey('data');
+    }
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (decoded == null) return {};
+      if (decoded is Map<String, dynamic> && isApiEnvelope(decoded)) {
+        final statusValue = (decoded['status'] ?? '').toString().toLowerCase();
+        final envelopeMessage = (decoded['message'] ?? '').toString().trim();
+        if (statusValue == 'error') {
+          throw ApiException(
+            envelopeMessage.isNotEmpty ? envelopeMessage : 'Request failed',
+            response.statusCode,
+          );
+        }
+
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          if (envelopeMessage.isNotEmpty && !data.containsKey('message')) {
+            data['message'] = envelopeMessage;
+          }
+          return data;
+        }
+        if (data is List) {
+          return data;
+        }
+        if (data == null) {
+          return {
+            if (envelopeMessage.isNotEmpty) 'message': envelopeMessage,
+          };
+        }
+        return {
+          'value': data,
+          if (envelopeMessage.isNotEmpty) 'message': envelopeMessage,
+        };
+      }
       return decoded;
     }
 
     var message = 'API Error: ${response.statusCode} - ${response.reasonPhrase}';
     if (decoded is Map<String, dynamic>) {
+      if (isApiEnvelope(decoded)) {
+        final envelopeMessage = (decoded['message'] ?? '').toString().trim();
+        if (envelopeMessage.isNotEmpty) {
+          message = envelopeMessage;
+        }
+      }
       final detail = decoded['detail'] ?? decoded['message'] ?? decoded['error'];
       if (detail is String && detail.trim().isNotEmpty) {
         message = detail.trim();

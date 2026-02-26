@@ -1,7 +1,13 @@
 class AppConstants {
   // API Configuration
-  static const String baseUrl = 'http://localhost:8000'; // Update with your backend URL
-  static const String wsBaseUrl = 'ws://localhost:8000'; // WebSocket URL
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
+  static const String wsBaseUrl = String.fromEnvironment(
+    'WS_BASE_URL',
+    defaultValue: '',
+  );
 
   // API Endpoints
   static const String apiAuth = '/api/auth';
