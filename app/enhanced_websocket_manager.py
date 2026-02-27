@@ -1,12 +1,14 @@
 ﻿"""
 Enhanced WebSocket Manager with Live Forex Data Integration
 """
-from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, Set, Optional
+from fastapi import WebSocket
+from typing import Any, Dict, Set, Optional
 import asyncio
 import uuid
 from datetime import datetime
 import os
+
+from .services.redis_store import redis_store
 
 
 class EnhancedWebSocketManager:
@@ -17,6 +19,9 @@ class EnhancedWebSocketManager:
         self.active_connections: Dict[str, Set[WebSocket]] = {}
         # Store all connections for broadcasts
         self.all_connections: Set[WebSocket] = set()
+        # Connection registry for diagnostics and lifecycle tracking
+        self.connection_registry: Dict[str, Dict[str, Any]] = {}
+        self.websocket_to_connection_id: Dict[int, str] = {}
         # Track streaming tasks
         self.streaming_tasks: Dict[str, asyncio.Task] = {}
         # Track forex stream interval
@@ -28,7 +33,19 @@ class EnhancedWebSocketManager:
         self.engagement_logging_enabled = os.getenv("ENABLE_ENGAGEMENT_LOGGING", "").lower() != "false"
         self._activity_logger = None
 
-    async def connect(self, websocket: WebSocket, task_id: str = "global"):
+    def _schedule_background_task(self, coroutine):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(coroutine)
+
+    async def connect(
+        self,
+        websocket: WebSocket,
+        task_id: str = "global",
+        user_id: Optional[str] = None,
+    ) -> str:
         """Accept a new WebSocket connection"""
         await websocket.accept()
 
@@ -40,6 +57,18 @@ class EnhancedWebSocketManager:
         # Add to all connections
         self.all_connections.add(websocket)
 
+        connection_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        self.connection_registry[connection_id] = {
+            "connection_id": connection_id,
+            "task_id": task_id,
+            "user_id": user_id,
+            "connected_at": now,
+            "last_seen": now,
+        }
+        self.websocket_to_connection_id[id(websocket)] = connection_id
+        await redis_store.set_ws_connection(connection_id, self.connection_registry[connection_id])
+
         print(f"WebSocket connected for task: {task_id}")
         print(f"Total connections: {len(self.all_connections)}")
 
@@ -50,20 +79,72 @@ class EnhancedWebSocketManager:
             update_type="success",
             websocket=websocket
         )
+        return connection_id
 
-    def disconnect(self, websocket: WebSocket, task_id: str = "global"):
+    def disconnect(
+        self,
+        websocket: WebSocket,
+        task_id: Optional[str] = None,
+        reason: Optional[str] = None,
+    ):
         """Remove a WebSocket connection"""
+        resolved_task = task_id or self._find_task_for_websocket(websocket) or "global"
+
         # Remove from task-specific connections
-        if task_id in self.active_connections:
-            self.active_connections[task_id].discard(websocket)
-            if not self.active_connections[task_id]:
-                del self.active_connections[task_id]
+        if resolved_task in self.active_connections:
+            self.active_connections[resolved_task].discard(websocket)
+            if not self.active_connections[resolved_task]:
+                del self.active_connections[resolved_task]
 
         # Remove from all connections
         self.all_connections.discard(websocket)
 
-        print(f"WebSocket disconnected for task: {task_id}")
+        connection_id = self.websocket_to_connection_id.pop(id(websocket), None)
+        if connection_id and connection_id in self.connection_registry:
+            if reason:
+                self.connection_registry[connection_id]["disconnect_reason"] = reason
+            del self.connection_registry[connection_id]
+            self._schedule_background_task(redis_store.remove_ws_connection(connection_id))
+
+        print(f"WebSocket disconnected for task: {resolved_task}")
         print(f"Remaining connections: {len(self.all_connections)}")
+
+    def mark_connection_alive(self, websocket: WebSocket):
+        """Update heartbeat timestamp for a connected websocket."""
+        connection_id = self.websocket_to_connection_id.get(id(websocket))
+        if not connection_id:
+            return
+        metadata = self.connection_registry.get(connection_id)
+        if metadata:
+            metadata["last_seen"] = datetime.now().isoformat()
+            self._schedule_background_task(
+                redis_store.patch_ws_connection(
+                    connection_id,
+                    {"last_seen": metadata["last_seen"]},
+                )
+            )
+
+    def _find_task_for_websocket(self, websocket: WebSocket) -> Optional[str]:
+        for candidate_task_id, sockets in self.active_connections.items():
+            if websocket in sockets:
+                return candidate_task_id
+        return None
+
+    def get_task_registry_snapshot(self, task_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Return filtered connection metadata for diagnostics."""
+        if task_id is None:
+            return {key: dict(value) for key, value in self.connection_registry.items()}
+        return {
+            key: dict(value)
+            for key, value in self.connection_registry.items()
+            if value.get("task_id") == task_id
+        }
+
+    async def get_task_registry_snapshot_async(self, task_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Return registry snapshot, preferring Redis when available."""
+        if await redis_store.ensure_connected():
+            return await redis_store.get_ws_registry(task_id=task_id)
+        return self.get_task_registry_snapshot(task_id=task_id)
 
     async def send_update(
         self,
@@ -98,15 +179,19 @@ class EnhancedWebSocketManager:
         try:
             if websocket:
                 await websocket.send_json(update)
+                self.mark_connection_alive(websocket)
             elif task_id in self.active_connections:
                 # Use a copy to avoid issues if the set is modified during iteration
                 connections = list(self.active_connections[task_id])
                 for connection in connections:
                     try:
                         await connection.send_json(update)
+                        self.mark_connection_alive(connection)
                     except Exception:
-                        self.disconnect(connection, task_id)
+                        self.disconnect(connection, task_id=task_id, reason="send_failure")
         except Exception as e:
+            if websocket is not None:
+                self.disconnect(websocket, task_id=task_id, reason="send_failure")
             print(f"Error in send_update: {e}")
 
     async def _maybe_log_activity(
@@ -179,12 +264,9 @@ class EnhancedWebSocketManager:
         for connection in all_connections_copy:
             try:
                 await connection.send_json(update)
+                self.mark_connection_alive(connection)
             except Exception:
-                # Find which task_id this dead connection belongs to
-                for task_id, web_sockets in self.active_connections.items():
-                    if connection in web_sockets:
-                        self.disconnect(connection, task_id)
-                        break
+                self.disconnect(connection, reason="broadcast_send_failure")
 
     async def send_forex_update(self, forex_data: dict):
         """Send forex market data to all connected clients"""

@@ -10,22 +10,8 @@ from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 from dataclasses import dataclass
 import json
-import os
-from dotenv import load_dotenv
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
-
-# Load environment variables
-load_dotenv()
-
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
-if GEMINI_AVAILABLE:
-    genai.configure(api_key=GEMINI_API_KEY)
+from .ai import RiskEngine, StrategyEngine, gemini_client
 
 
 @dataclass
@@ -69,6 +55,8 @@ class ForexAIEngine:
         self.session: Optional[aiohttp.ClientSession] = None
         self.active_positions: Dict[str, Dict] = {}
         self.user_preferences: Dict[str, Any] = {}
+        self.strategy_engine = StrategyEngine()
+        self.risk_engine = RiskEngine()
         
     async def initialize(self):
         """Initialize the AI engine"""
@@ -79,6 +67,7 @@ class ForexAIEngine:
         """Close sessions"""
         if self.session:
             await self.session.close()
+            self.session = None
     
     # ========================================================================
     # REAL-TIME DATA FETCHING
@@ -265,10 +254,8 @@ class ForexAIEngine:
         Generate AI-powered trading signal using Google Generative AI (Gemini)
         """
         try:
-            if not GEMINI_AVAILABLE:
+            if not gemini_client.available:
                 return await self.generate_trading_signal(pair, market_condition, user_strategy)
-                
-            model = genai.GenerativeModel("gemini-2.0-flash")
             
             # Format market conditions for analysis
             condition_text = f"""
@@ -312,14 +299,14 @@ class ForexAIEngine:
             
             Format your response as JSON.
             """
-            
-            response = model.generate_content(prompt)
-            
-            try:
-                signal_data = json.loads(response.text)
-            except Exception:
+
+            signal_data = gemini_client.generate_json(
+                model_name="gemini-2.0-flash",
+                prompt=prompt,
+            )
+            if not signal_data:
                 return await self.generate_trading_signal(pair, market_condition, user_strategy)
-                
+
             return TradingSignal(
                 pair=pair,
                 action=signal_data.get("action", "HOLD"),
@@ -342,70 +329,16 @@ class ForexAIEngine:
         user_strategy: Dict
     ) -> TradingSignal:
         """Generate AI-powered trading signal (fallback method)"""
-        
-        action = "HOLD"
-        confidence = 0.0
-        reason = ""
-        entry_price = market_condition.current_price
-        stop_loss = 0.0
-        take_profit = 0.0
-        
-        # AI Decision Logic
-        signals = []
-        
-        # RSI Signal
-        if market_condition.rsi < 30:
-            signals.append(("BUY", 0.7, "RSI oversold"))
-        elif market_condition.rsi > 70:
-            signals.append(("SELL", 0.7, "RSI overbought"))
-        
-        # MACD Signal
-        if market_condition.macd["histogram"] > 0:
-            signals.append(("BUY", 0.6, "MACD bullish crossover"))
-        elif market_condition.macd["histogram"] < 0:
-            signals.append(("SELL", 0.6, "MACD bearish crossover"))
-        
-        # Trend Signal
-        if market_condition.trend == "BULLISH":
-            signals.append(("BUY", 0.8, "Strong uptrend"))
-        elif market_condition.trend == "BEARISH":
-            signals.append(("SELL", 0.8, "Strong downtrend"))
-        
-        # Support/Resistance Signal
-        if market_condition.current_price <= market_condition.support_level * 1.01:
-            signals.append(("BUY", 0.9, "Price at support"))
-        elif market_condition.current_price >= market_condition.resistance_level * 0.99:
-            signals.append(("SELL", 0.9, "Price at resistance"))
-        
-        # Aggregate signals
-        if signals:
-            buy_signals = [s for s in signals if s[0] == "BUY"]
-            sell_signals = [s for s in signals if s[0] == "SELL"]
-            
-            buy_confidence = sum(s[1] for s in buy_signals) / len(signals)
-            sell_confidence = sum(s[1] for s in sell_signals) / len(signals)
-            
-            if buy_confidence > sell_confidence and buy_confidence > 0.5:
-                action = "BUY"
-                confidence = buy_confidence
-                reason = ", ".join(s[2] for s in buy_signals)
-                stop_loss = market_condition.support_level
-                take_profit = market_condition.current_price * 1.02  # 2% profit target
-            elif sell_confidence > buy_confidence and sell_confidence > 0.5:
-                action = "SELL"
-                confidence = sell_confidence
-                reason = ", ".join(s[2] for s in sell_signals)
-                stop_loss = market_condition.resistance_level
-                take_profit = market_condition.current_price * 0.98  # 2% profit target
-        
+        _ = user_strategy  # Reserved for future strategy profiles.
+        decision = self.strategy_engine.generate_signal(market_condition)
         return TradingSignal(
             pair=pair,
-            action=action,
-            confidence=confidence,
-            entry_price=entry_price,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            reason=reason,
+            action=decision.action,
+            confidence=decision.confidence,
+            entry_price=decision.entry_price,
+            stop_loss=decision.stop_loss,
+            take_profit=decision.take_profit,
+            reason=decision.reason,
             timestamp=datetime.now()
         )
 
@@ -414,10 +347,8 @@ class ForexAIEngine:
         Use Google Generative AI (Gemini) to analyze portfolio performance
         """
         try:
-            if not GEMINI_AVAILABLE:
+            if not gemini_client.available:
                 return self._get_default_portfolio_analysis(portfolio_data)
-                
-            model = genai.GenerativeModel("gemini-1.5-pro")
             
             prompt = f"""
             You are an expert portfolio analyst.
@@ -436,17 +367,21 @@ class ForexAIEngine:
             
             Format your response as JSON.
             """
-            
-            response = model.generate_content(prompt)
-            
-            import json
-            try:
-                analysis = json.loads(response.text)
-                analysis["timestamp"] = datetime.now().isoformat()
-            except:
+
+            analysis = gemini_client.generate_json(
+                model_name="gemini-1.5-pro",
+                prompt=prompt,
+            )
+            if not analysis:
                 analysis = self._get_default_portfolio_analysis(portfolio_data)
-                analysis["ai_analysis"] = response.text
-                
+                ai_text = gemini_client.generate_text(
+                    model_name="gemini-1.5-pro",
+                    prompt=prompt,
+                )
+                if ai_text:
+                    analysis["ai_analysis"] = ai_text
+            else:
+                analysis["timestamp"] = datetime.now().isoformat()
             return analysis
             
         except Exception as e:
@@ -487,24 +422,13 @@ class ForexAIEngine:
         }
         """
         
-        # Check if signal meets user criteria
-        if signal.confidence < 0.6:
+        allowed, reason = self.risk_engine.can_execute_signal(signal, min_confidence=0.6)
+        if not allowed:
             return {
                 "executed": False,
-                "reason": "Confidence too low"
+                "reason": reason
             }
-        
-        # Simulate trade execution
-        trade = {
-            "pair": signal.pair,
-            "action": signal.action,
-            "entry_price": signal.entry_price,
-            "quantity": user_limits.get("max_position_size", 1000) / signal.entry_price,
-            "stop_loss": signal.stop_loss,
-            "take_profit": signal.take_profit,
-            "timestamp": signal.timestamp.isoformat(),
-            "status": "OPEN"
-        }
+        trade = self.risk_engine.build_trade(signal, user_limits)
         
         # Store active position
         self.active_positions[signal.pair] = trade
@@ -522,30 +446,11 @@ class ForexAIEngine:
         for pair, position in list(self.active_positions.items()):
             if pair not in current_rates:
                 continue
-            
-            current_price = current_rates[pair]
-            entry_price = position["entry_price"]
-            
-            # Calculate profit/loss
-            if position["action"] == "BUY":
-                pnl = (current_price - entry_price) * position["quantity"]
-            else:  # SELL
-                pnl = (entry_price - current_price) * position["quantity"]
-            
-            # Check take profit
-            if pnl >= (position["take_profit"] - entry_price) * position["quantity"]:
-                position["status"] = "CLOSED"
-                position["close_price"] = current_price
-                position["profit"] = pnl
-                closed_trades.append(position)
-                del self.active_positions[pair]
-            
-            # Check stop loss
-            elif pnl <= -(entry_price - position["stop_loss"]) * position["quantity"]:
-                position["status"] = "CLOSED"
-                position["close_price"] = current_price
-                position["profit"] = pnl
-                closed_trades.append(position)
+
+            current_price = float(current_rates[pair])
+            closed_trade = self.risk_engine.evaluate_position(position, current_price)
+            if closed_trade:
+                closed_trades.append(closed_trade)
                 del self.active_positions[pair]
         
         return closed_trades

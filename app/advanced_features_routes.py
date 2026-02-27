@@ -19,6 +19,7 @@ from .services.paper_trading_engine import PaperTradingEngine
 from .services.natural_language_service import NaturalLanguageService
 from .services.broker_execution_service import broker_execution_service
 from .services.subscription_service import subscription_service
+from .ai_forex_engine import MarketCondition, ai_engine
 from .security import get_current_user_id
 
 # Initialize services (in production, use dependency injection)
@@ -553,9 +554,6 @@ async def generate_trading_signal_with_gemini(
     """
     Use Google Generative AI (Gemini) to generate trading signal with full context
     """
-    from .ai_forex_engine import ai_engine
-    from .ai_forex_engine import MarketCondition
-    
     # Convert market condition dictionary to dataclass
     condition = MarketCondition(
         pair=pair,
@@ -592,8 +590,6 @@ async def analyze_portfolio_performance(portfolio_data: Dict):
     """
     Use Google Generative AI (Gemini) to analyze portfolio performance
     """
-    from .ai_forex_engine import ai_engine
-    
     return await ai_engine.analyze_portfolio_performance(portfolio_data)
 
 

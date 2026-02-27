@@ -1,19 +1,95 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == userId
-        && request.auth.token.email_verified == true
-        && request.auth.token.phone_number != null;
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
+    // Helper: Check if user owns this resource
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Users Collection - Owner access only
+    match /users/{userId} {
+      allow create: if isOwner(userId);
+      allow read, update, delete: if isOwner(userId);
+      
+      // User metadata sub-collection
+      match /metadata/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Tasks Collection - Owner access only
     match /tasks/{taskId} {
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.userId;
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isOwner(resource.data.userId);
+      
+      // Task results sub-collection
+      match /results/{resultId} {
+        allow read, write: if isOwner(resource.data.userId);
+      }
+    }
+
+    // Trading Accounts - Owner access only
+    match /trading/{userId}/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Subscriptions - Owner can read, server-only write
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false; // Server-side only via Cloud Functions
+    }
+
+    // Notifications - Owner read only
+    match /notifications/{userId}/messages/{messageId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false; // Server-side only
+    }
+
+    // User Settings - Owner access only
+    match /settings/{userId} {
+      allow read, update: if isOwner(userId);
+      allow create, delete: if false;
+    }
+
+    // Trading History - Owner access only  
+    match /trading_history/{userId}/{document=**} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false; // Server-side only
+    }
+
+    // Chat/Messages - Both parties can access
+    match /messages/{conversationId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId1 || 
+         request.auth.uid == resource.data.userId2);
+      allow write: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.sender_id;
+    }
+
+    // Public Data (news, forex rates, etc) - Read only
+    match /public/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Server-side only
+    }
+
+    // Forecasts - Owner access
+    match /forecasts/{userId}/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Analysis Results - Owner access
+    match /analysis/{userId}/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

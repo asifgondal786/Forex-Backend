@@ -3,11 +3,13 @@ Complete WebSocket Routes with Live Forex Data Integration
 """
 import os
 import time
+import json
 from collections import defaultdict, deque
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
+from datetime import datetime, timezone
 
 from .enhanced_websocket_manager import ws_manager
 from .forex_data_service import forex_service
@@ -19,6 +21,8 @@ router = APIRouter(prefix="/api", tags=["Live Updates"])
 _ws_rate_limit_max = int(os.getenv("WS_CONN_MAX", "30"))
 _ws_rate_limit_window = int(os.getenv("WS_CONN_WINDOW_SECONDS", "60"))
 _ws_rate_limit_store = defaultdict(deque)
+_ws_heartbeat_interval = int(os.getenv("WS_HEARTBEAT_INTERVAL_SECONDS", "25"))
+_ws_heartbeat_timeout = int(os.getenv("WS_HEARTBEAT_TIMEOUT_SECONDS", "60"))
 
 
 def _ws_rate_limit_ok(websocket: WebSocket) -> bool:
@@ -73,6 +77,82 @@ async def _require_ws_auth(websocket: WebSocket):
     return user_id, token, False
 
 
+def _extract_ws_message_type(message: str) -> str:
+    raw = (message or "").strip()
+    lowered = raw.lower()
+    if lowered in {"ping", "pong"}:
+        return lowered
+
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return "message"
+
+    if isinstance(payload, dict):
+        payload_type = str(payload.get("type", "")).strip().lower()
+        if payload_type in {"ping", "pong"}:
+            return payload_type
+    return "message"
+
+
+async def _run_ws_session(
+    websocket: WebSocket,
+    *,
+    task_id: str,
+    token: Optional[str],
+    is_dev: bool,
+    echo_messages: bool,
+):
+    heartbeat_interval = max(5, _ws_heartbeat_interval)
+    heartbeat_timeout = max(heartbeat_interval * 2, _ws_heartbeat_timeout)
+    last_seen = time.monotonic()
+
+    while True:
+        try:
+            data = await asyncio.wait_for(
+                websocket.receive_text(),
+                timeout=heartbeat_interval,
+            )
+        except asyncio.TimeoutError:
+            idle_seconds = time.monotonic() - last_seen
+            if idle_seconds >= heartbeat_timeout:
+                await websocket.close(code=4408, reason="Heartbeat timeout")
+                return
+            await websocket.send_json(
+                {
+                    "type": "ping",
+                    "task_id": task_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            continue
+
+        if not is_dev:
+            try:
+                verify_firebase_token(token)
+            except Exception:
+                await websocket.close(code=4401)
+                return
+
+        last_seen = time.monotonic()
+        ws_manager.mark_connection_alive(websocket)
+
+        message_type = _extract_ws_message_type(data)
+        if message_type == "ping":
+            await websocket.send_text("pong")
+            continue
+        if message_type == "pong":
+            continue
+
+        if echo_messages:
+            await ws_manager.send_update(
+                task_id=task_id,
+                message=f"Received: {data}",
+                update_type="info",
+                websocket=websocket,
+            )
+
+
 class UpdateRequest(BaseModel):
     task_id: str
     message: str
@@ -89,7 +169,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     """
     WebSocket endpoint for real-time updates for a specific task.
 
-    Connect to: ws://localhost:8080/api/ws/{task_id}
+    Connect to: wss://<your-backend-domain>/api/ws/{task_id}
     """
     if not _ws_rate_limit_ok(websocket):
         await websocket.close(code=4408)
@@ -100,31 +180,21 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
         await websocket.close(code=4401)
         return
 
-    await ws_manager.connect(websocket, task_id)
+    await ws_manager.connect(websocket, task_id, user_id=user_id)
     try:
-        while True:
-            data = await websocket.receive_text()
-            if not is_dev:
-                try:
-                    verify_firebase_token(token)
-                except Exception:
-                    await websocket.close(code=4401)
-                    return
-
-            if data == "ping":
-                await websocket.send_text("pong")
-            else:
-                await ws_manager.send_update(
-                    task_id=task_id,
-                    message=f"Received: {data}",
-                    update_type="info",
-                    websocket=websocket
-                )
+        await _run_ws_session(
+            websocket,
+            task_id=task_id,
+            token=token,
+            is_dev=is_dev,
+            echo_messages=True,
+        )
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, task_id)
+        pass
     except Exception as e:
         print(f"WebSocket error for task {task_id}: {e}")
-        ws_manager.disconnect(websocket, task_id)
+    finally:
+        ws_manager.disconnect(websocket, task_id=task_id, reason="session_closed")
 
 
 @router.websocket("/ws")
@@ -132,7 +202,7 @@ async def websocket_global(websocket: WebSocket):
     """
     Global WebSocket endpoint for broadcasts.
 
-    Connect to: ws://localhost:8080/api/ws
+    Connect to: wss://<your-backend-domain>/api/ws
     """
     if not _ws_rate_limit_ok(websocket):
         await websocket.close(code=4408)
@@ -143,24 +213,21 @@ async def websocket_global(websocket: WebSocket):
         await websocket.close(code=4401)
         return
 
-    await ws_manager.connect(websocket, "global")
+    await ws_manager.connect(websocket, "global", user_id=user_id)
     try:
-        while True:
-            data = await websocket.receive_text()
-            if not is_dev:
-                try:
-                    verify_firebase_token(token)
-                except Exception:
-                    await websocket.close(code=4401)
-                    return
-
-            if data == "ping":
-                await websocket.send_text("pong")
+        await _run_ws_session(
+            websocket,
+            task_id="global",
+            token=token,
+            is_dev=is_dev,
+            echo_messages=False,
+        )
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, "global")
+        pass
     except Exception as e:
         print(f"Global WebSocket error: {e}")
-        ws_manager.disconnect(websocket, "global")
+    finally:
+        ws_manager.disconnect(websocket, task_id="global", reason="session_closed")
 
 
 # ============================================================================
@@ -182,9 +249,26 @@ async def send_update(update: UpdateRequest):
 @router.get("/updates/connections")
 async def get_all_connections():
     """Get total number of active WebSocket connections."""
+    registry = await ws_manager.get_task_registry_snapshot_async()
+    task_ids = sorted(
+        {
+            str(item.get("task_id"))
+            for item in registry.values()
+            if isinstance(item, dict) and item.get("task_id")
+        }
+    )
+    if not task_ids:
+        task_ids = list(ws_manager.active_connections.keys())
+
     return {
-        "total_connections": ws_manager.get_connection_count(),
-        "tasks": list(ws_manager.active_connections.keys())
+        "total_connections": len(registry),
+        "local_connections": ws_manager.get_connection_count(),
+        "tasks": task_ids,
+        "registry": registry,
+        "heartbeat": {
+            "interval_seconds": _ws_heartbeat_interval,
+            "timeout_seconds": _ws_heartbeat_timeout,
+        },
     }
 
 
