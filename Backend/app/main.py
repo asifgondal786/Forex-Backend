@@ -254,28 +254,39 @@ from .security import verify_http_request
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events"""
-    public_api_base = _public_api_base_url()
     print("=" * 60)
     print("[Startup] Forex Companion AI Backend Starting...")
     print("=" * 60)
-    print(f"[Startup] WebSocket: {_public_ws_endpoint()}")
-    print(f"[Startup] API Docs: {f'{public_api_base}/docs' if public_api_base else '/docs'}")
-    print(f"[Startup] AI Engine: {'ACTIVE' if AI_ROUTES_AVAILABLE else 'DISABLED'}")
-    print(f"[Startup] Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
+    
+    try:
+        public_api_base = _public_api_base_url()
+        print(f"[Startup] WebSocket: {_public_ws_endpoint()}")
+        print(f"[Startup] API Docs: {f'{public_api_base}/docs' if public_api_base else '/docs'}")
+        print(f"[Startup] AI Engine: {'ACTIVE' if AI_ROUTES_AVAILABLE else 'DISABLED'}")
+        print(f"[Startup] Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
+    except Exception as e:
+        print(f"[Startup] Warning: Could not print startup info: {e}")
+    
     print("=" * 60)
 
-    # Fail fast on invalid production URL configuration.
-    _validate_env_urls()
+    # Fail fast on invalid production URL configuration (graceful).
+    try:
+        _validate_env_urls()
+    except Exception as e:
+        print(f"[Startup] Warning: URL validation failed (non-blocking): {e}")
 
     # Startup checklist (no secrets / redacted).
-    print(
-        json.dumps(
-            {
-                "event": "startup_checklist",
-                **_startup_snapshot(),
-            }
+    try:
+        print(
+            json.dumps(
+                {
+                    "event": "startup_checklist",
+                    **_startup_snapshot(),
+                }
+            )
         )
-    )
+    except Exception as e:
+        print(f"[Startup] Warning: Could not generate startup snapshot: {e}")
 
     # Firebase Admin SDK startup health check
     firebase_initialized = False
@@ -299,19 +310,22 @@ async def lifespan(app: FastAPI):
             raise
     
     # Register health checks (Phase 6: Observability)
-    async def check_firebase() -> bool:
-        return firebase_initialized
-    
-    async def check_redis() -> bool:
-        return redis_store.is_connected() or not redis_store.is_enabled()
-    
-    async def check_firestore() -> bool:
-        # Firestore health check would go here
-        return True
-    
-    health_checker.register_check("firebase", check_firebase)
-    health_checker.register_check("redis", check_redis)
-    health_checker.register_check("firestore", check_firestore)
+    try:
+        async def check_firebase() -> bool:
+            return firebase_initialized
+        
+        async def check_redis() -> bool:
+            return redis_store.is_connected() or not redis_store.is_enabled()
+        
+        async def check_firestore() -> bool:
+            # Firestore health check would go here
+            return True
+        
+        health_checker.register_check("firebase", check_firebase)
+        health_checker.register_check("redis", check_redis)
+        health_checker.register_check("firestore", check_firestore)
+    except Exception as e:
+        print(f"[Startup] Warning: Could not register health checks: {e}")
 
     # Optional startup guard for Firebase Auth Authorized Domains.
     if firebase_initialized and _env_bool("FIREBASE_AUTH_DOMAIN_CHECK_ENABLED", True):
