@@ -730,6 +730,7 @@ app.add_middleware(
     allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
     allow_origin_regex=_cors_origin_regex,
     max_age=_env_int("CORS_MAX_AGE_SECONDS", 86400),
 )
