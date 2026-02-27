@@ -815,13 +815,9 @@ async def root():
 
 @app.get("/health")
 async def health():
-    firebase_status = get_firebase_config_status() if os.getenv("DEBUG", "").lower() == "true" else "hidden"
-    return {
-        "status": "healthy",
-        "ai_engine": "active" if AI_ROUTES_AVAILABLE else "disabled",
-        "connections": ws_manager.get_connection_count(),
-        "firebase": firebase_status,
-    }
+    # CRITICAL: Must respond instantly with NO dependencies
+    # Railway healthcheck relies on this endpoint
+    return {"status": "ok"}
 
 
 @app.get("/healthz")
