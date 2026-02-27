@@ -13,6 +13,7 @@ import os
 import time
 import json
 import uuid
+import asyncio
 from collections import defaultdict, deque
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -371,20 +372,36 @@ async def lifespan(app: FastAPI):
                     raise
                 print(f"[Firebase] WARNING: Authorized-domain check skipped: {exc}")
     
-    forex_stream_enabled = os.getenv("FOREX_STREAM_ENABLED", "true").lower() == "true"
+    forex_stream_enabled = os.getenv("FOREX_STREAM_ENABLED", "false").lower() == "true"
     forex_stream_interval = _env_int("FOREX_STREAM_INTERVAL", 10)
-    task_queue_enabled = _env_bool("TASK_QUEUE_ENABLED", True)
+    task_queue_enabled = _env_bool("TASK_QUEUE_ENABLED", False)
     task_queue_workers = _env_int("TASK_QUEUE_WORKERS", 2)
     task_queue_max_size = _env_int("TASK_QUEUE_MAX_SIZE", 200)
 
     if task_queue_enabled:
-        await task_queue_service.start(
-            workers=task_queue_workers,
-            max_size=task_queue_max_size,
-        )
+        try:
+            await asyncio.wait_for(
+                task_queue_service.start(
+                    workers=task_queue_workers,
+                    max_size=task_queue_max_size,
+                ),
+                timeout=10.0  # 10 second timeout
+            )
+        except asyncio.TimeoutError:
+            print("[Startup] WARNING: Task queue startup timed out (non-blocking)")
+        except Exception as e:
+            print(f"[Startup] WARNING: Task queue startup failed: {e}")
 
     if forex_stream_enabled:
-        await ws_manager.start_forex_stream(interval=forex_stream_interval)
+        try:
+            await asyncio.wait_for(
+                ws_manager.start_forex_stream(interval=forex_stream_interval),
+                timeout=10.0  # 10 second timeout
+            )
+        except asyncio.TimeoutError:
+            print("[Startup] WARNING: Forex stream startup timed out (non-blocking)")
+        except Exception as e:
+            print(f"[Startup] WARNING: Forex stream startup failed: {e}")
 
     yield
 
