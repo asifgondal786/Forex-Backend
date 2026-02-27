@@ -8,21 +8,8 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 import requests
 import os
-from dotenv import load_dotenv
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
-
-# Load environment variables
-load_dotenv()
-
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
-if GEMINI_AVAILABLE:
-    genai.configure(api_key=GEMINI_API_KEY)
+from ..ai import gemini_client
 
 class AIAnalysisService:
     """
@@ -52,10 +39,8 @@ class AIAnalysisService:
         Use Google Generative AI (Gemini) to analyze news impact on currency pairs
         """
         try:
-            if not GEMINI_AVAILABLE:
+            if not gemini_client.available:
                 return self._get_default_news_analysis(news, currency_pairs)
-                
-            model = genai.GenerativeModel("gemini-2.0-flash")
             
             # Format news for analysis
             news_text = "\n".join([
@@ -84,17 +69,21 @@ class AIAnalysisService:
             
             Format your response as JSON.
             """
-            
-            response = model.generate_content(prompt)
-            
-            import json
-            try:
-                analysis = json.loads(response.text)
-                analysis["timestamp"] = datetime.now().isoformat()
-            except:
+
+            analysis = gemini_client.generate_json(
+                model_name="gemini-2.0-flash",
+                prompt=prompt,
+            )
+            if not analysis:
                 analysis = self._get_default_news_analysis(news, currency_pairs)
-                analysis["ai_analysis"] = response.text
-                
+                ai_text = gemini_client.generate_text(
+                    model_name="gemini-2.0-flash",
+                    prompt=prompt,
+                )
+                if ai_text:
+                    analysis["ai_analysis"] = ai_text
+            else:
+                analysis["timestamp"] = datetime.now().isoformat()
             return analysis
             
         except Exception as e:
@@ -129,10 +118,8 @@ class AIAnalysisService:
         Use Google Generative AI (Gemini) to analyze sentiment from raw news text
         """
         try:
-            if not GEMINI_AVAILABLE:
+            if not gemini_client.available:
                 return self._get_default_sentiment_analysis()
-                
-            model = genai.GenerativeModel("gemini-1.5-pro")
             
             prompt = f"""
             You are an expert financial news sentiment analyzer.
@@ -151,17 +138,21 @@ class AIAnalysisService:
             
             Format your response as JSON.
             """
-            
-            response = model.generate_content(prompt)
-            
-            import json
-            try:
-                sentiment = json.loads(response.text)
-                sentiment["timestamp"] = datetime.now().isoformat()
-            except:
+
+            sentiment = gemini_client.generate_json(
+                model_name="gemini-1.5-pro",
+                prompt=prompt,
+            )
+            if not sentiment:
                 sentiment = self._get_default_sentiment_analysis()
-                sentiment["ai_analysis"] = response.text
-                
+                ai_text = gemini_client.generate_text(
+                    model_name="gemini-1.5-pro",
+                    prompt=prompt,
+                )
+                if ai_text:
+                    sentiment["ai_analysis"] = ai_text
+            else:
+                sentiment["timestamp"] = datetime.now().isoformat()
             return sentiment
             
         except Exception as e:

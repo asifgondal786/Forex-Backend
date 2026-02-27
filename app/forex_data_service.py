@@ -39,6 +39,12 @@ class ForexDataService:
         self._next_rates_retry_monotonic = 0.0
         self._last_rates_error_log_monotonic = 0.0
         self._last_rates_error_text = ""
+        self._cached_news: List[Dict[str, Any]] = []
+        self._cached_news_monotonic = 0.0
+        self._cached_sentiment: Dict[str, Any] = {}
+        self._cached_sentiment_monotonic = 0.0
+        self._pair_forecast_cache: Dict[str, Dict[str, Any]] = {}
+        self._pair_forecast_cache_monotonic: Dict[str, float] = {}
         try:
             self._min_rates_fetch_interval_seconds = max(
                 1,
@@ -46,6 +52,35 @@ class ForexDataService:
             )
         except Exception:
             self._min_rates_fetch_interval_seconds = 3
+        self._news_cache_ttl_seconds = self._env_int("FOREX_NEWS_CACHE_TTL_SECONDS", 30, minimum=1)
+        self._sentiment_cache_ttl_seconds = self._env_int(
+            "FOREX_SENTIMENT_CACHE_TTL_SECONDS",
+            15,
+            minimum=1,
+        )
+        self._pair_forecast_cache_ttl_seconds = self._env_int(
+            "FOREX_FORECAST_CACHE_TTL_SECONDS",
+            20,
+            minimum=1,
+        )
+
+    def _env_int(self, name: str, default: int, minimum: int = 1) -> int:
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        try:
+            parsed = int(raw.strip())
+        except Exception:
+            return default
+        return parsed if parsed >= minimum else default
+
+    def _cache_is_fresh(self, cached_at_monotonic: float, ttl_seconds: int) -> bool:
+        return cached_at_monotonic > 0 and (time.monotonic() - cached_at_monotonic) < ttl_seconds
+
+    def _cache_age_seconds(self, cached_at_monotonic: float) -> float:
+        if cached_at_monotonic <= 0:
+            return -1.0
+        return max(0.0, time.monotonic() - cached_at_monotonic)
 
     async def initialize(self):
         """Initialize the HTTP session"""
@@ -69,10 +104,13 @@ class ForexDataService:
         Fetch news from Forex Factory calendar
         Note: This is a simplified version. Real implementation would need web scraping.
         """
+        if self._cache_is_fresh(self._cached_news_monotonic, self._news_cache_ttl_seconds):
+            return [dict(item) for item in self._cached_news]
+
         try:
             # For production, you'd use web scraping or a paid API.
             # For now, we'll simulate with structured data.
-            return [
+            news = [
                 {
                     "time": datetime.now().isoformat(),
                     "currency": "USD",
@@ -92,6 +130,9 @@ class ForexDataService:
                     "previous": "4.50%"
                 }
             ]
+            self._cached_news = [dict(item) for item in news]
+            self._cached_news_monotonic = time.monotonic()
+            return news
         except Exception as e:
             print(f"Error fetching Forex Factory news: {e}")
             return []
@@ -268,6 +309,12 @@ class ForexDataService:
         """
         normalized_pair = self._normalize_pair(pair)
         normalized_horizon = self._normalize_horizon(horizon)
+        cache_key = f"{normalized_pair}:{normalized_horizon}"
+        cached_at = self._pair_forecast_cache_monotonic.get(cache_key, 0.0)
+        if self._cache_is_fresh(cached_at, self._pair_forecast_cache_ttl_seconds):
+            cached_forecast = self._pair_forecast_cache.get(cache_key)
+            if isinstance(cached_forecast, dict):
+                return dict(cached_forecast)
 
         rates = await self.get_currency_rates()
         current_price = rates.get(normalized_pair)
@@ -366,7 +413,7 @@ class ForexDataService:
                 f"{target_low:.{digits}f} and {target_high:.{digits}f}."
             )
 
-        return {
+        forecast = {
             "pair": normalized_pair,
             "horizon": normalized_horizon,
             "generated_at": datetime.now().isoformat(),
@@ -393,6 +440,9 @@ class ForexDataService:
             ],
             "disclaimer": "Simulation-grade forecast. Not financial advice.",
         }
+        self._pair_forecast_cache[cache_key] = dict(forecast)
+        self._pair_forecast_cache_monotonic[cache_key] = time.monotonic()
+        return forecast
 
     async def analyze_market_with_gemini(self, rates: Dict[str, float], news: List[Dict]) -> Dict[str, any]:
         """
@@ -544,10 +594,19 @@ class ForexDataService:
         Get market sentiment analysis
         """
         try:
+            if self._cache_is_fresh(
+                self._cached_sentiment_monotonic,
+                self._sentiment_cache_ttl_seconds,
+            ):
+                return dict(self._cached_sentiment)
+
             effective_rates = rates if rates is not None else await self.get_currency_rates()
             effective_news = news if news is not None else await self.get_forex_factory_news()
-
-            return await self.analyze_market_with_gemini(effective_rates, effective_news)
+            sentiment = await self.analyze_market_with_gemini(effective_rates, effective_news)
+            if isinstance(sentiment, dict) and sentiment:
+                self._cached_sentiment = dict(sentiment)
+                self._cached_sentiment_monotonic = time.monotonic()
+            return sentiment
         except Exception as e:
             print(f"Error getting market sentiment: {e}")
             return {}
@@ -612,6 +671,37 @@ class ForexDataService:
     def stop_streaming(self):
         """Stop the live data stream"""
         self.running = False
+
+    def get_runtime_stats(self) -> Dict[str, Any]:
+        """Return runtime diagnostics for ops endpoints."""
+        now = time.monotonic()
+        next_retry_in = 0.0
+        if self._next_rates_retry_monotonic > now:
+            next_retry_in = self._next_rates_retry_monotonic - now
+
+        return {
+            "running": bool(self.running),
+            "session_open": bool(self.session and not self.session.closed),
+            "latest_rates_count": len(self._latest_rates),
+            "latest_usd_base_count": len(self._latest_usd_base_rates),
+            "price_history_pairs": len(self._price_history),
+            "rates_cache_age_seconds": round(
+                self._cache_age_seconds(self._last_rates_fetch_monotonic), 3
+            ),
+            "rates_min_fetch_interval_seconds": self._min_rates_fetch_interval_seconds,
+            "rate_failure_streak": int(self._rate_failure_streak),
+            "next_rates_retry_in_seconds": round(next_retry_in, 3),
+            "news_cache_age_seconds": round(
+                self._cache_age_seconds(self._cached_news_monotonic), 3
+            ),
+            "news_cache_ttl_seconds": self._news_cache_ttl_seconds,
+            "sentiment_cache_age_seconds": round(
+                self._cache_age_seconds(self._cached_sentiment_monotonic), 3
+            ),
+            "sentiment_cache_ttl_seconds": self._sentiment_cache_ttl_seconds,
+            "forecast_cache_items": len(self._pair_forecast_cache),
+            "forecast_cache_ttl_seconds": self._pair_forecast_cache_ttl_seconds,
+        }
 
 
 # Global instance
