@@ -26,7 +26,7 @@ PHASE_1_STATUS = {
             "location": "app/security.py - verify_firebase_token()",
             "detail": "All endpoints use get_current_user_id() dependency"
         },
-        "Restrict CORS to Vercel domain": {
+        "Restrict CORS to frontend domain": {
             "status": "✓ COMPLETE",
             "location": "app/main.py - _get_cors_origins()",
             "detail": "CORS configured from CORS_ORIGINS env var"
@@ -36,7 +36,7 @@ PHASE_1_STATUS = {
             "location": "Procfile and run.py",
             "detail": "Uses os.getenv('PORT', 8080)"
         },
-        "Firebase authorized domains include Vercel": {
+        "Firebase authorized domains include frontend domain": {
             "status": "✓ COMPLETE",
             "location": "Firebase Console configuration",
             "detail": "FRONTEND_APP_URL environment variable"

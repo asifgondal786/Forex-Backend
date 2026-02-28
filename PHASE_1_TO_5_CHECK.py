@@ -17,9 +17,9 @@ phases = {
             "Replace localhost references: COMPLETE",
             "Use wss:// for WebSocket: COMPLETE",
             "Backend verifies Firebase ID tokens: COMPLETE",
-            "Restrict CORS to Vercel domain: COMPLETE",
+            "Restrict CORS to frontend domain: COMPLETE",
             "Railway start command uses $PORT: COMPLETE",
-            "Firebase authorized domains include Vercel: COMPLETE"
+            "Firebase authorized domains include frontend domain: COMPLETE"
         ]
     },
     "Phase 2": {
