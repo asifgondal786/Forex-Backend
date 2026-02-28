@@ -709,10 +709,6 @@ def _get_cors_origins():
         if frontend_app_url:
             origins.append(frontend_app_url)
 
-        vercel_url = _normalize_url(os.getenv("VERCEL_URL") or "")
-        if vercel_url:
-            origins.append(vercel_url)
-
         deduped: list[str] = []
         for origin in origins:
             if origin and origin not in deduped:
