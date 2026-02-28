@@ -13,6 +13,11 @@ Thumbs.db
 Backend/.env
 Frontend/.env
 
+# Service account / credentials files
+*firebase-adminsdk-*.json
+*service-account*.json
+*credentials*.json
+
 # Logs
 *.log
 firebase-debug.log
