@@ -301,6 +301,25 @@ async def lifespan(app: FastAPI):
                 f"[Firebase] Initialized via {status['credential_source']} "
                 f"(project_id={status['project_id']})"
             )
+            identity_payload = {
+                "event": "firebase_runtime_identity",
+                "credential_source": status.get("credential_source"),
+                "env_project_id": status.get("env_project_id"),
+                "app_project_id": status.get("app_project_id"),
+                "credential_project_id": status.get("credential_project_id"),
+                "project_id_match": status.get("project_id_match"),
+                "credential_client_email": status.get("credential_client_email"),
+            }
+            if status.get("credential_metadata_error"):
+                identity_payload["credential_metadata_error"] = status.get(
+                    "credential_metadata_error"
+                )
+            print(json.dumps(identity_payload))
+            if status.get("project_id_match") is False:
+                print(
+                    "[Firebase] WARNING: FIREBASE_PROJECT_ID does not match "
+                    "initialized Firebase app project."
+                )
         else:
             print("[Firebase] Not configured (no credentials found).")
             if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
