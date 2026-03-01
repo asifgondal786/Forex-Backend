@@ -15,7 +15,11 @@ from .services.mail_delivery_service import (
     sanitize_email,
     is_valid_email,
 )
-from .utils.firestore_client import init_firebase, get_firebase_config_status
+from .utils.firestore_client import (
+    get_firebase_config_status,
+    init_firebase,
+    is_firebase_admin_ready,
+)
 
 
 router = APIRouter(prefix="/auth", tags=["Public Auth"])
@@ -59,9 +63,20 @@ def _debug_enabled() -> bool:
     return (os.getenv("DEBUG") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _firebase_admin_credentials_available() -> bool:
+def _firebase_admin_runtime_state() -> tuple[bool, str]:
     source = (get_firebase_config_status().get("credential_source") or "").strip().lower()
-    return source in {"json_b64", "json", "path", "adc"}
+    if source not in {"json_b64", "json", "path", "adc"}:
+        return False, "Firebase Admin credentials are not configured."
+
+    ready, reason = is_firebase_admin_ready()
+    if ready:
+        return True, ""
+    return False, reason or "Firebase Admin initialization failed."
+
+
+def _firebase_admin_credentials_available() -> bool:
+    ready, _ = _firebase_admin_runtime_state()
+    return ready
 
 
 def _build_reset_email_content(reset_link: str) -> tuple[str, str, str]:
@@ -377,7 +392,15 @@ def _build_insufficient_permission_error(*, flow: str, exc: Exception) -> HTTPEx
         "service account has Firebase Admin access."
     )
     if _debug_enabled():
-        detail = f"{detail} ({exc})"
+        status = get_firebase_config_status()
+        diagnostic = (
+            f"credential_source={status.get('credential_source')}, "
+            f"env_project_id={status.get('env_project_id')}, "
+            f"app_project_id={status.get('app_project_id')}, "
+            f"project_id_match={status.get('project_id_match')}, "
+            f"initialized={status.get('initialized')}"
+        )
+        detail = f"{detail} [{diagnostic}] ({exc})"
     return HTTPException(status_code=503, detail=detail)
 
 
@@ -406,10 +429,6 @@ def _auth_link_timeout_seconds() -> float:
     if parsed <= 0:
         return 15.0
     return parsed
-
-
-def _has_password_reset_link_generator() -> bool:
-    return _firebase_admin_credentials_available() or _firebase_api_key_valid(_firebase_api_key())
 
 
 def _mail_delivery_http_error(exc: Exception, *, flow: str) -> HTTPException:
@@ -486,6 +505,49 @@ async def _generate_reset_link_via_rest(email: str) -> str:
                 raise RuntimeError(f"REST sendOobCode missing oobLink in response: {body}")
             _assert_action_link_redirect(link, flow="password_reset", expected_path="/reset")
             return link
+
+
+async def _generate_reset_link_with_rest_handling(email: str) -> tuple[str | None, bool]:
+    try:
+        link = await _generate_reset_link_via_rest(email)
+        return link, False
+    except Exception as rest_exc:
+        reason = str(rest_exc).lower()
+        if _is_unauthorized_domain_error(rest_exc):
+            continue_url = _resolve_reset_continue_url()
+            raise _build_unauthorized_domain_error(
+                flow="password reset",
+                continue_url=continue_url,
+                exc=rest_exc,
+            )
+        if _is_insufficient_permission_error(rest_exc):
+            raise _build_insufficient_permission_error(
+                flow="password reset",
+                exc=rest_exc,
+            )
+        if (
+            "api key not valid" in reason
+            or "api_key_invalid" in reason
+            or "missing or invalid for rest fallback" in reason
+        ):
+            detail = (
+                "FIREBASE_API_KEY is missing/invalid for password reset REST fallback."
+            )
+            if not _debug_enabled():
+                detail = "Password reset service is not configured."
+            raise HTTPException(status_code=503, detail=detail)
+        if _is_too_many_attempts_error(rest_exc):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many password reset attempts. Please wait a few minutes and try again.",
+            )
+        if "email_not_found" in reason or "user-not-found" in reason:
+            return None, True
+        debug_suffix = f" ({rest_exc})" if _debug_enabled() else ""
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to generate password reset link right now.{debug_suffix}",
+        )
 
 
 def _generate_reset_link(email: str) -> str:
@@ -587,88 +649,81 @@ async def request_password_reset(payload: PasswordResetRequest):
     if not is_valid_email(email):
         raise HTTPException(status_code=400, detail="Invalid email.")
 
-    if not _has_password_reset_link_generator():
+    admin_ready, admin_reason = _firebase_admin_runtime_state()
+    api_key_ready = _firebase_api_key_valid(_firebase_api_key())
+
+    if not admin_ready and not api_key_ready:
         detail = (
             "Password reset link service is not configured. Set Firebase Admin credentials "
             "or a valid FIREBASE_API_KEY."
         )
+        if _debug_enabled() and admin_reason:
+            detail = f"{detail} ({admin_reason})"
         if not _debug_enabled():
             detail = "Password reset service is not configured."
         raise HTTPException(status_code=503, detail=detail)
 
-    # Avoid user enumeration by returning a generic response for unknown users.
-    try:
-        reset_link = await asyncio.wait_for(
-            asyncio.to_thread(_generate_reset_link, email),
-            timeout=_auth_link_timeout_seconds(),
-        )
-    except firebase_auth.UserNotFoundError:
-        print(f"[AUTH] Password reset requested for unknown email: {email}")
-        debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
-        return PasswordResetResponse(
-            success=True,
-            message=_public_reset_message(),
-            debug=debug_payload,
-        )
-    except Exception as exc:
-        print(f"[AUTH] Password reset link generation failed for {email}: {exc!r}")
-        if isinstance(exc, asyncio.TimeoutError):
-            # Firebase Admin can be intermittently slow; try REST fallback before failing.
-            print("[AUTH] Password reset admin link timed out; attempting REST fallback.")
-        elif _is_unauthorized_domain_error(exc):
-            continue_url = _resolve_reset_continue_url()
-            raise _build_unauthorized_domain_error(
-                flow="password reset",
-                continue_url=continue_url,
-                exc=exc,
-            )
-        elif _is_insufficient_permission_error(exc):
-            raise _build_insufficient_permission_error(flow="password reset", exc=exc)
+    reset_link: str | None = None
+
+    if admin_ready:
+        # Avoid user enumeration by returning a generic response for unknown users.
         try:
-            reset_link = await _generate_reset_link_via_rest(email)
-            print("[AUTH] Password reset link generated via REST fallback.")
-        except Exception as rest_exc:
-            reason = str(rest_exc).lower()
-            if _is_unauthorized_domain_error(rest_exc):
+            reset_link = await asyncio.wait_for(
+                asyncio.to_thread(_generate_reset_link, email),
+                timeout=_auth_link_timeout_seconds(),
+            )
+        except firebase_auth.UserNotFoundError:
+            print(f"[AUTH] Password reset requested for unknown email: {email}")
+            debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
+            return PasswordResetResponse(
+                success=True,
+                message=_public_reset_message(),
+                debug=debug_payload,
+            )
+        except Exception as exc:
+            print(f"[AUTH] Password reset link generation failed for {email}: {exc!r}")
+            if isinstance(exc, asyncio.TimeoutError):
+                # Firebase Admin can be intermittently slow; try REST fallback before failing.
+                print("[AUTH] Password reset admin link timed out; attempting REST fallback.")
+            elif _is_unauthorized_domain_error(exc):
                 continue_url = _resolve_reset_continue_url()
                 raise _build_unauthorized_domain_error(
                     flow="password reset",
                     continue_url=continue_url,
-                    exc=rest_exc,
+                    exc=exc,
                 )
-            if _is_insufficient_permission_error(rest_exc):
-                raise _build_insufficient_permission_error(
-                    flow="password reset",
-                    exc=rest_exc,
-                )
-            if (
-                "api key not valid" in reason
-                or "api_key_invalid" in reason
-                or "missing or invalid for rest fallback" in reason
-            ):
-                detail = (
-                    "FIREBASE_API_KEY is missing/invalid for password reset REST fallback."
-                )
-                if not _debug_enabled():
-                    detail = "Password reset service is not configured."
-                raise HTTPException(status_code=503, detail=detail)
-            if _is_too_many_attempts_error(rest_exc):
-                raise HTTPException(
-                    status_code=429,
-                    detail="Too many password reset attempts. Please wait a few minutes and try again.",
-                )
-            if "email_not_found" in reason or "user-not-found" in reason:
+            elif _is_insufficient_permission_error(exc):
+                raise _build_insufficient_permission_error(flow="password reset", exc=exc)
+
+            reset_link, user_not_found = await _generate_reset_link_with_rest_handling(email)
+            if user_not_found:
                 debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
                 return PasswordResetResponse(
                     success=True,
                     message=_public_reset_message(),
                     debug=debug_payload,
                 )
-            debug_suffix = f" ({rest_exc})" if _debug_enabled() else ""
-            raise HTTPException(
-                status_code=500,
-                detail=f"Unable to generate password reset link right now.{debug_suffix}",
+            print("[AUTH] Password reset link generated via REST fallback.")
+    else:
+        print(
+            "[AUTH] Firebase Admin SDK not ready for password reset; using REST fallback. "
+            f"reason={admin_reason}"
+        )
+        reset_link, user_not_found = await _generate_reset_link_with_rest_handling(email)
+        if user_not_found:
+            debug_payload = {"result": "user_not_found"} if _debug_enabled() else None
+            return PasswordResetResponse(
+                success=True,
+                message=_public_reset_message(),
+                debug=debug_payload,
             )
+        print("[AUTH] Password reset link generated via REST fallback (admin unavailable).")
+
+    if not reset_link:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate password reset link right now.",
+        )
 
     frontend_reset_link = _build_frontend_action_url(
         action_link=reset_link,
@@ -718,11 +773,14 @@ async def request_email_verification(payload: EmailVerificationRequest):
     if not is_valid_email(email):
         raise HTTPException(status_code=400, detail="Invalid email.")
 
-    if not _firebase_admin_credentials_available():
+    admin_ready, admin_reason = _firebase_admin_runtime_state()
+    if not admin_ready:
         detail = (
             "Firebase Admin credentials are missing on backend. Configure "
             "FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON_B64."
         )
+        if _debug_enabled() and admin_reason:
+            detail = f"{detail} ({admin_reason})"
         if not _debug_enabled():
             detail = "Verification link service is not configured."
         raise HTTPException(status_code=503, detail=detail)

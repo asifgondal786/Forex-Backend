@@ -12,6 +12,7 @@ from google.auth.transport.requests import Request as GoogleAuthRequest
 
 
 _firebase_initialized = False
+_firebase_init_error = ""
 
 
 def _get_project_id() -> Optional[str]:
@@ -100,22 +101,30 @@ def _get_initialized_app_project_id() -> str:
 
 def init_firebase():
     global _firebase_initialized
+    global _firebase_init_error
     if _firebase_initialized:
         return
     if firebase_admin._apps:
         _firebase_initialized = True
+        _firebase_init_error = ""
         return
 
-    cred = _get_credentials()
-    project_id = _get_project_id()
-    options = {"projectId": project_id} if project_id else None
+    try:
+        cred = _get_credentials()
+        project_id = _get_project_id()
+        options = {"projectId": project_id} if project_id else None
 
-    if options:
-        firebase_admin.initialize_app(cred, options)
-    else:
-        firebase_admin.initialize_app(cred)
+        if options:
+            firebase_admin.initialize_app(cred, options)
+        else:
+            firebase_admin.initialize_app(cred)
 
-    _firebase_initialized = True
+        _firebase_initialized = True
+        _firebase_init_error = ""
+    except Exception as exc:
+        _firebase_initialized = False
+        _firebase_init_error = f"{type(exc).__name__}: {exc}"[:240]
+        raise
 
 
 def get_firestore_client():
@@ -158,13 +167,46 @@ def get_firebase_config_status() -> dict:
         "app_project_id": app_project_id,
         "credential_project_id": credential_project_id,
         "credential_client_email": _mask_email(credential_client_email),
+        "has_service_account_json_b64": bool(
+            (os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON_B64") or "").strip()
+        ),
+        "has_service_account_json": bool(
+            (os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") or "").strip()
+        ),
+        "has_service_account_path": bool(
+            (os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "").strip()
+        ),
         "initialized": initialized,
     }
     if project_id_match is not None:
         status["project_id_match"] = project_id_match
     if credential_metadata_error:
         status["credential_metadata_error"] = credential_metadata_error
+    if _firebase_init_error:
+        status["init_error"] = _firebase_init_error
     return status
+
+
+def is_firebase_admin_ready() -> tuple[bool, str]:
+    try:
+        init_firebase()
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+    status = get_firebase_config_status()
+    app_project_id = (status.get("app_project_id") or "").strip()
+    env_project_id = (status.get("env_project_id") or "").strip()
+
+    if not app_project_id:
+        return False, "Firebase app initialized without project_id."
+
+    if env_project_id and env_project_id != app_project_id:
+        return (
+            False,
+            f"Firebase project mismatch (env={env_project_id}, app={app_project_id}).",
+        )
+
+    return True, ""
 
 
 def get_firebase_auth_project_config(timeout_seconds: int = 10) -> dict:

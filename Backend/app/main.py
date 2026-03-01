@@ -291,11 +291,14 @@ async def lifespan(app: FastAPI):
 
     # Firebase Admin SDK startup health check
     firebase_initialized = False
+    firebase_status_snapshot = {}
     try:
         status = get_firebase_config_status()
+        firebase_status_snapshot = status
         if status["credential_source"] != "none":
             init_firebase()
             status = get_firebase_config_status()
+            firebase_status_snapshot = status
             firebase_initialized = True
             print(
                 f"[Firebase] Initialized via {status['credential_source']} "
@@ -309,11 +312,16 @@ async def lifespan(app: FastAPI):
                 "credential_project_id": status.get("credential_project_id"),
                 "project_id_match": status.get("project_id_match"),
                 "credential_client_email": status.get("credential_client_email"),
+                "has_service_account_json_b64": status.get("has_service_account_json_b64"),
+                "has_service_account_json": status.get("has_service_account_json"),
+                "has_service_account_path": status.get("has_service_account_path"),
             }
             if status.get("credential_metadata_error"):
                 identity_payload["credential_metadata_error"] = status.get(
                     "credential_metadata_error"
                 )
+            if status.get("init_error"):
+                identity_payload["init_error"] = status.get("init_error")
             print(json.dumps(identity_payload))
             if status.get("project_id_match") is False:
                 print(
@@ -322,10 +330,38 @@ async def lifespan(app: FastAPI):
                 )
         else:
             print("[Firebase] Not configured (no credentials found).")
+            print(
+                json.dumps(
+                    {
+                        "event": "firebase_runtime_identity",
+                        "credential_source": status.get("credential_source"),
+                        "env_project_id": status.get("env_project_id"),
+                        "has_service_account_json_b64": status.get("has_service_account_json_b64"),
+                        "has_service_account_json": status.get("has_service_account_json"),
+                        "has_service_account_path": status.get("has_service_account_path"),
+                    }
+                )
+            )
             if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
                 raise RuntimeError("Firebase configuration required but not found.")
     except Exception as exc:
         print(f"[Firebase] Startup check failed: {exc}")
+        if firebase_status_snapshot:
+            print(
+                json.dumps(
+                    {
+                        "event": "firebase_runtime_identity",
+                        "credential_source": firebase_status_snapshot.get("credential_source"),
+                        "env_project_id": firebase_status_snapshot.get("env_project_id"),
+                        "app_project_id": firebase_status_snapshot.get("app_project_id"),
+                        "project_id_match": firebase_status_snapshot.get("project_id_match"),
+                        "has_service_account_json_b64": firebase_status_snapshot.get("has_service_account_json_b64"),
+                        "has_service_account_json": firebase_status_snapshot.get("has_service_account_json"),
+                        "has_service_account_path": firebase_status_snapshot.get("has_service_account_path"),
+                        "init_error": firebase_status_snapshot.get("init_error"),
+                    }
+                )
+            )
         if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
             raise
     
