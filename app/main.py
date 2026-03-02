@@ -142,6 +142,8 @@ def _startup_snapshot() -> dict:
         "cors_origins": _get_cors_origins(),
         "cors_allow_credentials": _cors_allow_credentials,
         "cors_allow_all": _cors_allow_all,
+        "csp_enabled": _env_bool("ENABLE_CSP", True),
+        "csp_report_only": _env_bool("CSP_REPORT_ONLY", False),
         "has_brevo_api_key": bool((os.getenv("BREVO_API_KEY") or "").strip()),
         "has_mailjet_api_key": bool((os.getenv("MAILJET_API_KEY") or "").strip()),
         "has_firebase_api_key": bool((os.getenv("FIREBASE_API_KEY") or "").strip()),
@@ -521,6 +523,127 @@ def _derive_success_message(payload: Any) -> str:
     return "OK"
 
 
+def _split_csv_values(raw: str) -> list[str]:
+    return [value.strip() for value in (raw or "").split(",") if value.strip()]
+
+
+def _dedupe_values(values: list[str]) -> list[str]:
+    unique: list[str] = []
+    for value in values:
+        if value and value not in unique:
+            unique.append(value)
+    return unique
+
+
+def _origin_to_ws_source(origin: str) -> str:
+    parsed = urlparse(_normalize_url(origin))
+    scheme = (parsed.scheme or "").lower()
+    host = parsed.netloc or ""
+    if not host:
+        return ""
+    if scheme == "https":
+        return f"wss://{host}"
+    if scheme == "http":
+        return f"ws://{host}"
+    return ""
+
+
+def _csp_connect_sources() -> list[str]:
+    sources = ["'self'"]
+    origins = _get_cors_origins()
+
+    if "*" in origins:
+        # Keep wildcard mode dev-only and protocol-scoped for CSP.
+        sources.extend(["https:", "http:", "wss:", "ws:"])
+        return _dedupe_values(sources)
+
+    normalized_origins = [_normalize_url(origin) for origin in origins if origin and origin != "*"]
+    normalized_origins = [origin for origin in normalized_origins if origin]
+    sources.extend(normalized_origins)
+    sources.extend(
+        [
+            ws_source
+            for ws_source in (_origin_to_ws_source(origin) for origin in normalized_origins)
+            if ws_source
+        ]
+    )
+    return _dedupe_values(sources)
+
+
+def _serialize_csp_directives(directives: dict[str, list[str]]) -> str:
+    parts: list[str] = []
+    for directive, values in directives.items():
+        cleaned = _dedupe_values([value.strip() for value in values if value and value.strip()])
+        if cleaned:
+            parts.append(f"{directive} {' '.join(cleaned)}")
+    return "; ".join(parts)
+
+
+def _build_csp_header(*, docs_mode: bool) -> str:
+    explicit = (
+        os.getenv("CSP_HEADER_OVERRIDE")
+        or os.getenv("CSP_OVERRIDE")
+        or ""
+    ).strip()
+    if explicit:
+        return explicit
+
+    if _is_development_environment() and _env_bool("CSP_DEV_LOOSE", False):
+        return (
+            "default-src * data: blob:; "
+            "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; "
+            "style-src * 'unsafe-inline'; "
+            "img-src * data: blob:; "
+            "font-src * data:; "
+            "connect-src * ws: wss:;"
+        )
+
+    directives: dict[str, list[str]] = {
+        "default-src": ["'self'"],
+        "base-uri": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "form-action": ["'self'"],
+        "connect-src": _csp_connect_sources(),
+        "img-src": ["'self'", "data:"],
+        "font-src": ["'self'", "data:"],
+    }
+
+    if docs_mode:
+        directives["script-src"] = [
+            "'self'",
+            "https://cdn.jsdelivr.net",
+            "'unsafe-inline'",
+        ]
+        directives["style-src"] = [
+            "'self'",
+            "https://cdn.jsdelivr.net",
+            "'unsafe-inline'",
+        ]
+        directives["img-src"].append("https://fastapi.tiangolo.com")
+    else:
+        directives["script-src"] = ["'self'"]
+        directives["style-src"] = ["'self'"]
+
+    return _serialize_csp_directives(directives)
+
+
+def _is_docs_route(path: str) -> bool:
+    return (
+        path == "/docs"
+        or path == "/redoc"
+        or path == "/openapi.json"
+        or path.startswith("/docs/")
+        or path.startswith("/redoc/")
+    )
+
+
+def _csp_header_name() -> str:
+    if _env_bool("CSP_REPORT_ONLY", False):
+        return "Content-Security-Policy-Report-Only"
+    return "Content-Security-Policy"
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     detail = exc.detail
@@ -632,7 +755,14 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     if _env_bool("ENABLE_CSP", True):
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none';"
+        csp_header_name = _csp_header_name()
+        existing_csp = (
+            response.headers.get("Content-Security-Policy")
+            or response.headers.get("Content-Security-Policy-Report-Only")
+        )
+        if not existing_csp:
+            csp_header_value = _build_csp_header(docs_mode=_is_docs_route(request.url.path))
+            response.headers[csp_header_name] = csp_header_value
     if _env_bool("ENABLE_HSTS", not _env_bool("DEBUG", False)):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith("/api"):
