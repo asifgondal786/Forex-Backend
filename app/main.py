@@ -41,6 +41,17 @@ def _env_int(name: str, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def _current_environment() -> str:
+    explicit = (os.getenv("ENVIRONMENT") or "").strip().lower()
+    if explicit:
+        return explicit
+    return "development" if _env_bool("DEBUG", False) else "production"
+
+
+def _is_development_environment() -> bool:
+    return _current_environment() in {"dev", "development", "local", "test", "testing"}
+
+
 def _normalize_url(value: str) -> str:
     candidate = (value or "").strip()
     if not candidate:
@@ -118,6 +129,7 @@ def _redact(value: str, *, keep: int = 4) -> str:
 
 def _startup_snapshot() -> dict:
     return {
+        "environment": _current_environment(),
         "debug": _env_bool("DEBUG", False),
         "email_provider": (os.getenv("EMAIL_PROVIDER") or "auto").strip().lower(),
         "frontend_app_url": _normalize_url(os.getenv("FRONTEND_APP_URL") or ""),
@@ -128,6 +140,8 @@ def _startup_snapshot() -> dict:
             os.getenv("EMAIL_VERIFICATION_CONTINUE_URL") or ""
         ),
         "cors_origins": _get_cors_origins(),
+        "cors_allow_credentials": _cors_allow_credentials,
+        "cors_allow_all": _cors_allow_all,
         "has_brevo_api_key": bool((os.getenv("BREVO_API_KEY") or "").strip()),
         "has_mailjet_api_key": bool((os.getenv("MAILJET_API_KEY") or "").strip()),
         "has_firebase_api_key": bool((os.getenv("FIREBASE_API_KEY") or "").strip()),
@@ -149,7 +163,7 @@ def _startup_snapshot() -> dict:
 
 
 def _validate_env_urls() -> None:
-    if _env_bool("DEBUG", False):
+    if _is_development_environment():
         return
 
     for key in [
@@ -163,9 +177,20 @@ def _validate_env_urls() -> None:
         if not _is_https_url(value):
             raise RuntimeError(f"{key} must use HTTPS in production.")
 
+    if _env_bool("CORS_ALLOW_ALL", False):
+        raise RuntimeError("CORS_ALLOW_ALL must be disabled in production.")
+
+    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST_IN_PRODUCTION", True)
     for origin in _get_cors_origins():
+        if origin == "*":
+            raise RuntimeError("Wildcard CORS origin is not allowed in production.")
         if _is_local_origin(origin):
-            raise RuntimeError("CORS_ORIGINS must not include localhost in production.")
+            if not allow_localhost:
+                raise RuntimeError(
+                    "Localhost CORS origins are disabled in production by "
+                    "CORS_ALLOW_LOCALHOST_IN_PRODUCTION=false."
+                )
+            continue
         if not _is_https_url(origin):
             raise RuntimeError(f"CORS origin must use HTTPS in production: {origin}")
 
@@ -291,22 +316,77 @@ async def lifespan(app: FastAPI):
 
     # Firebase Admin SDK startup health check
     firebase_initialized = False
+    firebase_status_snapshot = {}
     try:
         status = get_firebase_config_status()
+        firebase_status_snapshot = status
         if status["credential_source"] != "none":
             init_firebase()
             status = get_firebase_config_status()
+            firebase_status_snapshot = status
             firebase_initialized = True
             print(
                 f"[Firebase] Initialized via {status['credential_source']} "
                 f"(project_id={status['project_id']})"
             )
+            identity_payload = {
+                "event": "firebase_runtime_identity",
+                "credential_source": status.get("credential_source"),
+                "env_project_id": status.get("env_project_id"),
+                "app_project_id": status.get("app_project_id"),
+                "credential_project_id": status.get("credential_project_id"),
+                "project_id_match": status.get("project_id_match"),
+                "credential_client_email": status.get("credential_client_email"),
+                "has_service_account_json_b64": status.get("has_service_account_json_b64"),
+                "has_service_account_json": status.get("has_service_account_json"),
+                "has_service_account_path": status.get("has_service_account_path"),
+            }
+            if status.get("credential_metadata_error"):
+                identity_payload["credential_metadata_error"] = status.get(
+                    "credential_metadata_error"
+                )
+            if status.get("init_error"):
+                identity_payload["init_error"] = status.get("init_error")
+            print(json.dumps(identity_payload))
+            if status.get("project_id_match") is False:
+                print(
+                    "[Firebase] WARNING: FIREBASE_PROJECT_ID does not match "
+                    "initialized Firebase app project."
+                )
         else:
             print("[Firebase] Not configured (no credentials found).")
+            print(
+                json.dumps(
+                    {
+                        "event": "firebase_runtime_identity",
+                        "credential_source": status.get("credential_source"),
+                        "env_project_id": status.get("env_project_id"),
+                        "has_service_account_json_b64": status.get("has_service_account_json_b64"),
+                        "has_service_account_json": status.get("has_service_account_json"),
+                        "has_service_account_path": status.get("has_service_account_path"),
+                    }
+                )
+            )
             if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
                 raise RuntimeError("Firebase configuration required but not found.")
     except Exception as exc:
         print(f"[Firebase] Startup check failed: {exc}")
+        if firebase_status_snapshot:
+            print(
+                json.dumps(
+                    {
+                        "event": "firebase_runtime_identity",
+                        "credential_source": firebase_status_snapshot.get("credential_source"),
+                        "env_project_id": firebase_status_snapshot.get("env_project_id"),
+                        "app_project_id": firebase_status_snapshot.get("app_project_id"),
+                        "project_id_match": firebase_status_snapshot.get("project_id_match"),
+                        "has_service_account_json_b64": firebase_status_snapshot.get("has_service_account_json_b64"),
+                        "has_service_account_json": firebase_status_snapshot.get("has_service_account_json"),
+                        "has_service_account_path": firebase_status_snapshot.get("has_service_account_path"),
+                        "init_error": firebase_status_snapshot.get("init_error"),
+                    }
+                )
+            )
         if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
             raise
     
@@ -581,6 +661,11 @@ _auth_rate_limited_paths = {
     "/auth/login",
     "/auth/signup",
 }
+_public_unauthenticated_auth_paths = {
+    "/auth/password-reset",
+    "/auth/email-verification",
+    "/auth/email-provider-status",
+}
 
 
 @app.middleware("http")
@@ -672,6 +757,9 @@ async def strict_auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     path = request.url.path
+    if path in _public_unauthenticated_auth_paths:
+        return await call_next(request)
+
     if path.startswith("/api"):
         try:
             await verify_http_request(request)
@@ -692,72 +780,108 @@ async def strict_auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 # CORS
-def _get_cors_origins():
-    if _env_bool("CORS_ALLOW_ALL"):
-        return ["*"]
-    raw = os.getenv("CORS_ORIGINS", "")
-    debug_mode = _env_bool("DEBUG", False)
-    if raw:
-        origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-        if not debug_mode:
-            origins = [origin for origin in origins if not _is_local_origin(origin)]
-        return origins
-    if not debug_mode:
-        # Production default: restrict to explicitly configured frontend origin(s).
-        origins: list[str] = []
-        frontend_app_url = _normalize_url(os.getenv("FRONTEND_APP_URL") or "")
-        if frontend_app_url:
-            origins.append(frontend_app_url)
+_FRONTEND_PROD_ORIGIN = "https://forexcompanion-e5a28.web.app"
+_FRONTEND_DEV_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "http://localhost:8080",
+]
 
-        deduped: list[str] = []
-        for origin in origins:
-            if origin and origin not in deduped:
-                deduped.append(origin)
-        return deduped
-    # Local dev defaults
-    return [
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
+
+def _split_csv(raw: str) -> list[str]:
+    return [value.strip() for value in (raw or "").split(",") if value.strip()]
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    unique: list[str] = []
+    for value in values:
+        if value and value not in unique:
+            unique.append(value)
+    return unique
+
+
+def _parse_origin_list(raw: str) -> list[str]:
+    parsed = [_normalize_url(value) for value in _split_csv(raw)]
+    return _dedupe([value for value in parsed if value])
+
+
+def _default_cors_origins() -> list[str]:
+    frontend_prod = (
+        _normalize_url(os.getenv("FRONTEND_APP_URL") or "")
+        or _normalize_url(os.getenv("FRONTEND_PROD_URL") or "")
+        or _FRONTEND_PROD_ORIGIN
+    )
+    origins: list[str] = [frontend_prod, *_FRONTEND_DEV_ORIGINS]
+    origins.extend(_parse_origin_list(os.getenv("CORS_EXTRA_ORIGINS") or ""))
+    return _dedupe([value for value in origins if value])
+
+
+def _get_cors_origins() -> list[str]:
+    origins = _default_cors_origins()
+    origins.extend(_parse_origin_list(os.getenv("CORS_ORIGINS") or ""))
+    return _dedupe(origins)
+
 
 def _get_cors_origin_regex() -> str | None:
-    if _env_bool("CORS_ALLOW_ALL"):
-        return None
-    explicit = os.getenv("CORS_ORIGIN_REGEX", "").strip()
-    debug_mode = _env_bool("DEBUG", False)
-    allow_localhost = _env_bool("CORS_ALLOW_LOCALHOST", True)
-    localhost_pattern = r"^https?://(localhost|127[.]0[.]0[.]1)(:[0-9]+)?$"
+    explicit = (
+        os.getenv("CORS_ALLOWED_ORIGIN_REGEX")
+        or os.getenv("CORS_ORIGIN_REGEX")
+        or ""
+    ).strip()
+    return explicit or None
 
+
+def _get_cors_allow_methods() -> list[str]:
+    explicit = [value.upper() for value in _split_csv(os.getenv("CORS_ALLOW_METHODS") or "")]
     if explicit:
-        if debug_mode and allow_localhost:
-            # In local development, always allow localhost random dev ports even when
-            # an explicit regex is provided.
-            return f"(?:{explicit})|(?:{localhost_pattern})"
-        return explicit
+        return _dedupe(explicit)
+    return ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
-    if not debug_mode:
-        return None
-    # Default to allowing localhost/127.0.0.1 any port for dev tooling
-    # (Flutter web, Vite, React, etc). Can be disabled via CORS_ALLOW_LOCALHOST=false.
-    if allow_localhost:
-        return localhost_pattern
-    return None
 
-_cors_allow_all = _env_bool("CORS_ALLOW_ALL")
-_cors_allow_credentials = _env_bool("CORS_ALLOW_CREDENTIALS") and not _cors_allow_all
-_cors_origin_regex = _get_cors_origin_regex()
+def _get_cors_allow_headers() -> list[str]:
+    explicit = _split_csv(os.getenv("CORS_ALLOW_HEADERS") or "")
+    if explicit:
+        return _dedupe(explicit)
+    return [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "User-Agent",
+        "X-Request-ID",
+        "X-User-Id",
+        "X-Dev-Auth",
+    ]
+
+
+def _get_cors_expose_headers() -> list[str]:
+    explicit = _split_csv(os.getenv("CORS_EXPOSE_HEADERS") or "")
+    if explicit:
+        return _dedupe(explicit)
+    return ["X-Request-ID"]
+
+
+def _get_cors_allow_all() -> bool:
+    if not _env_bool("CORS_ALLOW_ALL", False):
+        return False
+    if _is_development_environment():
+        return True
+    print("[CORS] Warning: CORS_ALLOW_ALL=true ignored outside development.")
+    return False
+
+
+_cors_allow_all = _get_cors_allow_all()
+_cors_allow_credentials = _env_bool("CORS_ALLOW_CREDENTIALS", True) and not _cors_allow_all
+_cors_origins = ["*"] if _cors_allow_all else _get_cors_origins()
+_cors_origin_regex = None if _cors_allow_all else _get_cors_origin_regex()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_get_cors_origins(),
+    allow_origins=_cors_origins,
     allow_credentials=_cors_allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=_get_cors_allow_methods(),
+    allow_headers=_get_cors_allow_headers(),
+    expose_headers=_get_cors_expose_headers(),
     allow_origin_regex=_cors_origin_regex,
     max_age=_env_int("CORS_MAX_AGE_SECONDS", 86400),
 )
