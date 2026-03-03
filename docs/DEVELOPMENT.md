@@ -66,6 +66,9 @@ Bash:
 ./scripts/business-ops-check.sh
 ```
 
+Phase 12 note:
+- The monthly business ops check now validates Phase 12 strategy and tracker files as required artifacts.
+
 ## Run Backend
 
 ```powershell

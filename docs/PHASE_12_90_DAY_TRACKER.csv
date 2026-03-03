@@ -1,0 +1,4 @@
+period,path,milestone,owner,due_date,status,metric,notes
+2026-03,TBD,Complete decision scorecard and board memo,CEO,2026-03-10,Open,decision_complete,initial milestone
+2026-03,TBD,Publish selected 90-day path plan,COO,2026-03-15,Open,plan_published,initial milestone
+2026-03,TBD,Run day-30 checkpoint,CEO,2026-04-02,Open,checkpoint_30d,initial milestone
