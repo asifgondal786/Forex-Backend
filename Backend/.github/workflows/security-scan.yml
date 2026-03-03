@@ -1,0 +1,68 @@
+name: Security Scan
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Scan Current Tree For Secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          SECRET_REGEX='(AIza[0-9A-Za-z_-]{20,}|xkeysib-[A-Za-z0-9-]{20,}|-----BEGIN[[:space:]]+PRIVATE[[:space:]]+KEY-----)'
+          if git ls-files | grep -E -v '(^docs/|\.md$|^\.venv/|^venv/|^__pycache__/|^firebase-debug\.log$)' | xargs -r grep -nE "$SECRET_REGEX"; then
+            echo "Potential secrets found in tracked files."
+            exit 1
+          fi
+          echo "No secret signatures detected in tracked files."
+
+      - name: Scan Git History For Secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          HISTORY_REGEX='AIza[0-9A-Za-z_-]{20,}|xkeysib-[A-Za-z0-9-]{20,}|BEGIN[[:space:]]+PRIVATE[[:space:]]+KEY'
+          if git log --all -p -G "$HISTORY_REGEX" --max-count=1 | grep -q '^commit '; then
+            echo "Potential secret signature found in git history."
+            exit 1
+          fi
+          echo "No secret signatures detected in recent git history scan."
+
+      - name: Validate Environment Configuration (Development Profile)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .env.development .env
+          python -m app.config.validate_env --json
+          rm -f .env
+
+      - name: Run Config Validation Tests
+        run: |
+          python -m pytest -q tests/test_env_validation.py
+
+      - name: Dependency Vulnerability Scan (Safety)
+        continue-on-error: true
+        run: |
+          python -m pip install safety
+          safety check --full-report

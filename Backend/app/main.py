@@ -14,13 +14,22 @@ import time
 import json
 import uuid
 import asyncio
+import logging
 from collections import defaultdict, deque
 from urllib.parse import urlparse
 from dotenv import load_dotenv
+from .config.audit import log_config_snapshot
+from .config.index import get_config, startup_snapshot as config_startup_snapshot
+from .config.logging import setup_logging
+from .config.validate_env import log_payload as env_validation_log_payload
+from .config.validate_env import validate_environment
 
 # Load environment variables from Backend/.env if present.
 # override=True ensures local .env values win over accidental shell-level vars.
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
+setup_logging()
+logger = logging.getLogger("app.main")
+rate_limit_logger = logging.getLogger("rate_limit")
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -128,40 +137,61 @@ def _redact(value: str, *, keep: int = 4) -> str:
 
 
 def _startup_snapshot() -> dict:
-    return {
-        "environment": _current_environment(),
-        "debug": _env_bool("DEBUG", False),
-        "email_provider": (os.getenv("EMAIL_PROVIDER") or "auto").strip().lower(),
-        "frontend_app_url": _normalize_url(os.getenv("FRONTEND_APP_URL") or ""),
-        "password_reset_continue_url": _normalize_url(
-            os.getenv("PASSWORD_RESET_CONTINUE_URL") or ""
-        ),
-        "email_verification_continue_url": _normalize_url(
-            os.getenv("EMAIL_VERIFICATION_CONTINUE_URL") or ""
-        ),
-        "cors_origins": _get_cors_origins(),
-        "cors_allow_credentials": _cors_allow_credentials,
-        "cors_allow_all": _cors_allow_all,
-        "csp_enabled": _env_bool("ENABLE_CSP", True),
-        "csp_report_only": _env_bool("CSP_REPORT_ONLY", False),
-        "has_brevo_api_key": bool((os.getenv("BREVO_API_KEY") or "").strip()),
-        "has_mailjet_api_key": bool((os.getenv("MAILJET_API_KEY") or "").strip()),
-        "has_firebase_api_key": bool((os.getenv("FIREBASE_API_KEY") or "").strip()),
-        "firebase_project_id": (os.getenv("FIREBASE_PROJECT_ID") or "").strip(),
-        "api_base_url_hint": _normalize_url(os.getenv("API_BASE_URL") or ""),
-        "firebase_auth_domain_check_enabled": _env_bool(
-            "FIREBASE_AUTH_DOMAIN_CHECK_ENABLED",
-            True,
-        ),
-        "firebase_auth_domain_check_fail_fast": _env_bool(
-            "FIREBASE_AUTH_DOMAIN_CHECK_FAIL_FAST",
-            not _env_bool("DEBUG", False),
-        ),
-        "redacted_service_account_path": _redact(
-            os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "",
-            keep=8,
-        ),
-    }
+    config = get_config()
+    snapshot = config_startup_snapshot(config)
+    snapshot.update(
+        {
+            "cors_origins": _get_cors_origins(),
+            "cors_allow_credentials": _cors_allow_credentials,
+            "cors_allow_all": _cors_allow_all,
+            "csp_report_only": _env_bool("CSP_REPORT_ONLY", False),
+            "has_mailjet_api_key": bool((os.getenv("MAILJET_API_KEY") or "").strip()),
+            "api_base_url_hint": _normalize_url(os.getenv("API_BASE_URL") or ""),
+            "redacted_service_account_path": _redact(
+                os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "",
+                keep=8,
+            ),
+        }
+    )
+    return snapshot
+
+
+def _init_sentry_if_configured() -> None:
+    config = get_config()
+    if not config.runtime.is_production:
+        return
+    if not config.monitoring.sentry_dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+        sentry_sdk.init(
+            dsn=config.monitoring.sentry_dsn,
+            integrations=[FastApiIntegration()],
+            traces_sample_rate=config.monitoring.sentry_traces_sample_rate,
+            environment=config.runtime.environment,
+            release=config.monitoring.app_release or None,
+        )
+        logger.info(
+            json.dumps(
+                {
+                    "event": "sentry_initialized",
+                    "environment": config.runtime.environment,
+                    "release": config.monitoring.app_release,
+                    "traces_sample_rate": config.monitoring.sentry_traces_sample_rate,
+                }
+            )
+        )
+    except Exception as exc:
+        logger.warning(
+            json.dumps(
+                {
+                    "event": "sentry_init_failed",
+                    "error": str(exc),
+                }
+            )
+        )
 
 
 def _validate_env_urls() -> None:
@@ -282,30 +312,50 @@ from .security import verify_http_request
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events"""
-    print("=" * 60)
-    print("[Startup] Forex Companion AI Backend Starting...")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("[Startup] Forex Companion AI Backend Starting...")
+    logger.info("=" * 60)
     
     try:
         public_api_base = _public_api_base_url()
-        print(f"[Startup] WebSocket: {_public_ws_endpoint()}")
-        print(f"[Startup] API Docs: {f'{public_api_base}/docs' if public_api_base else '/docs'}")
-        print(f"[Startup] AI Engine: {'ACTIVE' if AI_ROUTES_AVAILABLE else 'DISABLED'}")
-        print(f"[Startup] Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
+        logger.info(f"[Startup] WebSocket: {_public_ws_endpoint()}")
+        logger.info(f"[Startup] API Docs: {f'{public_api_base}/docs' if public_api_base else '/docs'}")
+        logger.info(f"[Startup] AI Engine: {'ACTIVE' if AI_ROUTES_AVAILABLE else 'DISABLED'}")
+        logger.info(f"[Startup] Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
     except Exception as e:
-        print(f"[Startup] Warning: Could not print startup info: {e}")
+        logger.warning(f"[Startup] Warning: Could not print startup info: {e}")
     
-    print("=" * 60)
+    logger.info("=" * 60)
+
+    # Configure optional monitoring integrations.
+    _init_sentry_if_configured()
+
+    # Structured environment validation (no secret values in logs).
+    try:
+        env_validation_result = validate_environment()
+        payload = env_validation_log_payload(env_validation_result)
+        if env_validation_result.errors:
+            logger.error(json.dumps(payload))
+        elif env_validation_result.warnings:
+            logger.warning(json.dumps(payload))
+        else:
+            logger.info(json.dumps(payload))
+        if env_validation_result.errors and get_config().runtime.validation_fail_fast:
+            raise RuntimeError("Environment validation failed with one or more errors.")
+    except Exception as e:
+        logger.error(f"[Startup] ERROR: Environment validation failed: {e}")
+        if get_config().runtime.validation_fail_fast:
+            raise
 
     # Fail fast on invalid production URL configuration (graceful).
     try:
         _validate_env_urls()
     except Exception as e:
-        print(f"[Startup] Warning: URL validation failed (non-blocking): {e}")
+        logger.warning(f"[Startup] Warning: URL validation failed (non-blocking): {e}")
 
     # Startup checklist (no secrets / redacted).
     try:
-        print(
+        logger.info(
             json.dumps(
                 {
                     "event": "startup_checklist",
@@ -313,8 +363,9 @@ async def lifespan(app: FastAPI):
                 }
             )
         )
+        log_config_snapshot(get_config())
     except Exception as e:
-        print(f"[Startup] Warning: Could not generate startup snapshot: {e}")
+        logger.warning(f"[Startup] Warning: Could not generate startup snapshot: {e}")
 
     # Firebase Admin SDK startup health check
     firebase_initialized = False
@@ -327,7 +378,7 @@ async def lifespan(app: FastAPI):
             status = get_firebase_config_status()
             firebase_status_snapshot = status
             firebase_initialized = True
-            print(
+            logger.info(
                 f"[Firebase] Initialized via {status['credential_source']} "
                 f"(project_id={status['project_id']})"
             )
@@ -349,15 +400,15 @@ async def lifespan(app: FastAPI):
                 )
             if status.get("init_error"):
                 identity_payload["init_error"] = status.get("init_error")
-            print(json.dumps(identity_payload))
+            logger.info(json.dumps(identity_payload))
             if status.get("project_id_match") is False:
-                print(
+                logger.warning(
                     "[Firebase] WARNING: FIREBASE_PROJECT_ID does not match "
                     "initialized Firebase app project."
                 )
         else:
-            print("[Firebase] Not configured (no credentials found).")
-            print(
+            logger.warning("[Firebase] Not configured (no credentials found).")
+            logger.info(
                 json.dumps(
                     {
                         "event": "firebase_runtime_identity",
@@ -372,9 +423,9 @@ async def lifespan(app: FastAPI):
             if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
                 raise RuntimeError("Firebase configuration required but not found.")
     except Exception as exc:
-        print(f"[Firebase] Startup check failed: {exc}")
+        logger.error(f"[Firebase] Startup check failed: {exc}")
         if firebase_status_snapshot:
-            print(
+            logger.info(
                 json.dumps(
                     {
                         "event": "firebase_runtime_identity",
@@ -408,7 +459,7 @@ async def lifespan(app: FastAPI):
         health_checker.register_check("redis", check_redis)
         health_checker.register_check("firestore", check_firestore)
     except Exception as e:
-        print(f"[Startup] Warning: Could not register health checks: {e}")
+        logger.warning(f"[Startup] Warning: Could not register health checks: {e}")
 
     # Optional startup guard for Firebase Auth Authorized Domains.
     if firebase_initialized and _env_bool("FIREBASE_AUTH_DOMAIN_CHECK_ENABLED", True):
@@ -438,7 +489,7 @@ async def lifespan(app: FastAPI):
                     log_payload["authorized_domains"] = (
                         domain_check.get("authorized_domains") or []
                     )
-                print(json.dumps(log_payload))
+                logger.info(json.dumps(log_payload))
 
                 if not domain_check.get("authorized"):
                     message = (
@@ -448,11 +499,11 @@ async def lifespan(app: FastAPI):
                     )
                     if check_fail_fast:
                         raise RuntimeError(message)
-                    print(f"[Firebase] WARNING: {message}")
+                    logger.warning(f"[Firebase] WARNING: {message}")
             except Exception as exc:
                 if check_fail_fast:
                     raise
-                print(f"[Firebase] WARNING: Authorized-domain check skipped: {exc}")
+                logger.warning(f"[Firebase] WARNING: Authorized-domain check skipped: {exc}")
     
     forex_stream_enabled = os.getenv("FOREX_STREAM_ENABLED", "false").lower() == "true"
     forex_stream_interval = _env_int("FOREX_STREAM_INTERVAL", 10)
@@ -470,9 +521,9 @@ async def lifespan(app: FastAPI):
                 timeout=10.0  # 10 second timeout
             )
         except asyncio.TimeoutError:
-            print("[Startup] WARNING: Task queue startup timed out (non-blocking)")
+            logger.warning("[Startup] WARNING: Task queue startup timed out (non-blocking)")
         except Exception as e:
-            print(f"[Startup] WARNING: Task queue startup failed: {e}")
+            logger.warning(f"[Startup] WARNING: Task queue startup failed: {e}")
 
     if forex_stream_enabled:
         try:
@@ -481,9 +532,9 @@ async def lifespan(app: FastAPI):
                 timeout=10.0  # 10 second timeout
             )
         except asyncio.TimeoutError:
-            print("[Startup] WARNING: Forex stream startup timed out (non-blocking)")
+            logger.warning("[Startup] WARNING: Forex stream startup timed out (non-blocking)")
         except Exception as e:
-            print(f"[Startup] WARNING: Forex stream startup failed: {e}")
+            logger.warning(f"[Startup] WARNING: Forex stream startup failed: {e}")
 
     yield
 
@@ -496,7 +547,7 @@ async def lifespan(app: FastAPI):
     if task_queue_enabled:
         await task_queue_service.stop()
     await redis_store.close()
-    print("[Shutdown] complete")
+    logger.info("[Shutdown] complete")
 
 
 app = FastAPI(
@@ -675,8 +726,12 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     request_id = _request_id_from_request(request)
-    print(
-        f"[UnhandledError] request_id={request_id} path={request.url.path} error={type(exc).__name__}: {exc}"
+    logger.exception(
+        "[UnhandledError] request_id=%s path=%s error=%s: %s",
+        request_id,
+        request.url.path,
+        type(exc).__name__,
+        exc,
     )
     return JSONResponse(
         status_code=500,
@@ -774,16 +829,17 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 # Rate limiting middleware (simple in-memory)
-_rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
-_rate_limit_max = int(os.getenv("RATE_LIMIT_MAX", "120"))
-_rate_limit_window = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+_runtime_config = get_config()
+_rate_limit_enabled = _runtime_config.security.rate_limit_enabled
+_rate_limit_max = _runtime_config.security.rate_limit_max
+_rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _rate_limit_store = defaultdict(deque)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
-_auth_rate_limit_enabled = _env_bool("AUTH_RATE_LIMIT_ENABLED", True)
-_auth_rate_limit_max = _env_int("AUTH_RATE_LIMIT_MAX", 10)
-_auth_rate_limit_window = _env_int("AUTH_RATE_LIMIT_WINDOW_SECONDS", 300)
+_auth_rate_limit_enabled = _runtime_config.security.auth_rate_limit_enabled
+_auth_rate_limit_max = _runtime_config.security.auth_rate_limit_max
+_auth_rate_limit_window = _runtime_config.security.auth_rate_limit_window_seconds
 _auth_rate_limit_store = defaultdict(deque)
 _auth_rate_limited_paths = {
     "/auth/password-reset",
@@ -843,6 +899,18 @@ async def auth_rate_limit_middleware(request: Request, call_next):
     while bucket and bucket[0] <= window_start:
         bucket.popleft()
     if len(bucket) >= _auth_rate_limit_max:
+        rate_limit_logger.warning(
+            json.dumps(
+                {
+                    "event": "auth_rate_limit_exceeded",
+                    "client_ip": client_host,
+                    "path": path,
+                    "limit": _auth_rate_limit_max,
+                    "window_seconds": _auth_rate_limit_window,
+                    "request_id": _request_id_from_request(request),
+                }
+            )
+        )
         return JSONResponse(
             status_code=429,
             content=error_payload(
@@ -871,6 +939,18 @@ async def rate_limit_middleware(request: Request, call_next):
     while bucket and bucket[0] <= window_start:
         bucket.popleft()
     if len(bucket) >= _rate_limit_max:
+        rate_limit_logger.warning(
+            json.dumps(
+                {
+                    "event": "global_rate_limit_exceeded",
+                    "client_ip": client_host,
+                    "path": path,
+                    "limit": _rate_limit_max,
+                    "window_seconds": _rate_limit_window,
+                    "request_id": _request_id_from_request(request),
+                }
+            )
+        )
         return JSONResponse(
             status_code=429,
             content=error_payload(
@@ -1001,7 +1081,10 @@ def _get_cors_allow_all() -> bool:
 
 
 _cors_allow_all = _get_cors_allow_all()
-_cors_allow_credentials = _env_bool("CORS_ALLOW_CREDENTIALS", True) and not _cors_allow_all
+_cors_allow_credentials = _runtime_config.security.cors_allow_all is False and _env_bool(
+    "CORS_ALLOW_CREDENTIALS",
+    True,
+)
 _cors_origins = ["*"] if _cors_allow_all else _get_cors_origins()
 _cors_origin_regex = None if _cors_allow_all else _get_cors_origin_regex()
 
@@ -1031,7 +1114,15 @@ try:
     app.add_middleware(ErrorTrackingMiddleware)
     app.add_middleware(DistributedTracingMiddleware)
 except Exception as exc:
-    print(f"[WARN] Could not load observability middleware: {exc}")
+    logger.warning(f"[WARN] Could not load observability middleware: {exc}")
+
+# Phase 7: Add audit middleware for auth-sensitive paths and error responses.
+try:
+    from .middleware.audit import AuditMiddleware
+
+    app.add_middleware(AuditMiddleware)
+except Exception as exc:
+    logger.warning(f"[WARN] Could not load audit middleware: {exc}")
 
 # Include routers
 app.include_router(users_router)
@@ -1055,9 +1146,6 @@ if PUBLIC_AUTH_ROUTES_AVAILABLE:
     app.include_router(public_auth_router)
 if OPS_ROUTES_AVAILABLE:
     app.include_router(ops_router)
-if MONITORING_ROUTES_AVAILABLE:
-    app.include_router(monitoring_router)
-
 if MONITORING_ROUTES_AVAILABLE:
     app.include_router(monitoring_router)
 

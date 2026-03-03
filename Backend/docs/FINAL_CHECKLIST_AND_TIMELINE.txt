@@ -1,0 +1,51 @@
+FOREX BACKEND - PHASE 7 FINAL CHECKLIST
+========================================
+
+Week 1 (6-8 hours total)
+------------------------
+
+Task A: Monitoring (2-3 hours)
+[ ] SENTRY_DSN set in production secrets
+[ ] Startup logs show env_validation + config_snapshot
+[ ] Railway metrics/alerts configured
+
+Task B: Audit Trail (1-2 hours)
+[ ] AuditMiddleware active for auth-sensitive routes
+[ ] 4xx/5xx request events logged
+[ ] Rate-limit exceed events logged
+[ ] File logging/rotation validated
+
+Task C: Automation (1-2 hours)
+[ ] .githooks/pre-commit installed locally
+[ ] Security Scan workflow passing on GitHub
+[ ] Dependency scan step running in CI
+
+Task D: Procedures (1 hour)
+[ ] MONTHLY_AUDIT.md reviewed and scheduled
+[ ] INCIDENT_RESPONSE.md reviewed by team
+[ ] SECURITY_CHECKLIST.md adopted in code review
+[ ] COMPLIANCE_REPORT_TEMPLATE.md ready for month-end reporting
+
+Verification Commands
+---------------------
+
+python -m app.config.validate_env --json
+pytest -q tests/test_env_validation.py
+git grep -n "AIza[0-9A-Za-z_-]\{20,\}\|xkeysib-[A-Za-z0-9-]\{20,\}\|BEGIN PRIVATE KEY"
+
+Done Criteria
+-------------
+
+[ ] Production logs show no secrets
+[ ] Monitoring and alerting are operational
+[ ] Audit events are searchable
+[ ] Secret scanning blocks risky changes
+[ ] Monthly process has an assigned owner
+
+Phase 8 Continuation
+--------------------
+
+[ ] Weekly standup uses docs/WEEKLY_SECURITY_STANDUP_TEMPLATE.md
+[ ] Monthly tracker updated in docs/SECURITY_FINDINGS_TRACKER.csv
+[ ] Metrics captured in docs/SECURITY_METRICS.csv
+[ ] Quarterly strategy review documented
