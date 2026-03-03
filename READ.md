@@ -50,7 +50,7 @@ Notes for local Flutter web:
 - In `DEBUG=true`, backend now allows localhost/127.0.0.1 on any port by default.
 - Dev `x-user-id` auth fallback is enabled by default in debug mode (can be overridden with `ALLOW_DEV_USER_ID=false`).
 
-8. Verify:
+9. Verify:
    - API docs: `http://localhost:8080/docs`
    - Health: `http://localhost:8080/health`
 
@@ -66,10 +66,13 @@ Additional docs:
 - `docs/PHASE_8_OPERATIONAL_EXCELLENCE.md`
 - `docs/PHASE_9_STRATEGIC_GROWTH.md`
 - `docs/PHASE_10_REVENUE_SCALING.md`
+- `docs/PHASE_11_MARKET_DOMINANCE.md`
 - `docs/BUSINESS_IMPACT.md`
 - `docs/REVENUE_MODEL.md`
 - `docs/WEEKLY_BUSINESS_REVIEW_TEMPLATE.md`
 - `docs/BUSINESS_SCORECARD_TEMPLATE.md`
+- `docs/THOUGHT_LEADERSHIP_STRATEGY.md`
+- `docs/CATEGORY_LEADERSHIP_SCORECARD.md`
 
 ## Railway Deploy (Nixpacks)
 

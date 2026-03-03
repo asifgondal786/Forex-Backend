@@ -1,0 +1,4 @@
+partner_name,partner_type,status,segment,pipeline_value,target_close_date,owner,notes
+TODO,Integration,Prospecting,Enterprise,0,2026-04-30,TODO,initial baseline
+TODO,Reseller,Discovery,SMB,0,2026-05-31,TODO,initial baseline
+TODO,Alliance,Proposal,Enterprise,0,2026-06-30,TODO,initial baseline
