@@ -18,7 +18,22 @@ pip install -r requirements.txt
 
 3. Configure environment variables (see `.env.example`).
 
-4. Run the server:
+4. Validate configuration before startup:
+```bash
+python -m app.config.validate_env --json
+```
+
+5. Install repository git hooks (recommended):
+```bash
+powershell -ExecutionPolicy Bypass -File .\scripts\install-git-hooks.ps1
+```
+
+6. Run weekly security healthcheck (recommended):
+```bash
+powershell -ExecutionPolicy Bypass -File .\scripts\security-healthcheck.ps1
+```
+
+7. Run the server:
 ```bash
 uvicorn app.main:app --reload --port 8080
 # or: python run.py
@@ -30,9 +45,20 @@ Notes for local Flutter web:
 - In `DEBUG=true`, backend now allows localhost/127.0.0.1 on any port by default.
 - Dev `x-user-id` auth fallback is enabled by default in debug mode (can be overridden with `ALLOW_DEV_USER_ID=false`).
 
-5. Verify:
+8. Verify:
    - API docs: `http://localhost:8080/docs`
    - Health: `http://localhost:8080/health`
+
+Additional docs:
+- `docs/DEVELOPMENT.md`
+- `docs/DEPLOYMENT.md`
+- `docs/SECRETS_MANAGEMENT.md`
+- `docs/TROUBLESHOOTING.md`
+- `docs/MONTHLY_AUDIT.md`
+- `docs/INCIDENT_RESPONSE.md`
+- `docs/SECURITY_CHECKLIST.md`
+- `docs/COMPLIANCE_REPORT_TEMPLATE.md`
+- `docs/PHASE_8_OPERATIONAL_EXCELLENCE.md`
 
 ## Railway Deploy (Nixpacks)
 
