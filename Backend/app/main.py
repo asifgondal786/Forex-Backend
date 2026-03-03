@@ -142,11 +142,13 @@ def _startup_snapshot() -> dict:
     snapshot.update(
         {
             "cors_origins": _get_cors_origins(),
+            "trusted_hosts": _get_trusted_hosts(),
             "cors_allow_credentials": _cors_allow_credentials,
             "cors_allow_all": _cors_allow_all,
             "csp_report_only": _env_bool("CSP_REPORT_ONLY", False),
             "has_mailjet_api_key": bool((os.getenv("MAILJET_API_KEY") or "").strip()),
             "api_base_url_hint": _normalize_url(os.getenv("API_BASE_URL") or ""),
+            "railway_public_domain": (os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip(),
             "redacted_service_account_path": _redact(
                 os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "",
                 keep=8,
@@ -1029,6 +1031,7 @@ def _default_cors_origins() -> list[str]:
 def _get_cors_origins() -> list[str]:
     origins = _default_cors_origins()
     origins.extend(_parse_origin_list(os.getenv("CORS_ORIGINS") or ""))
+    origins.extend(_parse_origin_list(os.getenv("CORS_ALLOWED_ORIGINS") or ""))
     return _dedupe(origins)
 
 
@@ -1080,6 +1083,26 @@ def _get_cors_allow_all() -> bool:
     return False
 
 
+def _get_trusted_hosts() -> list[str]:
+    explicit_hosts = _split_csv_values(os.getenv("ALLOWED_HOSTS", ""))
+    if not explicit_hosts:
+        return []
+
+    hosts = [value.lower() for value in explicit_hosts]
+
+    # Railway sets this in deployed environments; include it when host filtering is enabled.
+    railway_public_domain = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip().lower()
+    if railway_public_domain:
+        hosts.append(railway_public_domain)
+
+    # If a public API base URL is configured, allow that host as well.
+    public_api_host = _parse_host(_public_api_base_url())
+    if public_api_host:
+        hosts.append(public_api_host)
+
+    return _dedupe_values(hosts)
+
+
 _cors_allow_all = _get_cors_allow_all()
 _cors_allow_credentials = _runtime_config.security.cors_allow_all is False and _env_bool(
     "CORS_ALLOW_CREDENTIALS",
@@ -1099,7 +1122,7 @@ app.add_middleware(
     max_age=_env_int("CORS_MAX_AGE_SECONDS", 86400),
 )
 
-_trusted_hosts = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
+_trusted_hosts = _get_trusted_hosts()
 if _trusted_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts)
 
