@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Business Ops Check - Forex Backend"
+echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+required_files=(
+  "docs/PHASE_9_STRATEGIC_GROWTH.md"
+  "docs/PHASE_10_REVENUE_SCALING.md"
+  "docs/BUSINESS_IMPACT.md"
+  "docs/REVENUE_MODEL.md"
+  "docs/WEEKLY_BUSINESS_REVIEW_TEMPLATE.md"
+  "docs/BUSINESS_SCORECARD_TEMPLATE.md"
+  "docs/MONTHLY_BUSINESS_METRICS.csv"
+)
+
+echo
+echo "1) Required artifact check"
+missing=0
+for file in "${required_files[@]}"; do
+  if [[ ! -f "$file" ]]; then
+    echo "Missing required file: $file"
+    missing=1
+  fi
+done
+
+if [[ "$missing" -ne 0 ]]; then
+  exit 1
+fi
+echo "All required business artifacts are present."
+
+echo
+echo "2) Monthly metrics freshness check"
+period="$(date -u +"%Y-%m")"
+if grep -q "^${period}," "docs/MONTHLY_BUSINESS_METRICS.csv"; then
+  echo "Found metrics row for current period: $period"
+else
+  echo "Warning: no metrics row found for $period in docs/MONTHLY_BUSINESS_METRICS.csv"
+fi
+
+echo
+echo "Business ops check complete."

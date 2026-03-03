@@ -33,7 +33,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-git-hooks.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\security-healthcheck.ps1
 ```
 
-7. Run the server:
+7. Run monthly business operations check (recommended):
+```bash
+powershell -ExecutionPolicy Bypass -File .\scripts\business-ops-check.ps1
+```
+
+8. Run the server:
 ```bash
 uvicorn app.main:app --reload --port 8080
 # or: python run.py
@@ -59,6 +64,12 @@ Additional docs:
 - `docs/SECURITY_CHECKLIST.md`
 - `docs/COMPLIANCE_REPORT_TEMPLATE.md`
 - `docs/PHASE_8_OPERATIONAL_EXCELLENCE.md`
+- `docs/PHASE_9_STRATEGIC_GROWTH.md`
+- `docs/PHASE_10_REVENUE_SCALING.md`
+- `docs/BUSINESS_IMPACT.md`
+- `docs/REVENUE_MODEL.md`
+- `docs/WEEKLY_BUSINESS_REVIEW_TEMPLATE.md`
+- `docs/BUSINESS_SCORECARD_TEMPLATE.md`
 
 ## Railway Deploy (Nixpacks)
 

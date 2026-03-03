@@ -54,6 +54,18 @@ Bash:
 ./scripts/security-healthcheck.sh
 ```
 
+## Monthly Business Ops Check
+
+PowerShell:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\business-ops-check.ps1
+```
+
+Bash:
+```bash
+./scripts/business-ops-check.sh
+```
+
 ## Run Backend
 
 ```powershell
