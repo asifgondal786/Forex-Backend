@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 import '../../core/widgets/app_background.dart';
+import '../../routes/app_routes.dart';
 import '../../services/api_service.dart';
 
 class VerificationScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
   int _emailCooldown = 0;
   bool _isSendingEmail = false;
   bool _isRefreshing = false;
+  bool _isApplyingEmailAction = false;
   String? _verificationId;
   String? _errorMessage;
   String? _infoMessage;
@@ -55,6 +57,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     super.initState();
     if (_auth != null) {
       _startAutoRefresh();
+      Future<void>.microtask(_processEmailVerificationLink);
     } else {
       _errorMessage = 'Firebase authentication is unavailable in this build.';
     }
@@ -76,6 +79,139 @@ class _VerificationScreenState extends State<VerificationScreen> {
       const Duration(seconds: 12),
       (_) => _refreshUser(silent: true),
     );
+  }
+
+  Map<String, String> _extractActionParams() {
+    final directParams = Uri.base.queryParameters;
+    if (directParams.isNotEmpty) {
+      return directParams;
+    }
+
+    final fragment = Uri.base.fragment.trim();
+    if (fragment.isEmpty) {
+      return const <String, String>{};
+    }
+    final normalizedFragment = fragment.startsWith('/')
+        ? fragment
+        : '/$fragment';
+    return Uri.parse(normalizedFragment).queryParameters;
+  }
+
+  Future<void> _navigateIfVerificationComplete() async {
+    final hasCompletedEmail = _emailVerified;
+    final hasCompletedPhone = !_enablePhoneVerification || _phoneVerified;
+    if (!hasCompletedEmail || !hasCompletedPhone || !mounted) {
+      return;
+    }
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.dashboard,
+      (_) => false,
+    );
+  }
+
+  String _friendlyVerifyError(String code) {
+    switch (code.toLowerCase().trim()) {
+      case 'invalid-action-code':
+      case 'expired-action-code':
+        return 'This verification link is invalid or expired. Request a new verification email.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'network-request-failed':
+        return 'Network issue detected. Check internet and retry.';
+      default:
+        return 'Email verification failed ($code).';
+    }
+  }
+
+  Future<void> _processEmailVerificationLink() async {
+    if (_isApplyingEmailAction) {
+      return;
+    }
+
+    final params = _extractActionParams();
+    final mode = (params['mode'] ?? '').trim();
+    final code = (params['oobCode'] ?? '').trim();
+
+    if (code.isEmpty) {
+      return;
+    }
+    if (mode.isNotEmpty && mode != 'verifyEmail') {
+      return;
+    }
+
+    final auth = _auth;
+    if (auth == null) {
+      return;
+    }
+
+    _isApplyingEmailAction = true;
+    if (mounted) {
+      setState(() {
+        _isRefreshing = true;
+        _errorMessage = null;
+        _infoMessage = null;
+      });
+    }
+
+    try {
+      await auth.checkActionCode(code);
+      await auth.applyActionCode(code);
+      await _user?.reload();
+      if (!mounted) {
+        return;
+      }
+      if (_emailVerified) {
+        setState(() {
+          _infoMessage = 'Email verified successfully. Redirecting...';
+          _errorMessage = null;
+        });
+        await _navigateIfVerificationComplete();
+      } else {
+        setState(() {
+          _infoMessage = 'Email link was accepted. Tap "I Verified" to refresh status.';
+        });
+      }
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      await _user?.reload();
+      if (!mounted) {
+        return;
+      }
+      if (_emailVerified) {
+        setState(() {
+          _infoMessage = 'Email is already verified. Redirecting...';
+          _errorMessage = null;
+        });
+        await _navigateIfVerificationComplete();
+      } else {
+        setState(() {
+          _errorMessage = _friendlyVerifyError(e.code);
+        });
+      }
+    } catch (_) {
+      await _user?.reload();
+      if (!mounted) {
+        return;
+      }
+      if (_emailVerified) {
+        setState(() {
+          _infoMessage = 'Email is already verified. Redirecting...';
+          _errorMessage = null;
+        });
+        await _navigateIfVerificationComplete();
+      } else {
+        setState(() {
+          _errorMessage = 'Unable to process verification link. Request a new email verification link.';
+        });
+      }
+    } finally {
+      _isApplyingEmailAction = false;
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 
   void _startEmailCooldown([int seconds = 60]) {
@@ -117,6 +253,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       await _user?.reload();
       if (mounted) {
         setState(() {});
+        await _navigateIfVerificationComplete();
       }
     } catch (e) {
       if (!silent && mounted) {
