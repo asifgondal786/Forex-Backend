@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../features/embodied_agent/embodied_agent_screen.dart';
 import '../features/auth/auth_gate.dart';
 import '../features/auth/login_screen.dart';
@@ -32,15 +34,53 @@ class AppRoutes {
     signup: (_) => const SignupScreen(),
     verify: (_) => const VerificationScreen(),
     reset: (_) => const PasswordResetScreen(),
-    dashboard: (_) => const EmbodiedAgentScreen(),
-    createTask: (_) => const TaskCreationScreen(),
-    taskHistory: (_) => const TaskHistoryScreen(),
-    aiChat: (_) => const AiChatScreen(),
-    settings: (_) => const SettingsScreen(),
-    profile: (_) => const UserAdminDashboardScreen(),
-    security: (_) => const PlaceholderScreen(title: 'Security'),
-    help: (_) => const PlaceholderScreen(title: 'Help & Support'),
+    dashboard: (_) => const _ProtectedRoute(child: EmbodiedAgentScreen()),
+    createTask: (_) => const _ProtectedRoute(child: TaskCreationScreen()),
+    taskHistory: (_) => const _ProtectedRoute(child: TaskHistoryScreen()),
+    aiChat: (_) => const _ProtectedRoute(child: AiChatScreen()),
+    settings: (_) => const _ProtectedRoute(child: SettingsScreen()),
+    profile: (_) => const _ProtectedRoute(child: UserAdminDashboardScreen()),
+    security: (_) => const _ProtectedRoute(child: PlaceholderScreen(title: 'Security')),
+    help: (_) => const _ProtectedRoute(child: PlaceholderScreen(title: 'Help & Support')),
   };
+}
+
+class _ProtectedRoute extends StatelessWidget {
+  final Widget child;
+
+  const _ProtectedRoute({required this.child});
+
+  bool get _firebaseReady {
+    try {
+      return Firebase.apps.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_firebaseReady) {
+      return LoginScreen(onLoginSuccess: () {});
+    }
+
+    return StreamBuilder<firebase_auth.User?>(
+      stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.data == null) {
+          return LoginScreen(onLoginSuccess: () {});
+        }
+
+        return child;
+      },
+    );
+  }
 }
 
 class PlaceholderScreen extends StatelessWidget {

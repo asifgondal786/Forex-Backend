@@ -58,8 +58,8 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (!_firebaseAuthReady) {
-      _fetchAfterBuild(context);
-      return const EmbodiedAgentScreen();
+      _didFetch = false;
+      return LoginScreen(onLoginSuccess: () {});
     }
 
     return StreamBuilder<firebase_auth.User?>(
