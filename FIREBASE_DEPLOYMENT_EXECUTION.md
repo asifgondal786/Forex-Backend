@@ -197,7 +197,7 @@ Expected: ✓ 20-30 requests, ✓ Status 200
 ```
 When you click "Start Trading":
 DevTools > Network tab > XHR filter
-Look for: https://forex-backend-production-73e7.up.railway.app/api/...
+Look for: https://forex-backend-production-bc44.up.railway.app/api/...
 Expected: ✓ Status 200, ✓ Data received
 ```
 
@@ -298,7 +298,7 @@ firebase deploy --only hosting
 **Solution**:
 1. Check Brevo API key in: `d:\Tajir\Backend\.env`
    - Should be: `BREVO_API_KEY=xkeysib-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxx`
-2. Check backend running: https://forex-backend-production-73e7.up.railway.app/health
+2. Check backend running: https://forex-backend-production-bc44.up.railway.app/health
 3. Check Railway logs: https://railway.app (Tajir-Backend > Logs)
 4. Look for Brevo API errors
 
@@ -381,7 +381,7 @@ flutter build web --release
 | Firebase Console | https://console.firebase.google.com/project/forexcompanion-e5a28 | Monitor Firestore, Auth, Hosting |
 | Hosting Console | https://console.firebase.google.com/project/forexcompanion-e5a28/hosting | Deployment history, version control |
 | Firestore Database | https://console.firebase.google.com/project/forexcompanion-e5a28/firestore | See user data, set security rules |
-| Backend | https://forex-backend-production-73e7.up.railway.app | API health check |
+| Backend | https://forex-backend-production-bc44.up.railway.app | API health check |
 | Backend Logs | https://railway.app (open Tajir-Backend) | Debug backend errors |
 
 ---

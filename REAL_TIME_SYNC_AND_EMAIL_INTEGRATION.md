@@ -350,7 +350,7 @@ class TradingService {
     
     // Call backend API
     final response = await http.post(
-      Uri.parse('https://forex-backend-production-73e7.up.railway.app/api/trading/start'),
+      Uri.parse('https://forex-backend-production-bc44.up.railway.app/api/trading/start'),
       headers: {
         'Authorization': 'Bearer ${await _auth.currentUser?.getIdToken()}',
         'Content-Type': 'application/json',

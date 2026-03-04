@@ -137,7 +137,7 @@ Once credentials are confirmed working:
 - [ ] Step 2: Trigger rebuild (empty commit or manual restart)
 - [ ] Step 3: Wait for deployment to succeed
 - [ ] Step 4: Check deployment logs show `Deployment successful`
-- [ ] Step 5: Test `/health` endpoint: `curl https://forex-backend-production-73e7.up.railway.app/health`
+- [ ] Step 5: Test `/health` endpoint: `curl https://forex-backend-production-bc44.up.railway.app/health`
 - [ ] Step 6: If working, implement proper Firebase credentials (Option A or B)
 - [ ] Step 7: Set `REQUIRE_FIREBASE=true` and redeploy
 - [ ] Step 8: Verify Firebase logs: `[Firebase] Initialized via json_b64`

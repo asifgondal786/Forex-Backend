@@ -294,7 +294,7 @@ Look for any outages
 **Step 5: Check email end-to-end**
 ```bash
 # Manual test: Call Backend directly
-curl -X POST https://forex-backend-production-73e7.up.railway.app/api/test/send-email \
+curl -X POST https://forex-backend-production-bc44.up.railway.app/api/test/send-email \
   -H "Content-Type: application/json" \
   -d '{
     "to_email": "testuser@gmail.com",

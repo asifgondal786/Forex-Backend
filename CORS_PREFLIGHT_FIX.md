@@ -54,7 +54,7 @@ The configuration looks correct in the code.
 
 Open browser console and try:
 ```javascript
-fetch('https://forex-backend-production-73e7.up.railway.app/health', {
+fetch('https://forex-backend-production-bc44.up.railway.app/health', {
   method: 'GET',
   headers: {
     'Origin': 'https://forexcompanion-e5a28.web.app'

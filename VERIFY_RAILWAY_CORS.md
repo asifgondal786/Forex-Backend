@@ -30,7 +30,7 @@ If it still shows the old value, proceed to Method 2.
    - Run this to see actual backend environment:
    ```javascript
    // Check what the backend is actually using
-   fetch('https://forex-backend-production-73e7.up.railway.app/health')
+   fetch('https://forex-backend-production-bc44.up.railway.app/health')
      .then(r => r.headers)
      .then(headers => {
        console.log('CORS Headers:', headers.get('access-control-allow-origin'));
@@ -91,7 +91,7 @@ Once the backend redeploys with correct CORS_ORIGINS:
 - [ ] Wait 1-2 minutes for deployment
 - [ ] Test with browser console:
   ```javascript
-  fetch('https://forex-backend-production-73e7.up.railway.app/health')
+  fetch('https://forex-backend-production-bc44.up.railway.app/health')
     .then(r => r.json())
     .then(console.log)
   ```

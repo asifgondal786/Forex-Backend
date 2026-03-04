@@ -192,7 +192,7 @@ git push origin main
                style-src 'self' 'unsafe-inline'; 
                img-src 'self' data: https:; 
                font-src 'self' https:; 
-               connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://forex-backend-production-73e7.up.railway.app; 
+               connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://forex-backend-production-bc44.up.railway.app; 
                frame-ancestors 'none'; 
                form-action 'self';">
 ```
