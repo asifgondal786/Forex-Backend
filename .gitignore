@@ -22,5 +22,9 @@ Frontend/.env
 *.log
 firebase-debug.log
 
+# Local tooling state
+.chrome-debug/
+.pytest_cache/
+
 # Dependencies
 node_modules/

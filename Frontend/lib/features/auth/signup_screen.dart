@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -7,10 +6,11 @@ import '../../services/api_service.dart';
 import '../../services/firebase_service.dart';
 import '../../core/models/user.dart' as app_user;
 import '../../core/widgets/app_background.dart';
+import '../../core/utils/runtime_url_resolver.dart';
 import '../../routes/app_routes.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -28,7 +28,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _usernameController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -55,7 +55,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _validateInputs() {
     final normalizedEmail = _normalizeEmail(_emailController.text);
-    if (_firstNameController.text.isEmpty || 
+    if (_firstNameController.text.isEmpty ||
         _secondNameController.text.isEmpty ||
         normalizedEmail.isEmpty ||
         _mobileController.text.isEmpty ||
@@ -65,32 +65,33 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() => _errorMessage = 'Please fill all required fields');
       return false;
     }
-    
+
     if (!_isValidEmail(normalizedEmail)) {
       setState(() => _errorMessage = 'Please enter a valid email address');
       return false;
     }
-    
+
     if (_passwordController.text.length < 8) {
       setState(() => _errorMessage = 'Password must be at least 8 characters');
       return false;
     }
-    
+
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() => _errorMessage = 'Passwords do not match');
       return false;
     }
-    
+
     if (_usernameController.text.length < 3) {
       setState(() => _errorMessage = 'Username must be at least 3 characters');
       return false;
     }
-    
+
     if (_mobileController.text.length < 10) {
-      setState(() => _errorMessage = 'Mobile number must be at least 10 digits');
+      setState(
+          () => _errorMessage = 'Mobile number must be at least 10 digits');
       return false;
     }
-    
+
     return true;
   }
 
@@ -98,7 +99,7 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_validateInputs()) return;
     final normalizedEmail = _normalizeEmail(_emailController.text);
     _emailController.text = normalizedEmail;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -115,7 +116,8 @@ class _SignupScreenState extends State<SignupScreen> {
         if (user != null) {
           final appUser = app_user.User(
             id: user.uid,
-            name: '${_firstNameController.text.trim()} ${_secondNameController.text.trim()}',
+            name:
+                '${_firstNameController.text.trim()} ${_secondNameController.text.trim()}',
             email: normalizedEmail,
             createdAt: DateTime.now(),
             preferences: {
@@ -150,7 +152,8 @@ class _SignupScreenState extends State<SignupScreen> {
               verificationMessage =
                   'Account created. Verification is temporarily rate-limited; please wait a few minutes and retry from Verify screen.';
             }
-            if (!(errorText.contains('429') || errorText.contains('too many'))) {
+            if (!(errorText.contains('429') ||
+                errorText.contains('too many'))) {
               try {
                 await _sendVerificationEmail(user);
               } on firebase_auth.FirebaseAuthException catch (fe) {
@@ -168,6 +171,7 @@ class _SignupScreenState extends State<SignupScreen> {
           }
 
           debugPrint('Signup successful');
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(verificationMessage)),
           );
@@ -199,7 +203,8 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   bool _isValidEmail(String email) {
-    final pattern = RegExp(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$');
+    final pattern =
+        RegExp(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$');
     return pattern.hasMatch(email);
   }
 
@@ -225,29 +230,11 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   String _resolveEmailContinueUrl() {
-    const raw = String.fromEnvironment('APP_WEB_URL', defaultValue: '');
-    final trimmedRaw = raw.trim();
-    if (trimmedRaw.isNotEmpty) {
-      final normalized = _normalizeBaseUrl(trimmedRaw);
-      if (!normalized.startsWith('https://') && !kDebugMode) {
-        throw StateError('APP_WEB_URL must use HTTPS in production.');
-      }
-      final uri = Uri.parse(normalized);
-      return uri.replace(path: '/verify', query: null, fragment: null).toString();
-    }
-    throw StateError('APP_WEB_URL is not configured.');
-  }
-
-  String _normalizeBaseUrl(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return trimmed;
-    final normalized = trimmed.endsWith('/')
-        ? trimmed.substring(0, trimmed.length - 1)
-        : trimmed;
-    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-      return normalized;
-    }
-    return 'https://$normalized';
+    final baseUrl = resolveAppWebUrl(
+      const String.fromEnvironment('APP_WEB_URL', defaultValue: ''),
+    );
+    final uri = Uri.parse(baseUrl);
+    return uri.replace(path: '/verify', query: null, fragment: null).toString();
   }
 
   String _normalizeEmail(String email) {
@@ -334,10 +321,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.1),
                             ),
                           ),
                           child: const Icon(
@@ -360,11 +347,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(
-                        color: Colors.white.withOpacity(0.08),
+                        color: Colors.white.withValues(alpha: 0.08),
                         width: 1,
                       ),
                     ),
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withValues(alpha: 0.05),
                     child: Padding(
                       padding: EdgeInsets.all(isMobile ? 24 : 32),
                       child: Column(
@@ -375,9 +362,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.15),
+                                color: Colors.red.withValues(alpha: 0.15),
                                 border: Border.all(
-                                  color: Colors.red.withOpacity(0.4),
+                                  color: Colors.red.withValues(alpha: 0.4),
                                 ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -502,7 +489,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint: 'Minimum 8 characters',
                             obscure: _obscurePassword,
                             onToggle: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                  () => _obscurePassword = !_obscurePassword);
                             },
                           ),
                           const SizedBox(height: 16),
@@ -514,7 +502,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint: 'Re-enter your password',
                             obscure: _obscureConfirmPassword,
                             onToggle: () {
-                              setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                              setState(() => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword);
                             },
                           ),
                           const SizedBox(height: 28),
@@ -536,8 +525,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                       height: 24,
                                       width: 24,
                                       child: CircularProgressIndicator(
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white.withOpacity(0.8),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white.withValues(alpha: 0.8),
                                         ),
                                         strokeWidth: 2.5,
                                       ),
@@ -554,8 +544,11 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           )
                               .animate()
-                              .fadeIn(duration: const Duration(milliseconds: 600))
-                              .slideY(begin: 0.3, delay: const Duration(milliseconds: 200)),
+                              .fadeIn(
+                                  duration: const Duration(milliseconds: 600))
+                              .slideY(
+                                  begin: 0.3,
+                                  delay: const Duration(milliseconds: 200)),
                         ],
                       ),
                     ),
@@ -634,7 +627,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             prefixIcon: Icon(icon, color: const Color(0xFF3B82F6), size: 20),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -642,7 +635,7 @@ class _SignupScreenState extends State<SignupScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
@@ -696,7 +689,8 @@ class _SignupScreenState extends State<SignupScreen> {
               color: Colors.grey[600],
               fontSize: 13,
             ),
-            prefixIcon: Icon(Icons.lock_outline, color: const Color(0xFF3B82F6), size: 20),
+            prefixIcon: Icon(Icons.lock_outline,
+                color: const Color(0xFF3B82F6), size: 20),
             suffixIcon: IconButton(
               icon: Icon(
                 obscure ? Icons.visibility_off : Icons.visibility,
@@ -706,7 +700,7 @@ class _SignupScreenState extends State<SignupScreen> {
               onPressed: onToggle,
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -714,7 +708,7 @@ class _SignupScreenState extends State<SignupScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),

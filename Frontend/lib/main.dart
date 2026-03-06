@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'routes/app_routes.dart';
 import 'core/config/firebase_config.dart';
+import 'core/config/release_build_guard.dart';
 import 'services/api_service.dart';
 import 'services/firebase_service.dart';
 import 'services/live_updates_service.dart';
@@ -14,6 +15,7 @@ import 'providers/header_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/account_connection_provider.dart';
 import 'providers/agent_orchestrator_provider.dart';
+import 'core/utils/runtime_url_resolver.dart';
 import 'helpers/mock_data_helper.dart';
 
 // Toggle Firebase initialization (Auth/Storage/etc)
@@ -27,39 +29,24 @@ const bool useFirestoreTasks = false;
 
 // Set to true for UI development without a backend. Overrides task/API usage.
 const bool useMockData = false;
-const String _appWebUrlFromDefine = String.fromEnvironment(
-  'APP_WEB_URL',
-  defaultValue: '',
-);
-
-String _normalizeBaseUrl(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) return trimmed;
-  final withScheme = (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
-      ? trimmed
-      : 'https://$trimmed';
-  return withScheme.endsWith('/')
-      ? withScheme.substring(0, withScheme.length - 1)
-      : withScheme;
-}
 
 void _validateUrlConfigOnBoot() {
   if (kDebugMode) return;
 
-  final apiFromDefine = const String.fromEnvironment('API_BASE_URL', defaultValue: '').trim();
-  final apiBaseUrl = _normalizeBaseUrl(apiFromDefine);
-  if (apiBaseUrl.isEmpty || !apiBaseUrl.startsWith('https://')) {
-    throw StateError('API_BASE_URL must be configured with HTTPS in production.');
-  }
+  final apiBaseUrl = ApiService.baseUrl;
+  assertSecureRuntimeUrl(
+    apiBaseUrl,
+    label: 'API_BASE_URL',
+    allowHttpInRelease: false,
+  );
 
-  final appFromDefine = _appWebUrlFromDefine.trim();
-  final appWebUrl = _normalizeBaseUrl(appFromDefine);
-  if (appWebUrl.isEmpty || !appWebUrl.startsWith('https://')) {
-    throw StateError('APP_WEB_URL must be configured with HTTPS in production.');
-  }
+  resolveAppWebUrl(
+    const String.fromEnvironment('APP_WEB_URL', defaultValue: ''),
+  );
 }
 
 Future<void> main() async {
+  ensureReleaseBuildConfig();
   WidgetsFlutterBinding.ensureInitialized();
   _validateUrlConfigOnBoot();
 

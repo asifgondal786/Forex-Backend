@@ -8,6 +8,7 @@ import '../core/models/user.dart';
 import '../core/models/header_model.dart';
 import '../core/models/app_notification.dart';
 import '../core/models/account_connection.dart';
+import '../core/utils/runtime_url_resolver.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -62,6 +63,11 @@ class ApiService {
       return _normalizeBaseUrl(fromDefine);
     }
 
+    final currentOrigin = resolveCurrentWebOrigin();
+    if (currentOrigin != null && currentOrigin.isNotEmpty) {
+      return currentOrigin;
+    }
+
     if (!kDebugMode) {
       throw StateError(
         'API_BASE_URL must be configured for non-debug builds.',
@@ -106,6 +112,9 @@ class ApiService {
 
   static void _assertReleaseTransportSecurity() {
     if (kDebugMode || _allowInsecureHttpInRelease) {
+      return;
+    }
+    if (_isLocalApiTarget) {
       return;
     }
     if (baseUrl.toLowerCase().startsWith('http://')) {
@@ -233,7 +242,8 @@ class ApiService {
       return decoded;
     }
 
-    var message = 'API Error: ${response.statusCode} - ${response.reasonPhrase}';
+    var message =
+        'API Error: ${response.statusCode} - ${response.reasonPhrase}';
     if (decoded is Map<String, dynamic>) {
       if (isApiEnvelope(decoded)) {
         final envelopeMessage = (decoded['message'] ?? '').toString().trim();
@@ -241,7 +251,8 @@ class ApiService {
           message = envelopeMessage;
         }
       }
-      final detail = decoded['detail'] ?? decoded['message'] ?? decoded['error'];
+      final detail =
+          decoded['detail'] ?? decoded['message'] ?? decoded['error'];
       if (detail is String && detail.trim().isNotEmpty) {
         message = detail.trim();
       } else if (detail != null) {
@@ -477,7 +488,8 @@ class ApiService {
         body['autonomous_stage_alerts'] = autonomousStageAlerts;
       }
       if (autonomousStageIntervalSeconds != null) {
-        body['autonomous_stage_interval_seconds'] = autonomousStageIntervalSeconds;
+        body['autonomous_stage_interval_seconds'] =
+            autonomousStageIntervalSeconds;
       }
       if (channelSettings != null) body['channel_settings'] = channelSettings;
 

@@ -17,10 +17,13 @@ For production builds, configure secure API endpoints and disable debug auth fal
 ```bash
 flutter build web --release \
   --dart-define=API_BASE_URL=https://api.your-domain.com \
+  --dart-define=APP_WEB_URL=https://app.your-domain.com \
   --dart-define=WS_BASE_URL=wss://api.your-domain.com \
   --dart-define=ALLOW_DEBUG_USER_FALLBACK=false \
   --dart-define=SKIP_AUTH_GATE=false
 ```
+
+Release web builds now fail fast if `API_BASE_URL` or `APP_WEB_URL` is missing.
 
 Development-only convenience flags (do not use in production):
 

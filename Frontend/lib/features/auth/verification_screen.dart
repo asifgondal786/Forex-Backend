@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 import '../../core/widgets/app_background.dart';
+import '../../core/utils/runtime_url_resolver.dart';
 import '../../routes/app_routes.dart';
 import '../../services/api_service.dart';
 import 'auth_action_context.dart';
@@ -357,28 +358,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   String _resolveEmailContinueUrl() {
-    const raw = String.fromEnvironment('APP_WEB_URL', defaultValue: '');
-    final trimmedRaw = raw.trim();
-    if (trimmedRaw.isNotEmpty) {
-      final normalized = _normalizeBaseUrl(trimmedRaw);
-      if (!normalized.startsWith('https://') && !kDebugMode) {
-        throw StateError('APP_WEB_URL must use HTTPS in production.');
-      }
-      return normalized;
-    }
-    throw StateError('APP_WEB_URL is not configured.');
-  }
-
-  String _normalizeBaseUrl(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return trimmed;
-    final normalized = trimmed.endsWith('/')
-        ? trimmed.substring(0, trimmed.length - 1)
-        : trimmed;
-    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-      return normalized;
-    }
-    return 'https://$normalized';
+    return resolveAppWebUrl(
+      const String.fromEnvironment('APP_WEB_URL', defaultValue: ''),
+    );
   }
 
   String _friendlyEmailError(String code) {
