@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../features/embodied_agent/embodied_agent_screen.dart';
-import '../features/auth/auth_gate.dart';
+import '../features/auth/auth_entry_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/auth/verification_screen.dart';
@@ -29,7 +29,7 @@ class AppRoutes {
   static const String help = '/help';
 
   static Map<String, WidgetBuilder> routes = {
-    root: (_) => const AuthGate(),
+    root: (_) => const AuthEntryScreen(),
     login: (_) => LoginScreen(onLoginSuccess: () {}),
     signup: (_) => const SignupScreen(),
     verify: (_) => const VerificationScreen(),
@@ -40,8 +40,10 @@ class AppRoutes {
     aiChat: (_) => const _ProtectedRoute(child: AiChatScreen()),
     settings: (_) => const _ProtectedRoute(child: SettingsScreen()),
     profile: (_) => const _ProtectedRoute(child: UserAdminDashboardScreen()),
-    security: (_) => const _ProtectedRoute(child: PlaceholderScreen(title: 'Security')),
-    help: (_) => const _ProtectedRoute(child: PlaceholderScreen(title: 'Help & Support')),
+    security: (_) =>
+        const _ProtectedRoute(child: PlaceholderScreen(title: 'Security')),
+    help: (_) => const _ProtectedRoute(
+        child: PlaceholderScreen(title: 'Help & Support')),
   };
 }
 
@@ -65,7 +67,7 @@ class _ProtectedRoute extends StatelessWidget {
     }
 
     return StreamBuilder<firebase_auth.User?>(
-      stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
+      stream: firebase_auth.FirebaseAuth.instance.userChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(

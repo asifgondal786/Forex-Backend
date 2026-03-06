@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 import '../../core/widgets/app_background.dart';
 import '../../routes/app_routes.dart';
+import 'auth_action_context.dart';
 
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
@@ -48,32 +49,15 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     super.dispose();
   }
 
-  Map<String, String> _extractActionParams() {
-    final directParams = Uri.base.queryParameters;
-    if (directParams.isNotEmpty) {
-      return directParams;
-    }
-
-    // Flutter web hash routing keeps query parameters inside the URL fragment:
-    // https://app/#/reset?mode=resetPassword&oobCode=...
-    final fragment = Uri.base.fragment.trim();
-    if (fragment.isEmpty) {
-      return const <String, String>{};
-    }
-    final normalizedFragment = fragment.startsWith('/')
-        ? fragment
-        : '/$fragment';
-    return Uri.parse(normalizedFragment).queryParameters;
-  }
-
   Future<void> _resolveResetCode() async {
-    final params = _extractActionParams();
-    final mode = (params['mode'] ?? '').trim();
-    final code = (params['oobCode'] ?? '').trim();
+    final action = AuthActionContext.fromBaseUri();
+    final mode = action.mode;
+    final code = action.actionCode;
 
     if (code.isEmpty) {
       setState(() {
-        _errorMessage = 'Reset link is missing or invalid. Please request a new reset email.';
+        _errorMessage =
+            'Reset link is missing or invalid. Please request a new reset email.';
       });
       return;
     }
@@ -115,7 +99,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Unable to validate reset link. Request a new password reset email.';
+        _errorMessage =
+            'Unable to validate reset link. Request a new password reset email.';
       });
     } finally {
       if (mounted) {
@@ -172,7 +157,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       await auth.confirmPasswordReset(code: code, newPassword: password);
       if (!mounted) return;
       setState(() {
-        _infoMessage = 'Password reset successful. Please sign in with your new password.';
+        _infoMessage =
+            'Password reset successful. Please sign in with your new password.';
       });
       _passwordController.clear();
       _confirmPasswordController.clear();
@@ -180,7 +166,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
         if (!mounted) return;
         Navigator.pushNamedAndRemoveUntil(
           context,
-          AppRoutes.dashboard,
+          AppRoutes.login,
           (_) => false,
         );
       });
@@ -236,11 +222,11 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       width: 1,
                     ),
                   ),
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   child: Padding(
                     padding: EdgeInsets.all(isMobile ? 24 : 32),
                     child: Column(
@@ -275,7 +261,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                           label: 'New Password',
                           obscure: _obscurePassword,
                           onToggle: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+                            setState(
+                                () => _obscurePassword = !_obscurePassword);
                           },
                         ),
                         const SizedBox(height: 14),
@@ -285,7 +272,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                           obscure: _obscureConfirmPassword,
                           onToggle: () {
                             setState(
-                              () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
                             );
                           },
                         ),
@@ -299,7 +287,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Text('Update Password'),
                           ),
@@ -357,7 +346,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
           decoration: InputDecoration(
             hintText: 'Minimum 8 characters',
             hintStyle: TextStyle(color: Colors.grey[600], fontSize: 13),
-            prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF3B82F6)),
+            prefixIcon:
+                const Icon(Icons.lock_outline, color: Color(0xFF3B82F6)),
             suffixIcon: IconButton(
               onPressed: onToggle,
               icon: Icon(
@@ -366,7 +356,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
               ),
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -374,7 +364,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
@@ -398,8 +388,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          border: Border.all(color: color.withOpacity(0.4)),
+          color: color.withValues(alpha: 0.15),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

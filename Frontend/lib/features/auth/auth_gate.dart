@@ -63,7 +63,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     return StreamBuilder<firebase_auth.User?>(
-      stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
+      stream: firebase_auth.FirebaseAuth.instance.userChanges(),
       builder: (context, snapshot) {
         final user = snapshot.data;
 

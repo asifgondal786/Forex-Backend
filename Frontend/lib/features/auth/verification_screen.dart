@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../../core/widgets/app_background.dart';
 import '../../routes/app_routes.dart';
 import '../../services/api_service.dart';
+import 'auth_action_context.dart';
 
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
@@ -26,8 +27,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
   Timer? _emailCooldownTimer;
   int _emailCooldown = 0;
   bool _isSendingEmail = false;
-  bool _isRefreshing = false;
   bool _isApplyingEmailAction = false;
+  bool _isNavigatingToDashboard = false;
   String? _verificationId;
   String? _errorMessage;
   String? _infoMessage;
@@ -76,33 +77,22 @@ class _VerificationScreenState extends State<VerificationScreen> {
   void _startAutoRefresh() {
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 12),
+      const Duration(seconds: 3),
       (_) => _refreshUser(silent: true),
     );
-  }
-
-  Map<String, String> _extractActionParams() {
-    final directParams = Uri.base.queryParameters;
-    if (directParams.isNotEmpty) {
-      return directParams;
-    }
-
-    final fragment = Uri.base.fragment.trim();
-    if (fragment.isEmpty) {
-      return const <String, String>{};
-    }
-    final normalizedFragment = fragment.startsWith('/')
-        ? fragment
-        : '/$fragment';
-    return Uri.parse(normalizedFragment).queryParameters;
   }
 
   Future<void> _navigateIfVerificationComplete() async {
     final hasCompletedEmail = _emailVerified;
     final hasCompletedPhone = !_enablePhoneVerification || _phoneVerified;
-    if (!hasCompletedEmail || !hasCompletedPhone || !mounted) {
+    if (!hasCompletedEmail ||
+        !hasCompletedPhone ||
+        !mounted ||
+        _isNavigatingToDashboard) {
       return;
     }
+    _isNavigatingToDashboard = true;
+    _autoRefreshTimer?.cancel();
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.dashboard,
@@ -129,9 +119,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
       return;
     }
 
-    final params = _extractActionParams();
-    final mode = (params['mode'] ?? '').trim();
-    final code = (params['oobCode'] ?? '').trim();
+    final action = AuthActionContext.fromBaseUri();
+    final mode = action.mode;
+    final code = action.actionCode;
 
     if (code.isEmpty) {
       return;
@@ -148,7 +138,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     _isApplyingEmailAction = true;
     if (mounted) {
       setState(() {
-        _isRefreshing = true;
         _errorMessage = null;
         _infoMessage = null;
       });
@@ -169,7 +158,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
         await _navigateIfVerificationComplete();
       } else {
         setState(() {
-          _infoMessage = 'Email link was accepted. Tap "I Verified" to refresh status.';
+          _infoMessage =
+              'Verification link accepted. Your account will unlock automatically once Firebase sync completes.';
         });
       }
     } on firebase_auth.FirebaseAuthException catch (e) {
@@ -201,16 +191,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
         await _navigateIfVerificationComplete();
       } else {
         setState(() {
-          _errorMessage = 'Unable to process verification link. Request a new email verification link.';
+          _errorMessage =
+              'Unable to process verification link. Request a new email verification link.';
         });
       }
     } finally {
       _isApplyingEmailAction = false;
-      if (mounted) {
-        setState(() {
-          _isRefreshing = false;
-        });
-      }
     }
   }
 
@@ -236,7 +222,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
       if (!silent && mounted) {
         setState(() {
           _errorMessage = 'Firebase authentication is unavailable.';
-          _isRefreshing = false;
         });
       }
       return;
@@ -244,7 +229,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     if (!silent) {
       setState(() {
-        _isRefreshing = true;
         _errorMessage = null;
         _infoMessage = null;
       });
@@ -252,16 +236,19 @@ class _VerificationScreenState extends State<VerificationScreen> {
     try {
       await _user?.reload();
       if (mounted) {
-        setState(() {});
-        await _navigateIfVerificationComplete();
+        final isVerified = _emailVerified;
+        setState(() {
+          if (!silent && !isVerified) {
+            _infoMessage = 'Email still not verified. Please check your inbox.';
+          }
+        });
+        if (isVerified) {
+          await _navigateIfVerificationComplete();
+        }
       }
     } catch (e) {
       if (!silent && mounted) {
         setState(() => _errorMessage = 'Failed to refresh status: $e');
-      }
-    } finally {
-      if (!silent && mounted) {
-        setState(() => _isRefreshing = false);
       }
     }
   }
@@ -325,13 +312,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
     try {
       await _sendVerificationEmailWithFallback(user);
       if (mounted) {
-        setState(() => _infoMessage = 'Verification email sent to ${user.email}.');
+        setState(
+            () => _infoMessage = 'Verification email sent to ${user.email}.');
         _startEmailCooldown();
       }
     } on firebase_auth.FirebaseAuthException catch (e) {
       if (mounted) {
         setState(
-          () => _errorMessage = 'Failed to send email: ${_friendlyEmailError(e.code)}',
+          () => _errorMessage =
+              'Failed to send email: ${_friendlyEmailError(e.code)}',
         );
       }
     } catch (e) {
@@ -345,7 +334,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
-  Future<void> _sendVerificationEmailWithFallback(firebase_auth.User user) async {
+  Future<void> _sendVerificationEmailWithFallback(
+      firebase_auth.User user) async {
     final continueUrl = _resolveEmailContinueUrl();
     try {
       await user.sendEmailVerification(
@@ -461,7 +451,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   final auth = _auth;
                   if (auth == null) {
                     safeSetModal(
-                      () => dialogError = 'Firebase authentication is unavailable.',
+                      () => dialogError =
+                          'Firebase authentication is unavailable.',
                     );
                     return;
                   }
@@ -471,10 +462,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       try {
                         await _user?.linkWithCredential(credential);
                         await _refreshUser(silent: true);
-                        if (mounted) {
-                          FocusScope.of(dialogContext).unfocus();
-                          Navigator.of(dialogContext).pop();
-                        }
+                        if (!dialogContext.mounted) return;
+                        FocusScope.of(dialogContext).unfocus();
+                        Navigator.of(dialogContext).pop();
                       } catch (e) {
                         if (mounted) {
                           safeSetModal(
@@ -485,7 +475,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     },
                     verificationFailed: (e) {
                       safeSetModal(
-                        () => dialogError = 'Phone verification failed: ${e.message}',
+                        () => dialogError =
+                            'Phone verification failed: ${e.message}',
                       );
                     },
                     codeSent: (verificationId, forceResendingToken) {
@@ -508,7 +499,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   );
                 } else {
                   safeSetModal(
-                    () => dialogError = 'Phone verification error: ${e.message ?? code}',
+                    () => dialogError =
+                        'Phone verification error: ${e.message ?? code}',
                   );
                 }
               } catch (e) {
@@ -557,10 +549,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   await _user?.linkWithCredential(credential);
                 }
                 await _refreshUser(silent: true);
-                if (mounted) {
-                  FocusScope.of(dialogContext).unfocus();
-                  Navigator.of(dialogContext).pop();
-                }
+                if (!dialogContext.mounted) return;
+                FocusScope.of(dialogContext).unfocus();
+                Navigator.of(dialogContext).pop();
               } catch (e) {
                 safeSetModal(() => dialogError = 'Invalid code: $e');
               } finally {
@@ -576,10 +567,13 @@ class _VerificationScreenState extends State<VerificationScreen> {
               ),
               title: const Text(
                 'Verify phone number',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
               content: SizedBox(
-                width: MediaQuery.of(context).size.width < 520 ? double.infinity : 420,
+                width: MediaQuery.of(context).size.width < 520
+                    ? double.infinity
+                    : 420,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +597,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Send Code'),
                       ),
@@ -619,7 +614,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Verify Code'),
                       ),
@@ -687,12 +683,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-
                         if (_errorMessage != null)
                           _buildMessage(_errorMessage!, isError: true),
                         if (_infoMessage != null)
                           _buildMessage(_infoMessage!, isError: false),
-
                         _buildStatusRow(
                           title: 'Email',
                           subtitle: userEmail.isEmpty ? 'No email' : userEmail,
@@ -705,14 +699,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             runSpacing: 10,
                             children: [
                               ElevatedButton(
-                                onPressed: (_emailCooldown > 0 || _isSendingEmail)
-                                    ? null
-                                    : _sendEmailVerification,
+                                onPressed:
+                                    (_emailCooldown > 0 || _isSendingEmail)
+                                        ? null
+                                        : _sendEmailVerification,
                                 child: _isSendingEmail
                                     ? const SizedBox(
                                         width: 16,
                                         height: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
                                       )
                                     : Text(
                                         _emailCooldown > 0
@@ -720,26 +716,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
                                             : 'Send Verification',
                                       ),
                               ),
-                              OutlinedButton(
-                                onPressed: _isRefreshing ? null : _refreshUser,
-                                child: _isRefreshing
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : const Text('I Verified'),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Status refreshes automatically. Check your spam folder if needed.',
-                            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                            'Verification status refreshes automatically every few seconds. Check your spam folder if needed.',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[500]),
                           ),
                           const SizedBox(height: 20),
                         ],
-
                         if (_enablePhoneVerification) ...[
                           _buildStatusRow(
                             title: 'Phone',
@@ -763,16 +749,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               kIsWeb
                                   ? 'You will complete a reCAPTCHA before receiving the SMS.'
                                   : 'We will send an SMS code to verify your number.',
-                              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[500]),
                             ),
                           ],
                         ] else ...[
                           Text(
                             'Phone verification is currently disabled for this project.',
-                            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[500]),
                           ),
                         ],
-
                         const SizedBox(height: 24),
                         Text(
                           'After verification, return to the app. It will unlock automatically.',
@@ -801,7 +788,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
     required String subtitle,
     required bool isVerified,
   }) {
-    final color = isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    final color =
+        isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
     return Row(
       children: [
         Container(
@@ -886,7 +874,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
             width: 2,
           ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }
@@ -919,7 +908,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
             width: 2,
           ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
     );
   }
