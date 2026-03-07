@@ -43,4 +43,7 @@ Thumbs.db
 *.p8
 *.key
 secrets.json
-firebase-key.json
+firebase_key.json
+# Firebase / Google service accounts
+*firebase-adminsdk*.json
+*service-account*.json
