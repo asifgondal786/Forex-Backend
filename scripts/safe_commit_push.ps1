@@ -23,15 +23,31 @@ function Invoke-Step {
     }
 }
 
-$repoRoot = (git rev-parse --show-toplevel).Trim()
+# Always anchor this workflow to the repository containing this script.
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+Invoke-Step -Action { & git -C $repoRoot rev-parse --show-toplevel *> $null } -ErrorMessage "Git repository not found at script root."
 Set-Location $repoRoot
 
-Write-Host "Staging path(s): $($PathSpec -join ', ')" -ForegroundColor Cyan
-$addArgs = @("add", "--") + $PathSpec
+# Support both array syntax and comma-separated syntax from command line.
+$expandedPathSpec = @()
+foreach ($entry in $PathSpec) {
+    if ($null -eq $entry) { continue }
+    $expandedPathSpec += ($entry -split ",")
+}
+$expandedPathSpec = $expandedPathSpec | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+
+if (-not $expandedPathSpec) {
+    throw "No valid -PathSpec entries were provided."
+}
+
+Write-Host "Repository root: $repoRoot" -ForegroundColor Cyan
+Write-Host "Staging path(s): $($expandedPathSpec -join ', ')" -ForegroundColor Cyan
+$addArgs = @("add", "--") + $expandedPathSpec
 Invoke-Step -Action { & git @addArgs } -ErrorMessage "Failed to stage changes."
 
-$staged = (git diff --cached --name-only).Trim()
-if (-not $staged) {
+$stagedOutput = & git diff --cached --name-only
+$staged = if ($stagedOutput) { $stagedOutput.Trim() } else { "" }
+if ([string]::IsNullOrWhiteSpace($staged)) {
     throw "Nothing is staged. Update files first or adjust -PathSpec."
 }
 
