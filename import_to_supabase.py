@@ -12,6 +12,8 @@ Fixes from original:
   8. Idempotent re-runs via source_firestore_id
 """
 
+from dotenv import load_dotenv
+load_dotenv()  # ← add this line
 import json
 import re
 import os
