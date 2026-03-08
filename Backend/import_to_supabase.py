@@ -155,7 +155,7 @@ ALLOWED_COLUMNS = {
     },
     "notifications": {
         "id", "user_id", "title", "message", "short_message",
-        "category", "priority", "read", "created_at", "read_at",
+        "category", "priority", "is_read", "created_at", "read_at",
         "channels_to_send", "delivery_status", "rich_data_raw",
         "action_url", "source_firestore_id",
     },
@@ -276,7 +276,7 @@ def transform_notifications(raw: dict) -> dict:
         "short_message":       r.get("short_message"),
         "category":            r.get("category"),
         "priority":            r.get("priority"),
-        "read":                r.get("read", False),
+        "is_read":             r.get("read", False),
         "created_at":          r.get("created_at") or r.get("timestamp"),
         "read_at":             r.get("read_at"),
         "channels_to_send":    r.get("channels_to_send"),    # list → jsonb
