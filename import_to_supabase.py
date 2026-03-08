@@ -134,6 +134,7 @@ def update_remapped_users(firestore_users: list[dict]) -> None:
     print(f"  user updates  ✅ {updated}  ❌ {failed}")
 
 
+def remap_user_id(uid: str) -> str:
     """Return the canonical Supabase user_id, following any remap."""
     return ID_REMAP.get(uid, uid)
 
