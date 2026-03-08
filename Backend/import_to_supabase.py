@@ -15,6 +15,11 @@ Patch v2 fixes:
   FIX-A: users — conflict on "id"; email duplicates handled by row-level fallback
   FIX-B: user_subscriptions — conflict on "id" (no unique constraint on user_id)
   FIX-C: orphaned user_ids — placeholder users inserted BEFORE child tables
+
+Patch v3 fixes:
+  FIX-D: email-duplicate users already exist in Supabase with different IDs.
+          Build a firestore_id → supabase_id remap table by looking up emails,
+          then rewrite all child record user_ids before inserting.
 """
 
 from dotenv import load_dotenv
@@ -43,6 +48,50 @@ if not SUPABASE_KEY:
     raise RuntimeError("Set SUPABASE_SERVICE_ROLE_KEY env var.")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ═══════════════════════════════════════════════════════════════════
+# FIX-D: ID REMAP  firestore_id → supabase_id
+# Populated by build_id_remap() before migration starts.
+# ═══════════════════════════════════════════════════════════════════
+ID_REMAP: dict[str, str] = {}   # firestore_id → real supabase_id
+
+def build_id_remap(firestore_users: list[dict]) -> None:
+    """
+    For every Firestore user, check if their email already exists in Supabase
+    with a DIFFERENT id. If so, record the mapping so child records get the
+    correct FK value.
+    """
+    emails = [r.get("email") for r in firestore_users if r.get("email")]
+    if not emails:
+        return
+
+    # Fetch existing Supabase users matching those emails (chunked to avoid URL limits)
+    supabase_by_email: dict[str, str] = {}
+    chunk = 50
+    for i in range(0, len(emails), chunk):
+        batch_emails = emails[i:i+chunk]
+        try:
+            resp = supabase.table("users").select("id,email").in_("email", batch_emails).execute()
+            for row in (resp.data or []):
+                supabase_by_email[row["email"]] = row["id"]
+        except Exception as e:
+            print(f"  ⚠  build_id_remap fetch error: {e}")
+
+    remapped = 0
+    for r in firestore_users:
+        fs_id    = r.get("id") or r.get("_id")
+        email    = r.get("email")
+        supa_id  = supabase_by_email.get(email)
+        if fs_id and supa_id and fs_id != supa_id:
+            ID_REMAP[fs_id] = supa_id
+            remapped += 1
+
+    if remapped:
+        print(f"\n── ID remap: {remapped} Firestore IDs → existing Supabase IDs (email match) ──")
+
+def remap_user_id(uid: str) -> str:
+    """Return the canonical Supabase user_id, following any remap."""
+    return ID_REMAP.get(uid, uid)
 
 # ═══════════════════════════════════════════════════════════════════
 # UTILITIES
@@ -181,7 +230,7 @@ def transform_users(raw: dict) -> dict:
     children = []
     if prefs and primary.get("id"):
         pref_row = {
-            "user_id":  primary["id"],
+            "user_id":  remap_user_id(primary["id"]),
             "username": prefs.get("username"),
             "title":    prefs.get("title"),
             "address":  prefs.get("address"),
@@ -200,7 +249,7 @@ def transform_user_subscriptions(raw: dict) -> dict:
     primary = {
         "id":                  r.get("id") or firestore_id,   # FIX-B: id is conflict col
         "source_firestore_id": firestore_id,
-        "user_id":             r.get("user_id"),
+        "user_id":             remap_user_id(r.get("user_id", "")),
         "plan":                r.get("plan"),
         "status":              r.get("status"),
         "source":              r.get("source"),
@@ -222,7 +271,7 @@ def transform_notification_preferences(raw: dict) -> dict:
 
     primary = {
         "source_firestore_id":  firestore_id,
-        "user_id":              r.get("user_id"),
+        "user_id":              remap_user_id(r.get("user_id", "")),
         "enabled_channels":     r.get("enabled_channels"),
         "disabled_categories":  r.get("disabled_categories"),
         "quiet_hours_start":    r.get("quiet_hours_start"),
@@ -245,7 +294,7 @@ def transform_notifications(raw: dict) -> dict:
     primary = {
         "id":                  r.get("notification_id") or firestore_id,
         "source_firestore_id": firestore_id,
-        "user_id":             r.get("user_id"),
+        "user_id":             remap_user_id(r.get("user_id", "")),
         "title":               r.get("title"),
         "message":             r.get("message"),
         "short_message":       r.get("short_message"),
@@ -273,7 +322,7 @@ def transform_tasks(raw: dict) -> dict:
     primary = {
         "id":                  task_id,
         "source_firestore_id": firestore_id,
-        "user_id":             r.get("user_id"),
+        "user_id":             remap_user_id(r.get("user_id", "")),
         "task_type":           r.get("task_type"),
         "status":              r.get("status"),
         "priority":            r.get("priority"),
@@ -314,7 +363,7 @@ def transform_ai_activity(raw: dict) -> dict:
     primary = {
         "id":                  firestore_id,
         "source_firestore_id": firestore_id,
-        "user_id":             r.get("user_id"),
+        "user_id":             remap_user_id(r.get("user_id", "")),
         "type":                r.get("type"),
         "message":             r.get("message"),
         "timestamp":           r.get("timestamp"),
@@ -402,8 +451,8 @@ def ensure_placeholder_users(data: dict) -> int:
     user record, insert a minimal placeholder row so FK constraints pass.
     Returns the number of placeholders inserted.
     """
-    # Collect all known user IDs from the users collection
-    known_ids: set[str] = set()
+    # Collect all known user IDs from the users collection + remap targets
+    known_ids: set[str] = set(ID_REMAP.values())
     for r in data.get("users", []):
         uid = r.get("id") or r.get("_id")
         if uid:
@@ -415,6 +464,8 @@ def ensure_placeholder_users(data: dict) -> int:
                 "notifications", "tasks", "ai_activity"):
         for r in data.get(col, []):
             uid = r.get("userId") or r.get("user_id")
+            if uid:
+                uid = remap_user_id(uid)   # follow any remap first
             if uid and uid not in known_ids:
                 orphan_ids.add(uid)
 
@@ -542,6 +593,9 @@ def main():
 
     print(f"Loaded {EXPORT_FILE}  –  {len(data)} collections")
     orphan_report(data)
+
+    # FIX-D: build firestore_id → supabase_id remap from email matches
+    build_id_remap(data.get("users", []))
 
     # FIX-C: insert placeholders BEFORE any child table migration
     ensure_placeholder_users(data)
