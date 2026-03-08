@@ -1,0 +1,170 @@
+[
+  {
+    "collection": "users",
+    "record": {
+      "id": "CRzHi9UPzwXyXE4q74X6hqbAX9Z2",
+      "source_firestore_id": "CRzHi9UPzwXyXE4q74X6hqbAX9Z2",
+      "email": "sohaibdanialahmed@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-02-22T23:02:34.395",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(sohaibdanialahmed@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:08.768899+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "MJULV2lW4MNUHHi7XMHGZHcdOOh1",
+      "source_firestore_id": "MJULV2lW4MNUHHi7XMHGZHcdOOh1",
+      "email": "asifgondalcommando91@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-02-21T18:58:55.576",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(asifgondalcommando91@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:09.235552+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "OzdQKgn0pWcPAu828y0boPR3ZUi1",
+      "source_firestore_id": "OzdQKgn0pWcPAu828y0boPR3ZUi1",
+      "email": "asifgondalcommando91@gmail.com",
+      "name": "Danial Gondal",
+      "plan": "free",
+      "created_at": "2026-02-08T20:06:42.111",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(asifgondalcommando91@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:09.468118+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "XpC9vXYCj8NMdKZt1LPj1Oz3yj33",
+      "source_firestore_id": "XpC9vXYCj8NMdKZt1LPj1Oz3yj33",
+      "email": "gondalgondal0000@gmail.com",
+      "name": "Gondal",
+      "plan": "free",
+      "created_at": "2026-02-09T17:52:59.267",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(gondalgondal0000@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:10.495727+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "goRbvyqdlafPi2tg27WVDWmB1gr2",
+      "source_firestore_id": "goRbvyqdlafPi2tg27WVDWmB1gr2",
+      "email": "sohaibdanialahmed@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-02-23T21:26:35.765",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(sohaibdanialahmed@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:10.737428+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "httnPjMkBHalz0wF37wFfJYkqjC2",
+      "source_firestore_id": "httnPjMkBHalz0wF37wFfJYkqjC2",
+      "email": "sohaibahmedgondal@gmail.com",
+      "name": "Sohaib Gondal",
+      "plan": "free",
+      "created_at": "2026-03-04T21:51:51.775",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(sohaibahmedgondal@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:10.963117+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "knZwcvKdOXNgsTcIMRR0H6iK2F62",
+      "source_firestore_id": "knZwcvKdOXNgsTcIMRR0H6iK2F62",
+      "email": "asifgondalcommando91@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-02-21T20:10:28.059",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(asifgondalcommando91@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:11.237584+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "m963ZsveukTa3JgCEdoNOevyiiM2",
+      "source_firestore_id": "m963ZsveukTa3JgCEdoNOevyiiM2",
+      "email": "stephanmcdermottjohn@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-02-20T21:50:18.744",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(stephanmcdermottjohn@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:11.506293+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "nXXOLkWIHhMQokkku0c27BTxayg2",
+      "source_firestore_id": "nXXOLkWIHhMQokkku0c27BTxayg2",
+      "email": "gondalgondal0000@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-02-27T07:09:58.577",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(gondalgondal0000@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:11.757222+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "pFbCZq9hBKYMjlPUA4rTFw4Smr52",
+      "source_firestore_id": "pFbCZq9hBKYMjlPUA4rTFw4Smr52",
+      "email": "gondalbadshah786786@gmail.com",
+      "name": "Asif Gondal",
+      "plan": "free",
+      "created_at": "2026-03-04T21:20:58.471",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(gondalbadshah786786@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:12.003673+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "ut4TwVs7kUgvBw7m6D9Lp5iGZvG2",
+      "source_firestore_id": "ut4TwVs7kUgvBw7m6D9Lp5iGZvG2",
+      "email": "asifgondalcommando91@gmail.com",
+      "name": "Gondal",
+      "plan": "free",
+      "created_at": "2026-02-09T18:20:35.454",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(asifgondalcommando91@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:12.242375+00:00"
+  },
+  {
+    "collection": "users",
+    "record": {
+      "id": "yRi3ZmO6UofYRNB1E4L6JVRXe6O2",
+      "source_firestore_id": "yRi3ZmO6UofYRNB1E4L6JVRXe6O2",
+      "email": "sohaibahmedgondal@gmail.com",
+      "name": "Fatima Tu Zahra",
+      "plan": "free",
+      "created_at": "2026-02-09T16:15:57.783",
+      "avatar_url": null
+    },
+    "error": "{'message': 'duplicate key value violates unique constraint \"users_email_idx\"', 'code': '23505', 'hint': None, 'details': 'Key (email)=(sohaibahmedgondal@gmail.com) already exists.'}",
+    "ts": "2026-03-08T19:09:12.970015+00:00"
+  }
+]
