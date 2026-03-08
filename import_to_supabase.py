@@ -89,7 +89,51 @@ def build_id_remap(firestore_users: list[dict]) -> None:
     if remapped:
         print(f"\n── ID remap: {remapped} Firestore IDs → existing Supabase IDs (email match) ──")
 
-def remap_user_id(uid: str) -> str:
+def update_remapped_users(firestore_users: list[dict]) -> None:
+    """
+    For users whose Firestore ID was remapped to an existing Supabase ID,
+    overwrite name / plan / avatar_url with the Firestore values.
+    """
+    if not ID_REMAP:
+        return
+
+    # Reverse map: supabase_id → firestore record
+    fs_by_id = {}
+    for r in firestore_users:
+        fs_id = r.get("id") or r.get("_id")
+        if fs_id and fs_id in ID_REMAP:
+            fs_by_id[ID_REMAP[fs_id]] = r
+
+    if not fs_by_id:
+        return
+
+    print(f"\n── Updating {len(fs_by_id)} existing users with Firestore data ──")
+    updated = failed = 0
+    for supa_id, raw in fs_by_id.items():
+        r = snake_keys(deep_normalize_ts(raw))
+        patch = {k: v for k, v in {
+            "name":       r.get("name"),
+            "plan":       r.get("plan"),
+            "avatar_url": r.get("avatar_url"),
+        }.items() if v is not None}
+
+        if not patch:
+            updated += 1
+            continue
+        if DRY_RUN:
+            print(f"  [DRY RUN] would update user {supa_id} with {patch}")
+            updated += 1
+            continue
+        try:
+            supabase.table("users").update(patch).eq("id", supa_id).execute()
+            updated += 1
+        except Exception as e:
+            print(f"  ✗ update user {supa_id} error: {e}")
+            failed += 1
+
+    print(f"  user updates  ✅ {updated}  ❌ {failed}")
+
+
     """Return the canonical Supabase user_id, following any remap."""
     return ID_REMAP.get(uid, uid)
 
@@ -596,6 +640,9 @@ def main():
 
     # FIX-D: build firestore_id → supabase_id remap from email matches
     build_id_remap(data.get("users", []))
+
+    # Update existing users with Firestore data (name, plan, avatar)
+    update_remapped_users(data.get("users", []))
 
     # FIX-C: insert placeholders BEFORE any child table migration
     ensure_placeholder_users(data)
