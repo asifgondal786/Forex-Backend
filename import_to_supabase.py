@@ -10,10 +10,15 @@ Fixes from original:
   6. FK deferral until after ID reconciliation
   7. Orphan tracking report
   8. Idempotent re-runs via source_firestore_id
+
+Patch v2 fixes:
+  FIX-A: users — conflict on "id"; email duplicates handled by row-level fallback
+  FIX-B: user_subscriptions — conflict on "id" (no unique constraint on user_id)
+  FIX-C: orphaned user_ids — placeholder users inserted BEFORE child tables
 """
 
 from dotenv import load_dotenv
-load_dotenv()  # ← add this line
+load_dotenv()
 import json
 import re
 import os
@@ -23,17 +28,16 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-# ─── pip install supabase ────────────────────────────────────────────────────
 from supabase import create_client, Client
 
 # ═══════════════════════════════════════════════════════════════════
-# CONFIG  –  set via env vars or edit directly
+# CONFIG
 # ═══════════════════════════════════════════════════════════════════
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://vlmenitpmbibbqdlsick.supabase.co")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 EXPORT_FILE  = os.getenv("EXPORT_FILE", "firestore_export.json")
 BATCH_SIZE   = int(os.getenv("BATCH_SIZE", "50"))
-DRY_RUN      = os.getenv("DRY_RUN", "false").lower() == "true"   # set to true to preview only
+DRY_RUN      = os.getenv("DRY_RUN", "false").lower() == "true"
 
 if not SUPABASE_KEY:
     raise RuntimeError("Set SUPABASE_SERVICE_ROLE_KEY env var.")
@@ -47,46 +51,30 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 _camel_re = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 def to_snake(name: str) -> str:
-    """camelCase / PascalCase → snake_case"""
     return _camel_re.sub("_", name).lower()
 
-
 def snake_keys(obj: Any) -> Any:
-    """Recursively convert all dict keys to snake_case."""
     if isinstance(obj, dict):
         return {to_snake(k): snake_keys(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [snake_keys(i) for i in obj]
     return obj
 
-
 def normalize_ts(value: Any) -> Any:
-    """
-    Convert Firestore timestamp dict  { seconds, nanoseconds }
-    or ISO string → ISO-8601 string with UTC timezone.
-    Returns original value unchanged for anything else.
-    """
     if isinstance(value, dict) and "seconds" in value:
         try:
-            return datetime.fromtimestamp(
-                value["seconds"], tz=timezone.utc
-            ).isoformat()
+            return datetime.fromtimestamp(value["seconds"], tz=timezone.utc).isoformat()
         except Exception:
             return None
-
     if isinstance(value, str):
-        # already looks like a timestamp string — pass through
         try:
             datetime.fromisoformat(value.replace("Z", "+00:00"))
             return value
         except ValueError:
             pass
-
     return value
 
-
 def deep_normalize_ts(obj: Any) -> Any:
-    """Walk entire structure and normalize all timestamp-shaped dicts."""
     if isinstance(obj, dict):
         if "seconds" in obj and set(obj.keys()) <= {"seconds", "nanoseconds"}:
             return normalize_ts(obj)
@@ -95,15 +83,12 @@ def deep_normalize_ts(obj: Any) -> Any:
         return [deep_normalize_ts(i) for i in obj]
     return obj
 
-
 def row_hash(record: dict) -> str:
-    """Deterministic hash for idempotency tracking."""
     dumped = json.dumps(record, sort_keys=True, default=str)
     return hashlib.sha256(dumped.encode()).hexdigest()[:16]
 
-
 # ═══════════════════════════════════════════════════════════════════
-# DLQ (Dead-Letter Queue)  – bad rows written here for later retry
+# DLQ
 # ═══════════════════════════════════════════════════════════════════
 DLQ: list[dict] = []
 
@@ -115,7 +100,6 @@ def dlq_add(collection: str, record: dict, error: str):
         "ts": datetime.now(timezone.utc).isoformat(),
     })
 
-
 def dlq_flush():
     if not DLQ:
         return
@@ -124,21 +108,13 @@ def dlq_flush():
         json.dump(DLQ, f, indent=2, default=str)
     print(f"\n⚠  DLQ: {len(DLQ)} bad rows written to {path}")
 
-
 # ═══════════════════════════════════════════════════════════════════
-# PER-COLLECTION TRANSFORMERS
-# Each returns a dict: { "primary": row_dict, "children": [(table, [rows])] }
+# ALLOWED COLUMNS
 # ═══════════════════════════════════════════════════════════════════
-
-# ── Columns that exist in each Supabase table ──────────────────────
-# Add/remove to match your actual DDL.
 ALLOWED_COLUMNS = {
     "users": {
         "id", "source_firestore_id", "email", "name", "plan",
-        "created_at", "avatar_url",
-        # preferences flattened into user_preferences table (see below)
-        # but we also accept preferences as jsonb fallback:
-        "preferences",
+        "created_at", "avatar_url", "preferences",
     },
     "user_preferences": {
         "user_id", "username", "title", "address", "mobile",
@@ -151,7 +127,6 @@ ALLOWED_COLUMNS = {
     "notification_preferences": {
         "user_id", "enabled_channels", "disabled_categories",
         "quiet_hours_start", "quiet_hours_end", "updated_at",
-        # autonomous + digest booleans/numerics kept as jsonb sidecar
         "settings_raw", "channel_settings_raw",
         "source_firestore_id",
     },
@@ -177,36 +152,36 @@ ALLOWED_COLUMNS = {
     },
 }
 
-
 def filter_columns(table: str, row: dict) -> dict:
-    """Strip any key not in our allowed column set."""
     allowed = ALLOWED_COLUMNS.get(table, set())
     if not allowed:
         return row
     return {k: v for k, v in row.items() if k in allowed}
 
+# ═══════════════════════════════════════════════════════════════════
+# TRANSFORMERS
+# ═══════════════════════════════════════════════════════════════════
 
 def transform_users(raw: dict) -> dict:
     r = snake_keys(deep_normalize_ts(raw))
-
     prefs = r.pop("preferences", {}) or {}
     firestore_id = r.pop("_id", None) or r.get("id")
 
     primary = {
-        "id": r.get("id"),
+        "id":                  r.get("id"),
         "source_firestore_id": firestore_id,
-        "email": r.get("email"),
-        "name": r.get("name"),
-        "plan": r.get("plan"),
-        "created_at": r.get("created_at"),
-        "avatar_url": r.get("avatar_url"),  # may be null – that's fine
+        "email":               r.get("email"),
+        "name":                r.get("name"),
+        "plan":                r.get("plan"),
+        "created_at":          r.get("created_at"),
+        "avatar_url":          r.get("avatar_url"),
     }
     primary = {k: v for k, v in primary.items() if v is not None or k in ("avatar_url",)}
 
     children = []
     if prefs and primary.get("id"):
         pref_row = {
-            "user_id": primary["id"],
+            "user_id":  primary["id"],
             "username": prefs.get("username"),
             "title":    prefs.get("title"),
             "address":  prefs.get("address"),
@@ -223,7 +198,7 @@ def transform_user_subscriptions(raw: dict) -> dict:
     firestore_id = r.pop("_id", None)
 
     primary = {
-        "id":                  r.get("id") or firestore_id,
+        "id":                  r.get("id") or firestore_id,   # FIX-B: id is conflict col
         "source_firestore_id": firestore_id,
         "user_id":             r.get("user_id"),
         "plan":                r.get("plan"),
@@ -242,20 +217,19 @@ def transform_notification_preferences(raw: dict) -> dict:
     r = snake_keys(deep_normalize_ts(raw))
     firestore_id = r.pop("_id", None)
 
-    # boolean / numeric autonomous + digest settings → jsonb sidecar
     autonomous_keys = {k: v for k, v in r.items() if k.startswith("autonomous") or k.startswith("digest")}
     channel_settings = r.get("channel_settings", {})
 
     primary = {
-        "source_firestore_id":   firestore_id,
-        "user_id":               r.get("user_id"),
-        "enabled_channels":      r.get("enabled_channels"),   # list → jsonb
-        "disabled_categories":   r.get("disabled_categories"),  # list → jsonb
-        "quiet_hours_start":     r.get("quiet_hours_start"),
-        "quiet_hours_end":       r.get("quiet_hours_end"),
-        "updated_at":            r.get("updated_at"),
-        "settings_raw":          json.dumps(autonomous_keys) if autonomous_keys else None,
-        "channel_settings_raw":  json.dumps(channel_settings) if channel_settings else None,
+        "source_firestore_id":  firestore_id,
+        "user_id":              r.get("user_id"),
+        "enabled_channels":     r.get("enabled_channels"),
+        "disabled_categories":  r.get("disabled_categories"),
+        "quiet_hours_start":    r.get("quiet_hours_start"),
+        "quiet_hours_end":      r.get("quiet_hours_end"),
+        "updated_at":           r.get("updated_at"),
+        "settings_raw":         json.dumps(autonomous_keys) if autonomous_keys else None,
+        "channel_settings_raw": json.dumps(channel_settings) if channel_settings else None,
     }
     primary = {k: v for k, v in primary.items() if v is not None}
     return {"primary": primary, "children": []}
@@ -265,9 +239,8 @@ def transform_notifications(raw: dict) -> dict:
     r = snake_keys(deep_normalize_ts(raw))
     firestore_id = r.pop("_id", None)
 
-    # richData has 32 dynamic keys — store as jsonb blob
-    rich_data  = r.get("rich_data", {})
-    delivery   = r.get("delivery_status", {})
+    rich_data = r.get("rich_data", {})
+    delivery  = r.get("delivery_status", {})
 
     primary = {
         "id":                  r.get("notification_id") or firestore_id,
@@ -281,7 +254,7 @@ def transform_notifications(raw: dict) -> dict:
         "is_read":             r.get("read", False),
         "created_at":          r.get("created_at") or r.get("timestamp"),
         "read_at":             r.get("read_at"),
-        "channels_to_send":    r.get("channels_to_send"),    # list → jsonb
+        "channels_to_send":    r.get("channels_to_send"),
         "delivery_status":     json.dumps(delivery) if delivery else None,
         "rich_data_raw":       json.dumps(rich_data) if rich_data else None,
         "action_url":          r.get("action_url"),
@@ -361,17 +334,26 @@ TRANSFORMERS = {
     "ai_activity":              (transform_ai_activity,              "ai_activity"),
 }
 
+# ═══════════════════════════════════════════════════════════════════
+# CONFLICT COLUMN MAP
+# FIX-B: user_subscriptions uses "id" not "user_id" (no unique constraint on user_id)
+# ═══════════════════════════════════════════════════════════════════
+CONFLICT_COLS = {
+    "users":                    "id",
+    "user_preferences":         "user_id",
+    "user_subscriptions":       "id",          # FIX-B: was "user_id"
+    "notification_preferences": "user_id",
+    "notifications":            "id",
+    "tasks":                    "id",
+    "task_steps":               "task_id,step_order",
+    "ai_activity":              "id",
+}
 
 # ═══════════════════════════════════════════════════════════════════
-# UPSERT ENGINE  (idempotent — safe to re-run)
+# UPSERT ENGINE
 # ═══════════════════════════════════════════════════════════════════
 
 def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tuple[int, int]:
-    """
-    Upsert rows in batches of BATCH_SIZE.
-    ON CONFLICT (conflict_col) DO NOTHING  → idempotent.
-    Returns (success_count, fail_count).
-    """
     if not rows:
         return 0, 0
 
@@ -395,7 +377,6 @@ def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tupl
         except Exception as e:
             err_msg = str(e)
             print(f"  ✗ {table} batch [{i}:{i+len(batch)}] error: {err_msg[:120]}")
-            # Try row-by-row to isolate bad records
             for row in batch:
                 try:
                     (
@@ -410,21 +391,66 @@ def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tupl
 
     return success, fail
 
-
 # ═══════════════════════════════════════════════════════════════════
-# CONFLICT COLUMN MAP (per table)
+# FIX-C: Insert placeholder users for orphaned user_ids
+# so FK constraints on child tables don't fail.
 # ═══════════════════════════════════════════════════════════════════
-CONFLICT_COLS = {
-    "users":                    "id",
-    "user_preferences":         "user_id",
-    "user_subscriptions":       "user_id",
-    "notification_preferences": "user_id",
-    "notifications":            "id",
-    "tasks":                    "id",
-    "task_steps":               "task_id,step_order",
-    "ai_activity":              "id",
-}
 
+def ensure_placeholder_users(data: dict) -> int:
+    """
+    For every user_id referenced in child collections that has no matching
+    user record, insert a minimal placeholder row so FK constraints pass.
+    Returns the number of placeholders inserted.
+    """
+    # Collect all known user IDs from the users collection
+    known_ids: set[str] = set()
+    for r in data.get("users", []):
+        uid = r.get("id") or r.get("_id")
+        if uid:
+            known_ids.add(uid)
+
+    # Collect all orphaned user_ids from child collections
+    orphan_ids: set[str] = set()
+    for col in ("user_subscriptions", "notification_preferences",
+                "notifications", "tasks", "ai_activity"):
+        for r in data.get(col, []):
+            uid = r.get("userId") or r.get("user_id")
+            if uid and uid not in known_ids:
+                orphan_ids.add(uid)
+
+    if not orphan_ids:
+        return 0
+
+    print(f"\n── Inserting {len(orphan_ids)} placeholder users for orphaned FK refs ──")
+
+    placeholders = [
+        {
+            "id":                  uid,
+            "source_firestore_id": uid,
+            "email":               f"placeholder_{uid[:8]}@migrated.invalid",
+            "name":                f"[Placeholder {uid[:8]}]",
+            "created_at":          datetime.now(timezone.utc).isoformat(),
+        }
+        for uid in orphan_ids
+    ]
+
+    inserted = 0
+    for i in range(0, len(placeholders), BATCH_SIZE):
+        batch = placeholders[i : i + BATCH_SIZE]
+        if DRY_RUN:
+            print(f"  [DRY RUN] would insert {len(batch)} placeholder users")
+            inserted += len(batch)
+            continue
+        try:
+            supabase.table("users").upsert(
+                batch, on_conflict="id", ignore_duplicates=True
+            ).execute()
+            inserted += len(batch)
+        except Exception as e:
+            print(f"  ✗ placeholder batch error: {e}")
+
+    print(f"  placeholder users  ✅ {inserted}  ❌ {len(placeholders) - inserted}")
+    return inserted
 
 # ═══════════════════════════════════════════════════════════════════
 # COLLECTION MIGRATOR
@@ -434,7 +460,7 @@ def migrate_collection(name: str, records: list[dict]) -> tuple[int, int]:
     transformer_fn, primary_table = TRANSFORMERS.get(name, (None, name))
 
     if transformer_fn is None:
-        print(f"  ⚠  No transformer for '{name}' – skipping.")
+        print(f"  ⚠  No transformer for '{name}' — skipping.")
         return 0, len(records)
 
     print(f"\n── {name}  ({len(records)} records) ──")
@@ -459,12 +485,10 @@ def migrate_collection(name: str, records: list[dict]) -> tuple[int, int]:
 
     total_s = total_f = 0
 
-    # --- Primary table ---
     s, f = upsert_batch(primary_table, primary_rows, CONFLICT_COLS.get(primary_table, "id"))
     total_s += s; total_f += f
     print(f"  {primary_table:<35} ✅ {s}  ❌ {f}")
 
-    # --- Child tables ---
     for child_table, rows in child_buckets.items():
         cs, cf = upsert_batch(child_table, rows, CONFLICT_COLS.get(child_table, "id"))
         total_s += cs; total_f += cf
@@ -472,9 +496,8 @@ def migrate_collection(name: str, records: list[dict]) -> tuple[int, int]:
 
     return total_s, total_f
 
-
 # ═══════════════════════════════════════════════════════════════════
-# ORPHAN REPORT  – surface FK mismatch without blocking migration
+# ORPHAN REPORT
 # ═══════════════════════════════════════════════════════════════════
 
 def orphan_report(data: dict) -> None:
@@ -494,14 +517,12 @@ def orphan_report(data: dict) -> None:
         fk_field = "userId" if "userId" in (records[0] if records else {}) else "user_id"
         orphans = [r for r in records if r.get(fk_field) not in user_ids]
         print(f"  {col}: {len(orphans)}/{len(records)} orphaned user refs")
-    print("  (FK constraints should be deferred / NOT VALID until ID reconciliation)\n")
-
+    print("  (Placeholders will be inserted automatically before child tables)\n")
 
 # ═══════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════
 
-# Migrate users FIRST so FK targets exist for other collections
 COLLECTION_ORDER = [
     "users",
     "user_subscriptions",
@@ -514,7 +535,7 @@ COLLECTION_ORDER = [
 
 def main():
     if DRY_RUN:
-        print("🔍  DRY RUN mode – no data will be written.\n")
+        print("🔍 DRY RUN mode — no data will be written.\n")
 
     with open(EXPORT_FILE, "r", encoding="utf-8") as f:
         data: dict = json.load(f)
@@ -522,19 +543,21 @@ def main():
     print(f"Loaded {EXPORT_FILE}  –  {len(data)} collections")
     orphan_report(data)
 
+    # FIX-C: insert placeholders BEFORE any child table migration
+    ensure_placeholder_users(data)
+
     total_success = total_failed = 0
     run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     for collection in COLLECTION_ORDER:
         records = data.get(collection)
         if not isinstance(records, list):
-            print(f"  (skipping {collection} – not found or not a list)")
+            print(f"  (skipping {collection} — not found or not a list)")
             continue
         s, f = migrate_collection(collection, records)
         total_success += s
         total_failed  += f
 
-    # Migrate any extra collections not in our ordered list
     for collection, records in data.items():
         if collection in COLLECTION_ORDER:
             continue
@@ -556,7 +579,7 @@ def main():
     if total_failed == 0 and not DLQ:
         print("\n  🎉 Clean migration!")
     else:
-        print("\n  Fix DLQ rows and re-run – script is idempotent (safe to retry).")
+        print("\n  Fix DLQ rows and re-run — script is idempotent (safe to retry).")
 
 
 if __name__ == "__main__":
