@@ -1,22 +1,12 @@
-param(
-  [string]$ApiKey
-)
+# run_with_gemini.ps1
+# DEPRECATED: The Gemini API key is no longer passed to the Flutter client.
+# The key now lives as a Railway environment variable in the backend.
+#
+# To run the app locally:
+#   flutter run -d chrome
+#
+# The app will call: https://forex-backend-production-bc44.up.railway.app/api/ai/chat
+# Make sure GEMINI_API_KEY is set in your Railway service variables.
 
-$ErrorActionPreference = "Stop"
-
-$key = if ($ApiKey -and $ApiKey.Trim().Length -gt 0) {
-  $ApiKey.Trim()
-} else {
-  $env:GEMINI_API_KEY
-}
-
-if (-not $key -or $key.Trim().Length -eq 0) {
-  Write-Host "GEMINI_API_KEY is not set. Provide it or set the env var." -ForegroundColor Red
-  Write-Host "Examples:" -ForegroundColor Yellow
-  Write-Host "  .\\run_with_gemini.ps1 -ApiKey 'YOUR_KEY'" -ForegroundColor Yellow
-  Write-Host "  `$env:GEMINI_API_KEY = 'YOUR_KEY'" -ForegroundColor Yellow
-  exit 1
-}
-
-Write-Host "Launching Flutter with Gemini API key..." -ForegroundColor Green
-flutter run --dart-define=GEMINI_API_KEY=$key
+Write-Host "Running Flutter app (Gemini key is backend-only now)..." -ForegroundColor Green
+flutter run -d chrome

@@ -15,6 +15,7 @@ import json
 import uuid
 import asyncio
 import logging
+import importlib
 from collections import defaultdict, deque
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -165,12 +166,13 @@ def _init_sentry_if_configured() -> None:
     if not config.monitoring.sentry_dsn:
         return
     try:
-        import sentry_sdk
-        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        sentry_sdk = importlib.import_module("sentry_sdk")
+        fastapi_integration_module = importlib.import_module("sentry_sdk.integrations.fastapi")
+        fastapi_integration_cls = getattr(fastapi_integration_module, "FastApiIntegration")
 
         sentry_sdk.init(
             dsn=config.monitoring.sentry_dsn,
-            integrations=[FastApiIntegration()],
+            integrations=[fastapi_integration_cls()],
             traces_sample_rate=config.monitoring.sentry_traces_sample_rate,
             environment=config.runtime.environment,
             release=config.monitoring.app_release or None,
@@ -292,6 +294,13 @@ try:
 except ImportError:
     MONITORING_ROUTES_AVAILABLE = False
     print("[WARN] Monitoring routes not available")
+
+try:
+    from .routers.ai_proxy import router as ai_proxy_router
+    AI_PROXY_AVAILABLE = True
+except ImportError:
+    AI_PROXY_AVAILABLE = False
+    print("[WARN] AI proxy routes not available")
 
 from .enhanced_websocket_manager import ws_manager
 from .forex_data_service import forex_service
@@ -551,7 +560,7 @@ async def lifespan(app: FastAPI):
     await redis_store.close()
     logger.info("[Shutdown] complete")
 
-
+    
 app = FastAPI(
     title="Forex Companion AI API",
     description="AI-Powered Autonomous Forex Trading System",
@@ -853,8 +862,8 @@ _public_unauthenticated_auth_paths = {
     "/auth/password-reset",
     "/auth/email-verification",
     "/auth/email-provider-status",
+    "/api/ai/health",
 }
-
 
 @app.middleware("http")
 async def request_size_limit_middleware(request: Request, call_next):
@@ -1171,6 +1180,8 @@ if OPS_ROUTES_AVAILABLE:
     app.include_router(ops_router)
 if MONITORING_ROUTES_AVAILABLE:
     app.include_router(monitoring_router)
+if AI_PROXY_AVAILABLE:
+    app.include_router(ai_proxy_router)
 
 
 @app.get("/")

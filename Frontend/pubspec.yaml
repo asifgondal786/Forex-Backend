@@ -32,9 +32,6 @@ dependencies:
   cloud_firestore: ^6.1.1
   firebase_storage: ^13.0.5
   
-  # Gemini AI
-  google_generative_ai: ^0.4.7
-  
   # Local Storage
   shared_preferences: ^2.2.2
   # sqflite: ^2.3.0
