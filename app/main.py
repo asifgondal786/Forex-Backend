@@ -862,8 +862,8 @@ _public_unauthenticated_auth_paths = {
     "/auth/password-reset",
     "/auth/email-verification",
     "/auth/email-provider-status",
+    "/api/ai/health",
 }
-
 
 @app.middleware("http")
 async def request_size_limit_middleware(request: Request, call_next):
