@@ -48,3 +48,6 @@ firebase_key.json
 *firebase-adminsdk*.json
 *service-account*.json
 dlq_*.json
+
+.env.development
+.env.production
