@@ -848,6 +848,16 @@ _rate_limit_store = defaultdict(deque)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
+
+def _normalize_middleware_path(path: str) -> str:
+    if not path:
+        return "/"
+    if path != "/" and path.endswith("/"):
+        normalized = path.rstrip("/")
+        return normalized or "/"
+    return path
+
+
 _auth_rate_limit_enabled = _runtime_config.security.auth_rate_limit_enabled
 _auth_rate_limit_max = _runtime_config.security.auth_rate_limit_max
 _auth_rate_limit_window = _runtime_config.security.auth_rate_limit_window_seconds
@@ -857,12 +867,15 @@ _auth_rate_limited_paths = {
     "/auth/email-verification",
     "/auth/login",
     "/auth/signup",
+    "/auth/email-provider-status",   # ← add this
 }
+# app/main.py — find this set:
 _public_unauthenticated_auth_paths = {
     "/auth/password-reset",
     "/auth/email-verification",
     "/auth/email-provider-status",
     "/api/ai/health",
+    "/api/health",        # ← add this line
 }
 
 @app.middleware("http")
@@ -898,7 +911,7 @@ async def auth_rate_limit_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    path = request.url.path
+    path = _normalize_middleware_path(request.url.path)
     if path not in _auth_rate_limited_paths:
         return await call_next(request)
 
@@ -939,7 +952,7 @@ async def rate_limit_middleware(request: Request, call_next):
     if not _rate_limit_enabled:
         return await call_next(request)
 
-    path = request.url.path
+    path = _normalize_middleware_path(request.url.path)
     if path in _rate_limit_exempt or path.startswith("/docs"):
         return await call_next(request)
 
@@ -968,6 +981,7 @@ async def rate_limit_middleware(request: Request, call_next):
                 message="Rate limit exceeded",
                 request_id=_request_id_from_request(request),
             ),
+            headers={"Retry-After": str(_rate_limit_window)},   # ← add this
         )
     bucket.append(now)
     return await call_next(request)
@@ -977,7 +991,7 @@ async def strict_auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    path = request.url.path
+    path = _normalize_middleware_path(request.url.path)
     if path in _public_unauthenticated_auth_paths:
         return await call_next(request)
 
@@ -1240,3 +1254,4 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+

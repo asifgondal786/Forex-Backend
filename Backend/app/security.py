@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from typing import Optional, Dict, Any
@@ -7,6 +8,7 @@ from starlette.requests import HTTPConnection
 
 from .utils.firestore_client import verify_firebase_token
 
+logger = logging.getLogger("app.security")
 
 _USER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{3,128}$")
 
@@ -44,14 +46,34 @@ def _extract_bearer_token(auth_header: Optional[str]) -> Optional[str]:
 
 
 def _dev_auth_header_valid(connection: HTTPConnection) -> bool:
+    """
+    Validates the X-Dev-Auth shared secret header.
+    SECURITY: Returns False if no secret is configured — dev auth requires
+    an explicit secret. Previously returned True when secret was absent,
+    which allowed any localhost request to bypass auth without a secret.
+    """
     shared_secret = (os.getenv("DEV_AUTH_SHARED_SECRET") or "").strip()
     if not shared_secret:
-        return True
+        return False
     provided = (connection.headers.get("x-dev-auth") or "").strip()
     return provided == shared_secret
 
 
 def resolve_dev_user(connection: HTTPConnection) -> Optional[str]:
+    """
+    Resolves a dev user from request headers/params.
+    Hard-disabled in production regardless of environment variables.
+    Requires ALLOW_DEV_USER_ID=true, a valid DEV_AUTH_SHARED_SECRET,
+    and (by default) a localhost client.
+    """
+    # Hard-disable in production regardless of any env var settings.
+    from .config.index import get_config
+    if get_config().runtime.is_production:
+        return None
+
+    if not _allow_dev_user_id():
+        return None
+
     requested_user = (
         connection.headers.get("x-user-id")
         or connection.query_params.get("user_id")
@@ -61,8 +83,6 @@ def resolve_dev_user(connection: HTTPConnection) -> Optional[str]:
     requested_user = requested_user.strip()
     if not _is_valid_user_id(requested_user):
         return None
-    if not _allow_dev_user_id():
-        return None
 
     localhost_only = _env_bool("DEV_USER_LOCALHOST_ONLY", True)
     if localhost_only and not _is_local_client(connection):
@@ -71,7 +91,17 @@ def resolve_dev_user(connection: HTTPConnection) -> Optional[str]:
     if not _dev_auth_header_valid(connection):
         return None
 
+    logger.debug("resolve_dev_user: granted dev session for user_id=%s", requested_user)
     return requested_user
+
+
+def _dev_claims(user_id: str) -> Dict[str, Any]:
+    return {
+        "uid": user_id,
+        "email": f"{user_id}@example.com",
+        "name": "Dev User",
+        "dev": True,
+    }
 
 
 async def get_token_claims(
@@ -107,15 +137,6 @@ async def get_current_user_id(
             detail="Invalid Firebase token payload",
         )
     return user_id
-
-
-def _dev_claims(user_id: str) -> Dict[str, Any]:
-    return {
-        "uid": user_id,
-        "email": f"{user_id}@example.com",
-        "name": "Dev User",
-        "dev": True,
-    }
 
 
 async def verify_http_request(request: Request) -> Dict[str, Any]:
