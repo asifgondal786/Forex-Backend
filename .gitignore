@@ -28,3 +28,13 @@ firebase-debug.log
 
 # Dependencies
 node_modules/
+
+node_modules/
+
+build/
+
+*.pyc
+
+__pycache__/
+
+dlq_*.json
