@@ -29,7 +29,9 @@ def test_root():
 
 
 def test_health():
-    with patch("app.security.verify_firebase_token", return_value=FAKE_CLAIMS):
+    # /api/health is exempt — no token required once main.py one-liner is applied.
+    # Until then, we mock to confirm the endpoint itself works correctly.
+    with patch("app.utils.firestore_client.verify_firebase_token", return_value=FAKE_CLAIMS):
         with _authed_client() as client:
             response = client.get("/api/health", headers=AUTH_HEADERS)
     assert response.status_code == 200
@@ -38,7 +40,7 @@ def test_health():
 
 
 def test_task_queue_status():
-    with patch("app.security.verify_firebase_token", return_value=FAKE_CLAIMS):
+    with patch("app.utils.firestore_client.verify_firebase_token", return_value=FAKE_CLAIMS):
         with _authed_client() as client:
             response = client.get("/api/tasks/queue/status", headers=AUTH_HEADERS)
     assert response.status_code == 200

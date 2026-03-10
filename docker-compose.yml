@@ -1,0 +1,70 @@
+# ─── Tajir / Forex Companion AI — Local Development Stack ────────────────────
+#
+# Usage:
+#   docker compose up -d --build    # first run / after requirements.txt change
+#   docker compose up -d            # start (no rebuild)
+#   docker compose down             # stop
+#   docker compose logs -f backend  # tail logs
+#
+# Secrets: ensure D:\Tajir\Backend\.env.development exists before starting.
+# Copy .env.example → .env.development and fill in real values.
+#
+# Optional offline DB:
+#   docker compose --profile supabase up -d
+
+services:
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./Backend          # D:\Tajir\Backend  — where Dockerfile lives
+      dockerfile: Dockerfile      # D:\Tajir\Backend\Dockerfile  ✓
+    container_name: tajir-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      # Bind-mount source → uvicorn --reload picks up every .py save
+      - ./Backend:/backend
+      # Keep the image's pip-installed packages, don't overwrite with host .venv
+      - /backend/.venv
+    env_file:
+      - ./Backend/.env.development
+    environment:
+      DEBUG: "true"
+      ENVIRONMENT: "development"
+      CORS_ALLOW_LOCALHOST: "true"
+      DEV_USER_LOCALHOST_ONLY: "true"
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── Optional: Supabase local emulator ────────────────────────────────────────
+  # Start with:  docker compose --profile supabase up -d
+  supabase-db:
+    profiles: ["supabase"]
+    image: supabase/postgres:15.6.1.143
+    container_name: tajir-supabase-db
+    ports:
+      - "54322:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - supabase_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  supabase_db_data:
+
+networks:
+  default:
+    name: tajir-dev
