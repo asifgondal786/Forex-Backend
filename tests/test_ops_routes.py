@@ -1,16 +1,19 @@
 import os
 import pytest
-
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
-os.environ["ALLOW_DEV_USER_ID"] = "true"
-os.environ["DEV_USER_LOCALHOST_ONLY"] = "false"
 os.environ["FOREX_STREAM_ENABLED"] = "false"
 
 from app.main import app
 from app import ops_routes
 
-client = TestClient(app)
+FAKE_CLAIMS = {"uid": "ops_user", "email": "ops@example.com"}
+AUTH_HEADERS = {"Authorization": "Bearer fake-ops-token"}
+
+
+def _authed_client():
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def _payload_or_data(response_json: dict) -> dict:
@@ -20,10 +23,11 @@ def _payload_or_data(response_json: dict) -> dict:
 
 
 def test_ops_status_endpoint():
-    response = client.get("/api/ops/status", headers={"x-user-id": "ops_user"})
+    with patch("app.security.verify_firebase_token", return_value=FAKE_CLAIMS):
+        with _authed_client() as client:
+            response = client.get("/api/ops/status", headers=AUTH_HEADERS)
     assert response.status_code == 200
     payload = _payload_or_data(response.json())
-
     assert "timestamp" in payload
     assert "queue" in payload
     assert "websocket" in payload
@@ -35,10 +39,11 @@ def test_ops_status_endpoint():
 
 
 def test_ops_alerts_endpoint():
-    response = client.get("/api/ops/alerts", headers={"x-user-id": "ops_user"})
+    with patch("app.security.verify_firebase_token", return_value=FAKE_CLAIMS):
+        with _authed_client() as client:
+            response = client.get("/api/ops/alerts", headers=AUTH_HEADERS)
     assert response.status_code == 200
     payload = _payload_or_data(response.json())
-
     assert "timestamp" in payload
     assert "alerts" in payload
     assert "total" in payload
@@ -47,11 +52,12 @@ def test_ops_alerts_endpoint():
 
 
 def test_ops_metrics_endpoint():
-    response = client.get("/api/ops/metrics", headers={"x-user-id": "ops_user"})
+    with patch("app.security.verify_firebase_token", return_value=FAKE_CLAIMS):
+        with _authed_client() as client:
+            response = client.get("/api/ops/metrics", headers=AUTH_HEADERS)
     assert response.status_code == 200
     content_type = response.headers.get("content-type", "")
     assert "text/plain" in content_type
-
     body = response.text
     assert "forex_backend_queue_started" in body
     assert "forex_backend_queue_size" in body
@@ -87,10 +93,11 @@ async def test_emit_alert_hooks_sends_webhook_on_trigger_and_resolve(monkeypatch
 
 
 def test_ops_readiness_endpoint():
-    response = client.get("/api/ops/readiness", headers={"x-user-id": "ops_user"})
+    with patch("app.security.verify_firebase_token", return_value=FAKE_CLAIMS):
+        with _authed_client() as client:
+            response = client.get("/api/ops/readiness", headers=AUTH_HEADERS)
     assert response.status_code == 200
     payload = _payload_or_data(response.json())
-
     assert "ready" in payload
     assert "checks" in payload
     assert "queue" in payload["checks"]
