@@ -452,7 +452,7 @@ class ForexDataService:
             if not GEMINI_AVAILABLE:
                 return self.get_default_sentiment(rates)
                 
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel("gemini-1.5-flash")
             
             # Format news for analysis
             news_text = "\n".join([
@@ -527,7 +527,7 @@ class ForexDataService:
                     "prediction": None
                 }
                 
-            model = genai.GenerativeModel("gemini-1.5-pro")
+            model = genai.GenerativeModel("gemini-1.5-flash")
             
             # Format historical data for analysis
             data_text = "\n".join([
