@@ -1,5 +1,6 @@
 import 'dart:async';
-
+import '../../shared/widgets/mode_switcher_widget.dart';
+import '../../providers/mode_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
@@ -447,6 +448,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Dashboard Mode Selector
+                      _buildSectionCard(
+                        title: 'Dashboard Mode',
+                        child: const ModeSwitcherWidget(),
+                      ),
+
+                      const SizedBox(height: 24),
+
                       // Profile Section
                       _buildSectionCard(
                         title: 'Profile Information',

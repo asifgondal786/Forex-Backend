@@ -59,7 +59,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           .map((m) => '${m.isUser ? "User" : "AI"}: ${m.text}')
           .toList();
       
-      final response = await _geminiService.chat(message, context: context);
+      final response = await _geminiService.sendMessage(message);
       _addMessage(response, isUser: false);
     } catch (e) {
       _addMessage('Sorry, I encountered an error: $e', isUser: false);

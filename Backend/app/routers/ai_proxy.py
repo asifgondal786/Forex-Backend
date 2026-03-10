@@ -57,7 +57,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     system_prompt: Optional[str] = None
-    model: Optional[str] = "gemini-2.0-flash"
+    model: Optional[str] = "gemini-1.5-flash"
 
 
 class ChatResponse(BaseModel):

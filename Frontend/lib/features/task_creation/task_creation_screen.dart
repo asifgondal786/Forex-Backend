@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
@@ -37,14 +38,29 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     setState(() => _isAiEnhancing = true);
 
     try {
-      final suggestion = await _geminiService
-          .generateTaskSuggestion(_titleController.text.trim());
+      final raw = await _geminiService
+    .sendMessage(
+      'Suggest a Forex trading task for: ${_titleController.text.trim()}. '
+      'Reply ONLY with valid JSON like: '
+      '{"description":"...","priority":"high|medium|low"}',
+    );
 
-      if (mounted) {
-        setState(() {
-          _aiSuggestion = suggestion;
-          if (suggestion['description'] != null) {
-            _descriptionController.text = suggestion['description'];
+    Map<String, dynamic> suggestion = {};
+    try {
+      final jsonStr = raw.contains('{')
+      ? raw.substring(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
+      : '{}';
+      suggestion = Map<String, dynamic>.from(
+    jsonStr.isNotEmpty ? (json.decode(jsonStr) as Map) : {},
+  );
+} catch (_) {}
+
+  if (mounted) {
+    setState(() {
+    _aiSuggestion = suggestion;
+    if (suggestion['description'] != null) {
+
+
           }
           if (suggestion['priority'] != null) {
             final priority = suggestion['priority'].toLowerCase();

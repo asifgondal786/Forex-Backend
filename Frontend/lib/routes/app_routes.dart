@@ -36,14 +36,13 @@ class AppRoutes {
     signup: (_) => const SignupScreen(),
     verify: (_) => const VerificationScreen(),
     reset: (_) => const PasswordResetScreen(),
-    dashboard: (_) => const _ProtectedRoute(child: EmbodiedAgentScreen()),
+    dashboard: (_) => const _ProtectedRoute(child: ModeRouter()),
     createTask: (_) => const _ProtectedRoute(child: TaskCreationScreen()),
     taskHistory: (_) => const _ProtectedRoute(child: TaskHistoryScreen()),
     aiChat: (_) => const _ProtectedRoute(child: AiChatScreen()),
     settings: (_) => const _ProtectedRoute(child: SettingsScreen()),
     profile: (_) => const _ProtectedRoute(child: UserAdminDashboardScreen()),
     '/onboarding': (_) => const OnboardingScreen(),
-    '/dashboard':  (_) => const _ProtectedRoute(child: ModeRouter()),
     security: (_) =>
         const _ProtectedRoute(child: PlaceholderScreen(title: 'Security')),
     help: (_) => const _ProtectedRoute(

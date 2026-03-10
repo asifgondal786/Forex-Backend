@@ -170,7 +170,7 @@ class LiveUpdatesService {
       final wsUrl = Uri.parse('$_resolvedWsBaseUrl/api/ws')
           .replace(queryParameters: params)
           .toString();
-      debugPrint('Connecting to: $wsUrl');
+      debugPrint('Connecting to live updates...');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       await _channel!.ready.timeout(const Duration(seconds: 5));
