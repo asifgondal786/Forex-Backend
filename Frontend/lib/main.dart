@@ -1,3 +1,4 @@
+import 'providers/mode_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -104,6 +105,7 @@ class ForexCompanionApp extends StatelessWidget {
         Provider<LiveUpdatesService>(
           create: (_) => LiveUpdatesService(),
           dispose: (_, service) => service.dispose(),
+          ChangeNotifierProvider(create: (_) => ModeProvider()..load()),
         ),
 
         // Theme Provider

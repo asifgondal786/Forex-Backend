@@ -1,70 +1,66 @@
-# ─── Tajir / Forex Companion AI — Local Development Stack ────────────────────
+# =============================================================================
+# Tajir / Forex Companion AI — Local Development Stack
+# Backend only — Supabase and Flutter run as-is (cloud + native)
+# =============================================================================
 #
 # Usage:
-#   docker compose up -d --build    # first run / after requirements.txt change
-#   docker compose up -d            # start (no rebuild)
-#   docker compose down             # stop
+#   docker compose up               # start with logs
+#   docker compose up -d            # start detached
 #   docker compose logs -f backend  # tail logs
+#   docker compose down             # stop
 #
-# Secrets: ensure D:\Tajir\Backend\.env.development exists before starting.
-# Copy .env.example → .env.development and fill in real values.
-#
-# Optional offline DB:
-#   docker compose --profile supabase up -d
+# Backend:  http://localhost:8000
+# Docs UI:  http://localhost:8000/docs
+# Health:   http://localhost:8000/health
+# =============================================================================
+
+version: "3.9"
 
 services:
 
-  # ── FastAPI Backend ──────────────────────────────────────────────────────────
   backend:
-    build:
-      context: ./Backend          # D:\Tajir\Backend  — where Dockerfile lives
-      dockerfile: Dockerfile      # D:\Tajir\Backend\Dockerfile  ✓
+    image: python:3.12-slim
     container_name: tajir-backend
-    ports:
-      - "8080:8080"
+    working_dir: /app
+
     volumes:
-      # Bind-mount source → uvicorn --reload picks up every .py save
-      - ./Backend:/backend
-      # Keep the image's pip-installed packages, don't overwrite with host .venv
-      - /backend/.venv
+      # Live-mount your source — uvicorn --reload picks up every file save
+      - type: bind
+        source: ./Backend
+        target: /app
+
     env_file:
+      # All secrets (Firebase, Supabase cloud, Gemini, Brevo) from here
+      # This file is already in .gitignore — never committed
       - ./Backend/.env.development
+
     environment:
-      DEBUG: "true"
-      ENVIRONMENT: "development"
-      CORS_ALLOW_LOCALHOST: "true"
-      DEV_USER_LOCALHOST_ONLY: "true"
-      PORT: "8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      ENVIRONMENT: development
+      # Supabase stays on cloud — no override needed
+      # Uncomment below only if you later add a local DB:
+      # SUPABASE_URL: http://host.docker.internal:54321
+
+    ports:
+      - "8000:8000"
+
+    # Install deps then start with hot-reload
+    # pip cache is inside the container — reinstall only when requirements.txt changes
+    command: >
+      sh -c "
+        pip install --quiet --no-cache-dir -r requirements.txt &&
+        uvicorn app.main:app
+          --host 0.0.0.0
+          --port 8000
+          --reload
+          --reload-dir /app/app
+          --log-level info
+      "
+
     restart: unless-stopped
 
-  # ── Optional: Supabase local emulator ────────────────────────────────────────
-  # Start with:  docker compose --profile supabase up -d
-  supabase-db:
-    profiles: ["supabase"]
-    image: supabase/postgres:15.6.1.143
-    container_name: tajir-supabase-db
-    ports:
-      - "54322:5432"
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    volumes:
-      - supabase_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
       timeout: 5s
-      retries: 5
-
-volumes:
-  supabase_db_data:
-
-networks:
-  default:
-    name: tajir-dev
+      retries: 3
+      start_period: 30s   # give pip install time on first boot

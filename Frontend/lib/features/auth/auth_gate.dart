@@ -5,9 +5,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 import '../embodied_agent/embodied_agent_screen.dart';
+import '../onboarding/onboarding_screen.dart';
+import '../dashboard/mode_router.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/header_provider.dart';
+import '../../providers/mode_provider.dart';
 import 'login_screen.dart';
 import 'verification_screen.dart';
 
@@ -50,6 +53,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    // ── Dev shortcut (debug only) ──────────────────────────────────────────
     if (_skipAuthGate && kDebugMode) {
       if (_devUserId.isNotEmpty) {
         _fetchAfterBuild(context);
@@ -88,7 +92,22 @@ class _AuthGateState extends State<AuthGate> {
 
         _fetchAfterBuild(context);
 
-        return const EmbodiedAgentScreen();
+        // ── Mode routing ───────────────────────────────────────────────────
+        // Wait until ModeProvider has loaded from SharedPreferences
+        final modeProvider = context.watch<ModeProvider>();
+        if (!modeProvider.loaded) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // First-time user → show onboarding mode selector
+        if (!modeProvider.hasChosen) {
+          return const OnboardingScreen();
+        }
+
+        // Returning user → go straight to their chosen mode
+        return const ModeRouter();
       },
     );
   }

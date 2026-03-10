@@ -1,3 +1,5 @@
+import '../features/onboarding/onboarding_screen.dart';
+import '../features/dashboard/mode_router.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -40,6 +42,8 @@ class AppRoutes {
     aiChat: (_) => const _ProtectedRoute(child: AiChatScreen()),
     settings: (_) => const _ProtectedRoute(child: SettingsScreen()),
     profile: (_) => const _ProtectedRoute(child: UserAdminDashboardScreen()),
+    '/onboarding': (_) => const OnboardingScreen(),
+    '/dashboard':  (_) => const _ProtectedRoute(child: ModeRouter()),
     security: (_) =>
         const _ProtectedRoute(child: PlaceholderScreen(title: 'Security')),
     help: (_) => const _ProtectedRoute(
