@@ -101,21 +101,15 @@ class AgentOrchestratorProvider extends ChangeNotifier {
       return;
     }
     _initialized = true;
-    _isVoiceListening = true;
+    _isVoiceListening = false; // Voice is OFF by default — user must activate
 
-    _addSystemMessage(_localizedWelcome(), speak: true);
+    // Show welcome message silently (no auto-speak)
+    _addSystemMessage(_localizedWelcome(), speak: false);
     await _sendMarketBriefing(isWelcome: true);
     await refreshGuardrails();
     _startMarketBriefingLoop();
     _syncAutonomousLoop();
-    if (_voiceAssistant.supportsSpeechRecognition) {
-      Future<void>.delayed(const Duration(milliseconds: 1200), () {
-        if (!_initialized || !_isVoiceListening || _isProcessing) {
-          return;
-        }
-        unawaited(captureVoiceCommand(silentFailure: true));
-      });
-    }
+    // Auto voice capture removed — user activates via mic button
   }
 
   Future<void> setLanguage(String languageCode, {bool announce = true}) async {
@@ -196,22 +190,22 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     );
   }
 
+
   void toggleVoiceListening() {
     _isVoiceListening = !_isVoiceListening;
     if (!_isVoiceListening) {
       _voiceAssistant.stop();
+      _addSystemMessage(_localizedVoiceDisabled(), speak: false);
     } else {
       unawaited(_voiceAssistant.unlockAudio());
       _periodicVoiceBriefingsEnabled = true;
-      _startMarketBriefingLoop();
+      // Speak time-based greeting when user activates voice
+      _addSystemMessage(_localizedTimeBasedGreeting(), speak: true);
       unawaited(_sendMarketBriefing(forceSpeak: true));
     }
-    _addSystemMessage(
-      _isVoiceListening ? _localizedVoiceEnabled() : _localizedVoiceDisabled(),
-      speak: _isVoiceListening,
-    );
     notifyListeners();
   }
+
 
   Future<void> triggerVoiceTest() async {
     if (_disposed == true) {
@@ -1318,6 +1312,26 @@ class AgentOrchestratorProvider extends ChangeNotifier {
               isWelcome ? 'welcome_market_briefing' : 'periodic_market_briefing',
         ),
       );
+
+  String _localizedTimeBasedGreeting() {
+    final hour = DateTime.now().hour;
+    String period;
+    if (hour >= 5 && hour < 12) {
+      period = _languageCode == 'ur' ? 'صبح بخیر' : 'Good Morning';
+    } else if (hour >= 12 && hour < 17) {
+      period = _languageCode == 'ur' ? 'دوپہر بخیر' : 'Good Afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      period = _languageCode == 'ur' ? 'شام بخیر' : 'Good Evening';
+    } else {
+      period = _languageCode == 'ur' ? 'خوش آمدید' : 'Welcome Back';
+    }
+    if (_languageCode == 'ur') {
+      return '$period، سر۔ میں حاضر ہوں۔ مارکیٹ کے بارے میں کیا جاننا چاہتے ہیں؟';
+    }
+    return '$period, Sir. I\'m ready. What would you like to know about the market?';
+  }
+  
+
     } catch (_) {
       if (isWelcome || forceSpeak) {
         _addSystemMessage(

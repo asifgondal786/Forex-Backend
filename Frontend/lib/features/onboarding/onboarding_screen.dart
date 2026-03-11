@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/mode_provider.dart';
@@ -47,7 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       mode: AppMode.aiChat,
       icon: Icons.chat_bubble_rounded,
       label: 'AI Chat',
-      description: 'Ask anything about Forex — raw, direct answers from Gemini AI.',
+      description: 'Ask anything about Forex – raw, direct answers from Gemini AI.',
       color: Color(0xFF6C63FF),
       available: true,
     ),
@@ -79,7 +80,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       mode: AppMode.customSetup,
       icon: Icons.tune_rounded,
       label: 'Custom Setup',
-      description: 'Configure your own dashboard — pick what matters to you.',
+      description: 'Configure your own dashboard – pick what matters to you.',
       color: Color(0xFFB8860B),
       available: true,
     ),
@@ -88,37 +89,72 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void _onConfirm() {
     if (_selectedMode == null) return;
     context.read<ModeProvider>().setMode(_selectedMode!);
-    Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.dashboard,
+      (route) => false,
+    );
+  }
+
+  Future<void> _onWillPop() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D2E),
+        title: const Text('Exit App?', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Please select a mode to continue using Tajir.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Stay', style: TextStyle(color: Color(0xFF00C896))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Exit', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit == true) SystemNavigator.pop();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0F14) : const Color(0xFFF5F7FA),
-      body: FadeTransition(
-        opacity: _fadeIn,
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 36),
-              _buildHeader(),
-              const SizedBox(height: 28),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: _modes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, i) => _ModeCard(
-                    option: _modes[i],
-                    selected: _selectedMode == _modes[i].mode,
-                    onTap: () => setState(() => _selectedMode = _modes[i].mode),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) _onWillPop();
+      },
+      child: Scaffold(
+        backgroundColor:
+            isDark ? const Color(0xFF0D0F14) : const Color(0xFFF5F7FA),
+        body: FadeTransition(
+          opacity: _fadeIn,
+          child: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 36),
+                _buildHeader(),
+                const SizedBox(height: 28),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _modes.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) => _ModeCard(
+                      option: _modes[i],
+                      selected: _selectedMode == _modes[i].mode,
+                      onTap: () => setState(() => _selectedMode = _modes[i].mode),
+                    ),
                   ),
                 ),
-              ),
-              _buildBottomBar(),
-            ],
+                _buildBottomBar(),
+              ],
+            ),
           ),
         ),
       ),
@@ -130,7 +166,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          // Logo mark
           Container(
             width: 56,
             height: 56,
@@ -147,21 +182,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           const SizedBox(height: 16),
           const Text(
             'Welcome to Tajir',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
-            ),
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
           ),
           const SizedBox(height: 8),
           Text(
             'How would you like to start?\nYou can change this anytime in Settings.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-              height: 1.5,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500, height: 1.5),
           ),
         ],
       ),
@@ -183,9 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00C896),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
             child: Text(
@@ -201,23 +226,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-// ─── Mode card ───────────────────────────────────────────────────────────────
-
 class _ModeCard extends StatelessWidget {
   final _ModeOption option;
   final bool selected;
   final VoidCallback onTap;
 
-  const _ModeCard({
-    required this.option,
-    required this.selected,
-    required this.onTap,
-  });
+  const _ModeCard({required this.option, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -229,10 +247,7 @@ class _ModeCard extends StatelessWidget {
               ? option.color.withOpacity(isDark ? 0.15 : 0.08)
               : (isDark ? const Color(0xFF181B22) : Colors.white),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? option.color : Colors.transparent,
-            width: 1.8,
-          ),
+          border: Border.all(color: selected ? option.color : Colors.transparent, width: 1.8),
           boxShadow: selected
               ? [BoxShadow(color: option.color.withOpacity(0.18), blurRadius: 12, offset: const Offset(0, 4))]
               : [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 8, offset: const Offset(0, 2))],
@@ -253,26 +268,18 @@ class _ModeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        option.label,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: selected ? option.color : null,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    option.label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? option.color : null,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     option.description,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: Colors.grey.shade500,
-                      height: 1.4,
-                    ),
+                    style: TextStyle(fontSize: 12.5, color: Colors.grey.shade500, height: 1.4),
                   ),
                 ],
               ),
@@ -285,14 +292,9 @@ class _ModeCard extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: selected ? option.color : Colors.transparent,
-                border: Border.all(
-                  color: selected ? option.color : Colors.grey.shade400,
-                  width: 2,
-                ),
+                border: Border.all(color: selected ? option.color : Colors.grey.shade400, width: 2),
               ),
-              child: selected
-                  ? const Icon(Icons.check, size: 13, color: Colors.white)
-                  : null,
+              child: selected ? const Icon(Icons.check, size: 13, color: Colors.white) : null,
             ),
           ],
         ),
@@ -300,8 +302,6 @@ class _ModeCard extends StatelessWidget {
     );
   }
 }
-
-// ─── Data model ──────────────────────────────────────────────────────────────
 
 class _ModeOption {
   final AppMode mode;
