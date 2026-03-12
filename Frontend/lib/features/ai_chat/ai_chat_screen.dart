@@ -120,12 +120,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            '/dashboard',
-            (route) => false,
-          );
+      onPopInvokedWithResult: (didPop, result) {
+  if (!didPop) {
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/dashboard',
+      (route) => false,
+    );
         }
       },
       child: Scaffold(

@@ -101,15 +101,13 @@ class AgentOrchestratorProvider extends ChangeNotifier {
       return;
     }
     _initialized = true;
-    _isVoiceListening = false; // Voice is OFF by default — user must activate
-
-    // Show welcome message silently (no auto-speak)
+    _isVoiceListening = false; // Voice is OFF by default; user must activate
     _addSystemMessage(_localizedWelcome(), speak: false);
     await _sendMarketBriefing(isWelcome: true);
     await refreshGuardrails();
     _startMarketBriefingLoop();
     _syncAutonomousLoop();
-    // Auto voice capture removed — user activates via mic button
+    // Auto voice capture removed; user activates via mic button.
   }
 
   Future<void> setLanguage(String languageCode, {bool announce = true}) async {
@@ -199,6 +197,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     } else {
       unawaited(_voiceAssistant.unlockAudio());
       _periodicVoiceBriefingsEnabled = true;
+      _startMarketBriefingLoop();
       // Speak time-based greeting when user activates voice
       _addSystemMessage(_localizedTimeBasedGreeting(), speak: true);
       unawaited(_sendMarketBriefing(forceSpeak: true));
@@ -619,7 +618,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
           normalized.contains('disable voice') ||
           normalized.contains('stop voice')) {
         if (_isVoiceListening) {
-          _isVoiceListening = false;
+_isVoiceListening = false; // Voice is OFF by default; user must activate
           notifyListeners();
         }
         _voiceAssistant.stop();
@@ -1313,24 +1312,6 @@ class AgentOrchestratorProvider extends ChangeNotifier {
         ),
       );
 
-  String _localizedTimeBasedGreeting() {
-    final hour = DateTime.now().hour;
-    String period;
-    if (hour >= 5 && hour < 12) {
-      period = _languageCode == 'ur' ? 'صبح بخیر' : 'Good Morning';
-    } else if (hour >= 12 && hour < 17) {
-      period = _languageCode == 'ur' ? 'دوپہر بخیر' : 'Good Afternoon';
-    } else if (hour >= 17 && hour < 21) {
-      period = _languageCode == 'ur' ? 'شام بخیر' : 'Good Evening';
-    } else {
-      period = _languageCode == 'ur' ? 'خوش آمدید' : 'Welcome Back';
-    }
-    if (_languageCode == 'ur') {
-      return '$period، سر۔ میں حاضر ہوں۔ مارکیٹ کے بارے میں کیا جاننا چاہتے ہیں؟';
-    }
-    return '$period, Sir. I\'m ready. What would you like to know about the market?';
-  }
-  
 
     } catch (_) {
       if (isWelcome || forceSpeak) {
@@ -1973,6 +1954,89 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     }
   }
 
+  String _localizedTimeBasedGreeting() {
+    final hour = DateTime.now().hour;
+    final isMorning = hour >= 5 && hour < 12;
+    final isAfternoon = hour >= 12 && hour < 17;
+    final isEvening = hour >= 17 && hour < 21;
+
+    switch (_languageCode) {
+      case 'ur':
+        final period = isMorning
+            ? 'Subah bakhair'
+            : isAfternoon
+                ? 'Dopahar bakhair'
+                : isEvening
+                    ? 'Shaam bakhair'
+                    : 'Khush aamdeed';
+        return '$period. Voice ready hai. Market ke bare mein kya jan-na chahte hain?';
+      case 'es':
+        final period = isMorning
+            ? 'Buenos dias'
+            : isAfternoon
+                ? 'Buenas tardes'
+                : isEvening
+                    ? 'Buenas noches'
+                    : 'Bienvenido de nuevo';
+        return '$period. La voz esta lista. Que te gustaria saber del mercado?';
+      case 'fr':
+        final period = isMorning
+            ? 'Bonjour'
+            : isAfternoon
+                ? 'Bon apres-midi'
+                : isEvening
+                    ? 'Bonsoir'
+                    : 'Bon retour';
+        return '$period. Le mode vocal est pret. Que voulez-vous savoir du marche?';
+      case 'ar':
+        final period = isMorning
+            ? 'Sabah al khair'
+            : isAfternoon
+                ? 'Marhaban'
+                : isEvening
+                    ? 'Masa al khair'
+                    : 'Ahlan bik';
+        return '$period. Ana mustaed. Ma alladhi turid an taerifuh ean alsuuq?';
+      case 'zh':
+        final period = isMorning
+            ? 'Zao shang hao'
+            : isAfternoon
+                ? 'Xia wu hao'
+                : isEvening
+                    ? 'Wan shang hao'
+                    : 'Huan ying hui lai';
+        return '$period. Yuyin moshi yi zhunbei. Ni xiang wen shenme?';
+      case 'hi':
+        final period = isMorning
+            ? 'Suprabhat'
+            : isAfternoon
+                ? 'Namaskar'
+                : isEvening
+                    ? 'Shubh sandhya'
+                    : 'Wapas swagat hai';
+        return '$period. Voice ready hai. Aap market ke bare mein kya jan-na chahte hain?';
+      case 'de':
+        final period = isMorning
+            ? 'Guten Morgen'
+            : isAfternoon
+                ? 'Guten Tag'
+                : isEvening
+                    ? 'Guten Abend'
+                    : 'Willkommen zuruck';
+        return '$period. Die Sprachfunktion ist bereit. Was moechten Sie ueber den Markt wissen?';
+      case 'en':
+      default:
+        final period = isMorning
+            ? 'Good Morning'
+            : isAfternoon
+                ? 'Good Afternoon'
+                : isEvening
+                    ? 'Good Evening'
+                    : 'Welcome Back';
+        return '$period. Voice is ready. What would you like to know about the market?';
+    }
+  }
+
   String _localizedVoiceTestLine() {
     switch (_languageCode) {
       case 'ur':
@@ -2198,3 +2262,4 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     _error = null;
   }
 }
+

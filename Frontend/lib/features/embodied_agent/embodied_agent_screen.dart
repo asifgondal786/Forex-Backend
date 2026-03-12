@@ -46,27 +46,38 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
         final viewport = MediaQuery.of(context).size;
         final isMobile = viewport.width < 980;
         final isTinyViewport = viewport.width <= 260 || viewport.height <= 520;
-        return Scaffold(
-          floatingActionButton: _KillSwitchFab(agent: agent),
-          body: AppBackground(
-            child: SafeArea(
-              child: Column(
-                children: [
-                  _buildTopBar(agent, isMobile, isTinyViewport),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        isMobile ? (isTinyViewport ? 8 : 12) : 18,
-                        isTinyViewport ? 8 : 10,
-                        isMobile ? (isTinyViewport ? 8 : 12) : 18,
-                        isTinyViewport ? 8 : 12,
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/dashboard',
+                (route) => false,
+              );
+            }
+          },
+          child: Scaffold(
+            floatingActionButton: _KillSwitchFab(agent: agent),
+            body: AppBackground(
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    _buildTopBar(agent, isMobile, isTinyViewport),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          isMobile ? (isTinyViewport ? 8 : 12) : 18,
+                          isTinyViewport ? 8 : 10,
+                          isMobile ? (isTinyViewport ? 8 : 12) : 18,
+                          isTinyViewport ? 8 : 12,
+                        ),
+                        child: isMobile
+                            ? _buildMobileLayout(agent, isTinyViewport)
+                            : _buildDesktopLayout(agent),
                       ),
-                      child: isMobile
-                          ? _buildMobileLayout(agent, isTinyViewport)
-                          : _buildDesktopLayout(agent),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
