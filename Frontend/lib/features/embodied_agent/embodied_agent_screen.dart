@@ -572,6 +572,47 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey<String>(agent.riskProfile),
+                  value: agent.riskProfile,
+                  isExpanded: true,
+                  iconEnabledColor: Colors.white70,
+                  decoration: _inputDecoration('Risk profile'),
+                  dropdownColor: const Color(0xFF0B1220),
+                  items: const [
+                    DropdownMenuItem<String>(
+                      value: 'beginner',
+                      child: Text('Beginner (safest)'),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'intermediate',
+                      child: Text('Intermediate'),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'pro',
+                      child: Text('Pro'),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'custom',
+                      child: Text('Custom'),
+                    ),
+                  ],
+                  onChanged: agent.isProcessing
+                      ? null
+                      : (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          agent.setRiskProfile(value);
+                        },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           DropdownButtonFormField<AgentAutonomyMode>(
             key: ValueKey<AgentAutonomyMode>(agent.autonomyMode),
             initialValue: agent.autonomyMode,
@@ -1000,6 +1041,20 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
             value: '${g.hardMaxDrawdownPercent.toStringAsFixed(2)}%',
             color: const Color(0xFF8B5CF6),
           ),
+          _SafetyRow(
+            label: 'Profile',
+            value: g.profile.isEmpty ? 'custom' : g.profile,
+            color: const Color(0xFF38BDF8),
+          ),
+          _SafetyRow(
+            label: 'Risk Guardian',
+            value: g.riskGuardianStatus,
+            color: g.riskGuardianStatus == 'paused'
+                ? const Color(0xFFEF4444)
+                : g.riskGuardianStatus == 'near_limit'
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFF10B981),
+          ),
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
@@ -1010,9 +1065,11 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
               border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Text(
-              g.pauseReason.isEmpty
-                  ? 'No active risk lock. Live execution still requires explicit mode and guardrail alignment.'
-                  : 'Current pause reason: ${g.pauseReason}',
+              g.pauseReason.isNotEmpty
+                  ? 'Current pause reason: ${g.pauseReason}'
+                  : (g.riskGuardianReason.isNotEmpty
+                      ? g.riskGuardianReason
+                      : 'No active risk lock. Live execution still requires explicit mode and guardrail alignment.'),
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.72),
                 fontSize: 12,

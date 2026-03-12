@@ -47,6 +47,11 @@ class RiskGuardrails {
   final double dailyLossLimitPercent;
   final double weeklyLossLimitPercent;
   final double hardMaxDrawdownPercent;
+  // Backend-governed autonomy profile (beginner, intermediate, pro, custom).
+  final String profile;
+  // Coarse-grained guardian state for UI: stable / near_limit / paused.
+  final String riskGuardianStatus;
+  final String riskGuardianReason;
   final bool probationPassed;
   final bool paused;
   final String pauseReason;
@@ -57,6 +62,9 @@ class RiskGuardrails {
     this.dailyLossLimitPercent = 2.0,
     this.weeklyLossLimitPercent = 6.0,
     this.hardMaxDrawdownPercent = 12.0,
+    this.profile = 'custom',
+    this.riskGuardianStatus = 'stable',
+    this.riskGuardianReason = '',
     this.probationPassed = false,
     this.paused = false,
     this.pauseReason = '',
@@ -68,6 +76,9 @@ class RiskGuardrails {
     double? dailyLossLimitPercent,
     double? weeklyLossLimitPercent,
     double? hardMaxDrawdownPercent,
+    String? profile,
+    String? riskGuardianStatus,
+    String? riskGuardianReason,
     bool? probationPassed,
     bool? paused,
     String? pauseReason,
@@ -82,6 +93,9 @@ class RiskGuardrails {
           weeklyLossLimitPercent ?? this.weeklyLossLimitPercent,
       hardMaxDrawdownPercent:
           hardMaxDrawdownPercent ?? this.hardMaxDrawdownPercent,
+      profile: profile ?? this.profile,
+      riskGuardianStatus: riskGuardianStatus ?? this.riskGuardianStatus,
+      riskGuardianReason: riskGuardianReason ?? this.riskGuardianReason,
       probationPassed: probationPassed ?? this.probationPassed,
       paused: paused ?? this.paused,
       pauseReason: pauseReason ?? this.pauseReason,
@@ -96,6 +110,9 @@ class RiskGuardrails {
     final budget = payload['risk_budget'] is Map<String, dynamic>
         ? payload['risk_budget'] as Map<String, dynamic>
         : <String, dynamic>{};
+    final guardian = payload['risk_guardian'] is Map<String, dynamic>
+        ? payload['risk_guardian'] as Map<String, dynamic>
+        : <String, dynamic>{};
 
     return RiskGuardrails(
       maxRiskPerTradePercent:
@@ -105,6 +122,9 @@ class RiskGuardrails {
           _toDouble(budget['weekly_loss_limit_percent'], 6.0),
       hardMaxDrawdownPercent:
           _toDouble(budget['hard_max_drawdown_percent'], 12.0),
+      profile: (state['profile'] ?? 'custom').toString(),
+      riskGuardianStatus: (guardian['status'] ?? 'stable').toString(),
+      riskGuardianReason: (guardian['reason'] ?? '').toString(),
       probationPassed: state['probation_passed'] == true,
       paused: state['paused'] == true,
       pauseReason: (state['pause_reason'] ?? '').toString(),

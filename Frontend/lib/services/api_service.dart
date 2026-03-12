@@ -96,6 +96,35 @@ class ApiService {
         .toLowerCase();
   }
 
+  static List<String> _normalizePairs(List<String>? pairs) {
+    if (pairs == null) return const <String>[];
+    final normalized = <String>[];
+    for (final pair in pairs) {
+      final cleaned = pair.trim().toUpperCase();
+      if (cleaned.isNotEmpty) normalized.add(cleaned);
+    }
+    return normalized;
+  }
+
+  static Map<String, T> _filterRatesForPairs<T>(
+    Map<String, T> rates,
+    List<String> pairs,
+  ) {
+    if (pairs.isEmpty) return rates;
+    final filtered = <String, T>{};
+    for (final pair in pairs) {
+      if (rates.containsKey(pair)) {
+        filtered[pair] = rates[pair];
+        continue;
+      }
+      final compact = pair.replaceAll('/', '');
+      if (rates.containsKey(compact)) {
+        filtered[compact] = rates[compact];
+      }
+    }
+    return filtered.isNotEmpty ? filtered : rates;
+  }
+
   Map<String, String> get _baseHeaders => {
         'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json',
@@ -901,28 +930,32 @@ class ApiService {
 
   // ========== FOREX DATA ENDPOINTS ==========
 
-  Future<Map<String, dynamic>> getForexRates() async {
+  Future<Map<String, dynamic>> getForexRates({List<String>? pairs}) async {
+    final normalizedPairs = _normalizePairs(pairs);
     try {
       final headers = await _buildHeaders();
-      final response = await _client
-          .get(
-            Uri.parse('$baseUrl/api/forex/rates'),
-            headers: headers,
-          )
-          .timeout(_timeout);
-      return _handleResponse(response);
+      final uri = Uri.parse('$baseUrl/api/forex/rates').replace(
+        queryParameters: normalizedPairs.isEmpty
+            ? null
+            : {
+                'pairs': normalizedPairs.join(','),
+              },
+      );
+      final response = await _client.get(uri, headers: headers).timeout(_timeout);
+      final data = _handleResponse(response);
+      if (normalizedPairs.isNotEmpty && data is Map<String, dynamic>) {
+        final rates = data['rates'];
+        if (rates is Map<String, dynamic>) {
+          data['rates'] = _filterRatesForPairs(rates, normalizedPairs);
+        }
+      }
+      return data;
     } catch (e) {
       debugPrint('Error fetching forex rates: $e');
+      final fallbackRates = _fallbackForexRates();
       return {
         'status': 'fallback',
-        'rates': {
-          'EUR/USD': 1.0834,
-          'GBP/USD': 1.2712,
-          'USD/JPY': 154.22,
-          'USD/PKR': 278.90,
-          'AUD/USD': 0.6513,
-          'USD/CAD': 1.3611,
-        },
+        'rates': _filterRatesForPairs(fallbackRates, normalizedPairs),
       };
     }
   }
@@ -992,6 +1025,52 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> getTradeSignals({
+    List<String>? pairs,
+  }) async {
+    final normalizedPairs = _normalizePairs(pairs);
+    final targetPairs = normalizedPairs.isEmpty
+        ? const <String>['EUR/USD', 'GBP/USD', 'USD/JPY']
+        : normalizedPairs;
+    try {
+      final headers = await _buildHeaders();
+      final uri = Uri.parse('$baseUrl/api/forex/signals').replace(
+        queryParameters: targetPairs.isEmpty
+            ? null
+            : {
+                'pairs': targetPairs.join(','),
+              },
+      );
+      final response = await _client.get(uri, headers: headers).timeout(_timeout);
+      final data = _handleResponse(response);
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      return {
+        'signals': data,
+      };
+    } catch (e) {
+      debugPrint('Error fetching trade signals: $e');
+      return {
+        'status': 'fallback',
+        'signals': _buildFallbackSignals(targetPairs),
+      };
+    }
+  }
+
+  Map<String, double> _fallbackForexRates() {
+    return {
+      'EUR/USD': 1.0834,
+      'GBP/USD': 1.2712,
+      'USD/JPY': 154.22,
+      'USD/PKR': 278.90,
+      'AUD/USD': 0.6513,
+      'USD/CAD': 1.3611,
+      'NZD/USD': 0.5989,
+      'USD/CHF': 0.7895,
+    };
+  }
+
   double _fallbackPairPrice(String pair) {
     final normalized = pair.toUpperCase().replaceAll(' ', '');
     switch (normalized) {
@@ -1020,6 +1099,82 @@ class ApiService {
       return 2;
     }
     return 4;
+  }
+
+  int _stableHash(String value) {
+    var hash = 0;
+    for (final codeUnit in value.codeUnits) {
+      hash = (hash * 31 + codeUnit) & 0x7fffffff;
+    }
+    return hash;
+  }
+
+  double _formatPrice(String pair, double value) {
+    final digits = _pairDigits(pair);
+    return double.parse(value.toStringAsFixed(digits));
+  }
+
+  List<Map<String, dynamic>> _buildFallbackSignals(List<String> pairs) {
+    final now = DateTime.now();
+    final rates = _fallbackForexRates();
+    final timeframes = ['M30', 'H1', 'H4'];
+    return pairs.map((pair) {
+      final hash = _stableHash(pair);
+      final bias = hash % 4;
+      final type = switch (bias) {
+        0 => 'buy',
+        1 => 'sell',
+        2 => 'hold',
+        _ => 'wait',
+      };
+      final baseConfidence = 0.55 + (hash % 30) / 100;
+      final confidence = (type == 'hold' || type == 'wait'
+              ? (baseConfidence - 0.12).clamp(0.4, 0.7)
+              : baseConfidence.clamp(0.55, 0.9))
+          .toDouble();
+      final entry = rates[pair] ?? _fallbackPairPrice(pair);
+      final swing = entry * (0.0025 + (hash % 8) / 10000);
+      double? tp;
+      double? sl;
+      if (type == 'buy') {
+        tp = entry + swing * 1.6;
+        sl = entry - swing;
+      } else if (type == 'sell') {
+        tp = entry - swing * 1.6;
+        sl = entry + swing;
+      }
+
+      final reason = switch (type) {
+        'buy' =>
+          'Momentum aligned with higher-timeframe support; risk skew favors upside.',
+        'sell' =>
+          'Price rejected near resistance; short-term risk bias leans lower.',
+        'hold' =>
+          'Signals are mixed; waiting for confirmation before committing.',
+        _ =>
+          'Low volatility regime. Awaiting breakout and volume confirmation.',
+      };
+
+      return <String, dynamic>{
+        'pair': pair,
+        'signal': type,
+        'confidence': confidence,
+        'reason': reason,
+        'entry_price': (type == 'buy' || type == 'sell')
+            ? _formatPrice(pair, entry)
+            : null,
+        'take_profit':
+            tp != null ? _formatPrice(pair, tp) : null,
+        'stop_loss': sl != null ? _formatPrice(pair, sl) : null,
+        'timeframe': timeframes[hash % timeframes.length],
+        'generated_at':
+            now.subtract(Duration(minutes: hash % 45)).toIso8601String(),
+        'tags': [
+          'Fallback',
+          type == 'hold' || type == 'wait' ? 'Neutral' : 'Momentum'
+        ],
+      };
+    }).toList();
   }
 
   Future<Map<String, dynamic>> getForexPairForecast({
@@ -1163,6 +1318,25 @@ class ApiService {
     }
   }
 
+  // ========== SECURITY & COMPLIANCE ==========
+
+  Future<Map<String, dynamic>> getSecurityDashboard() async {
+    try {
+      final headers = await _buildHeaders();
+      final userId = await _resolveUserId(headers: headers);
+      final response = await _client
+          .get(
+            Uri.parse('$baseUrl/api/advanced/security/dashboard/$userId'),
+            headers: headers,
+          )
+          .timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error fetching security dashboard: $e');
+      throw ApiException('Error fetching security dashboard: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> getAutonomyGuardrails() async {
     try {
       final headers = await _buildHeaders();
@@ -1184,6 +1358,7 @@ class ApiService {
     String? level,
     Map<String, dynamic>? probation,
     Map<String, dynamic>? riskBudget,
+    String? profile,
   }) async {
     try {
       final headers = await _buildHeaders();
@@ -1193,6 +1368,9 @@ class ApiService {
       };
       if (level != null && level.trim().isNotEmpty) {
         body['level'] = level.trim().toLowerCase();
+      }
+      if (profile != null && profile.trim().isNotEmpty) {
+        body['profile'] = profile.trim().toLowerCase();
       }
       if (probation != null) body['probation'] = probation;
       if (riskBudget != null) body['risk_budget'] = riskBudget;

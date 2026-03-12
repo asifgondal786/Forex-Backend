@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_background.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
+import '../../routes/app_routes.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -576,6 +577,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildNotificationChannelsPanel(),
+                            const Divider(height: 32, color: Colors.white24),
+                            _SettingsTile(
+                              icon: Icons.shield_outlined,
+                              title: 'Security Center',
+                              subtitle:
+                                  'View legal status, API keys and security alerts',
+                              onTap: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.security,
+                                );
+                              },
+                            ),
                             const Divider(height: 32, color: Colors.white24),
                             _SettingsTile(
                               icon: Icons.language,

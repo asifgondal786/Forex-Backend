@@ -34,6 +34,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
   String? _pendingHighRiskCommand;
   double _draftRiskPerTradePercent = 1.0;
   double _draftDailyLossPercent = 2.0;
+  String _riskProfile = 'custom';
   String _languageCode = 'en';
   Object? _periodicVoiceBriefingsEnabled = true;
   Object? _briefingIntervalSeconds = 45;
@@ -95,6 +96,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
       List<DecisionLogEntry>.unmodifiable(_decisionLog);
   double get draftRiskPerTradePercent => _draftRiskPerTradePercent;
   double get draftDailyLossPercent => _draftDailyLossPercent;
+  String get riskProfile => _riskProfile;
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -136,6 +138,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
       _autonomyMode = _autonomyFromBackendLevel(_guardrails.backendLevel);
       _draftRiskPerTradePercent = _guardrails.maxRiskPerTradePercent;
       _draftDailyLossPercent = _guardrails.dailyLossLimitPercent;
+      _riskProfile = _guardrails.profile;
       _isKillSwitchEngaged = _guardrails.paused;
       _visualState = _guardrails.paused
           ? AgentVisualState.paused
@@ -179,11 +182,20 @@ class AgentOrchestratorProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRiskProfile(String value) {
+    if (value == _riskProfile) {
+      return;
+    }
+    _riskProfile = value;
+    notifyListeners();
+  }
+
   Future<void> applyDraftGuardrails() async {
     await _configureAutonomy(
       mode: _autonomyMode,
       riskPerTradePercent: _draftRiskPerTradePercent,
       dailyLossLimitPercent: _draftDailyLossPercent,
+      profile: _riskProfile,
       announce: true,
     );
   }
@@ -303,6 +315,7 @@ class AgentOrchestratorProvider extends ChangeNotifier {
       mode: mode,
       riskPerTradePercent: _draftRiskPerTradePercent,
       dailyLossLimitPercent: _draftDailyLossPercent,
+      profile: _riskProfile,
       announce: true,
     );
   }
@@ -681,6 +694,7 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
           mode: AgentAutonomyMode.fullAuto,
           riskPerTradePercent: _draftRiskPerTradePercent,
           dailyLossLimitPercent: _draftDailyLossPercent,
+          profile: _riskProfile,
           announce: true,
         );
         return;
@@ -693,6 +707,7 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
           mode: AgentAutonomyMode.semiAuto,
           riskPerTradePercent: _draftRiskPerTradePercent,
           dailyLossLimitPercent: _draftDailyLossPercent,
+          profile: _riskProfile,
           announce: true,
         );
         return;
@@ -703,6 +718,7 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
           mode: AgentAutonomyMode.assisted,
           riskPerTradePercent: _draftRiskPerTradePercent,
           dailyLossLimitPercent: _draftDailyLossPercent,
+          profile: _riskProfile,
           announce: true,
         );
         return;
@@ -714,6 +730,7 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
           mode: AgentAutonomyMode.assisted,
           riskPerTradePercent: _draftRiskPerTradePercent,
           dailyLossLimitPercent: _draftDailyLossPercent,
+          profile: _riskProfile,
           announce: true,
         );
         _addSystemMessage(
@@ -776,6 +793,7 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
     required AgentAutonomyMode mode,
     required double riskPerTradePercent,
     required double dailyLossLimitPercent,
+    String? profile,
     required bool announce,
   }) async {
     _setProcessing(true);
@@ -787,10 +805,12 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
           maxRiskPerTradePercent: riskPerTradePercent,
           dailyLossLimitPercent: dailyLossLimitPercent,
           backendLevel: _backendLevel(mode),
+          profile: profile ?? _riskProfile,
           paused: false,
           pauseReason: '',
         );
         _autonomyMode = mode;
+        _riskProfile = profile ?? _riskProfile;
         _isKillSwitchEngaged = false;
         _visualState = AgentVisualState.monitoring;
         _draftRiskPerTradePercent = riskPerTradePercent;
@@ -825,16 +845,19 @@ _isVoiceListening = false; // Voice is OFF by default; user must activate
           'max_risk_per_trade_percent': riskPerTradePercent,
           'daily_loss_limit_percent': dailyLossLimitPercent,
         },
+        profile: profile ?? _riskProfile,
       );
 
       _guardrails = RiskGuardrails.fromApi(response).copyWith(
         maxRiskPerTradePercent: riskPerTradePercent,
         dailyLossLimitPercent: dailyLossLimitPercent,
         backendLevel: _backendLevel(mode),
+        profile: profile ?? response['autonomy_state']?['profile']?.toString() ?? _riskProfile,
         paused: false,
         pauseReason: '',
       );
       _autonomyMode = mode;
+      _riskProfile = _guardrails.profile;
       _isKillSwitchEngaged = false;
       _visualState = AgentVisualState.monitoring;
       _draftRiskPerTradePercent = riskPerTradePercent;

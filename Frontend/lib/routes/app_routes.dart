@@ -13,6 +13,8 @@ import '../features/ai_chat/ai_chat_screen.dart';
 import '../features/task_creation/task_creation_screen.dart';
 import '../features/task_history/task_history_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/settings/custom_setup_screen.dart';
+import '../features/settings/security_center_screen.dart';
 import '../features/admin/user_admin_dashboard_screen.dart';
 
 class AppRoutes {
@@ -22,6 +24,7 @@ class AppRoutes {
   static const String taskHistory = '/task-history';
   static const String aiChat = '/ai-chat';
   static const String settings = '/settings';
+  static const String customSetup = '/custom-setup';
   static const String login = '/login';
   static const String signup = '/signup';
   static const String verify = '/verify';
@@ -41,10 +44,10 @@ class AppRoutes {
     taskHistory: (_) => const _ProtectedRoute(child: TaskHistoryScreen()),
     aiChat: (_) => const _ProtectedRoute(child: AiChatScreen()),
     settings: (_) => const _ProtectedRoute(child: SettingsScreen()),
+    customSetup: (_) => const _ProtectedRoute(child: CustomSetupScreen()),
     profile: (_) => const _ProtectedRoute(child: UserAdminDashboardScreen()),
     '/onboarding': (_) => const OnboardingScreen(),
-    security: (_) =>
-        const _ProtectedRoute(child: PlaceholderScreen(title: 'Security')),
+    security: (_) => const _ProtectedRoute(child: SecurityCenterScreen()),
     help: (_) => const _ProtectedRoute(
         child: PlaceholderScreen(title: 'Help & Support')),
   };

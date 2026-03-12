@@ -12,6 +12,8 @@ import json
 import hashlib
 import secrets
 
+from .macro_event_service import macro_event_service
+
 
 class RiskLevel(Enum):
     """Risk levels for trading"""
@@ -88,6 +90,8 @@ class AutonomyState:
     """Current autonomous governance state for a user."""
     user_id: str
     level: str = "assisted"  # manual, assisted, guarded_auto, full_auto
+    # Named profile applied to this user. "custom" means user-tuned sliders.
+    profile: str = "custom"  # beginner, intermediate, pro, custom
     probation_passed: bool = False
     paused: bool = False
     pause_reason: Optional[str] = None
@@ -101,6 +105,56 @@ class RiskManagementService:
     Comprehensive risk management and trading safety governance system
     """
     
+    # Conservative presets for different user archetypes.
+    # These are intentionally opinionated and can be tuned later or persisted to a DB.
+    _PROFILE_PRESETS = {
+        "beginner": {
+            "probation": {
+                "min_paper_trades": 30,
+                "min_win_rate_percent": 55.0,
+                "max_drawdown_percent": 10.0,
+                "min_active_days": 7,
+            },
+            "risk_budget": {
+                "max_risk_per_trade_percent": 0.5,
+                "daily_loss_limit_percent": 1.5,
+                "weekly_loss_limit_percent": 4.0,
+                "max_drawdown_percent": 8.0,
+            },
+            "level": "assisted",
+        },
+        "intermediate": {
+            "probation": {
+                "min_paper_trades": 20,
+                "min_win_rate_percent": 52.0,
+                "max_drawdown_percent": 14.0,
+                "min_active_days": 5,
+            },
+            "risk_budget": {
+                "max_risk_per_trade_percent": 1.0,
+                "daily_loss_limit_percent": 3.0,
+                "weekly_loss_limit_percent": 8.0,
+                "max_drawdown_percent": 12.0,
+            },
+            "level": "guarded_auto",
+        },
+        "pro": {
+            "probation": {
+                "min_paper_trades": 10,
+                "min_win_rate_percent": 50.0,
+                "max_drawdown_percent": 18.0,
+                "min_active_days": 3,
+            },
+            "risk_budget": {
+                "max_risk_per_trade_percent": 1.5,
+                "daily_loss_limit_percent": 4.0,
+                "weekly_loss_limit_percent": 10.0,
+                "max_drawdown_percent": 15.0,
+            },
+            "level": "guarded_auto",
+        },
+    }
+
     def __init__(self):
         self.user_limits: Dict[str, RiskLimits] = {}
         self.daily_stats: Dict[str, DailyTradingStats] = {}
@@ -141,6 +195,75 @@ class RiskManagementService:
         if user_id not in self.autonomy_state:
             self.autonomy_state[user_id] = AutonomyState(user_id=user_id)
         return self.autonomy_state[user_id]
+
+    def _apply_profile_presets(
+        self,
+        user_id: str,
+        profile: Optional[str],
+    ) -> Optional[str]:
+        """
+        Apply a named profile (beginner/intermediate/pro) if provided.
+
+        Returns the normalized profile name that was applied, or None when no
+        matching profile was found.
+        """
+        if not profile:
+            return None
+        normalized = profile.strip().lower()
+        presets = self._PROFILE_PRESETS.get(normalized)
+        if not presets:
+            return None
+
+        policy = self._get_or_create_probation_policy(user_id)
+        budget = self._get_or_create_risk_budget(user_id)
+        state = self._get_or_create_autonomy_state(user_id)
+
+        probation_cfg = presets.get("probation", {})
+        risk_budget_cfg = presets.get("risk_budget", {})
+        level = str(presets.get("level") or state.level).strip().lower()
+
+        # Apply probation thresholds
+        policy.min_paper_trades = int(probation_cfg.get("min_paper_trades", policy.min_paper_trades))
+        policy.min_win_rate_percent = float(
+            probation_cfg.get("min_win_rate_percent", policy.min_win_rate_percent)
+        )
+        policy.max_drawdown_percent = float(
+            probation_cfg.get("max_drawdown_percent", policy.max_drawdown_percent)
+        )
+        policy.min_active_days = int(probation_cfg.get("min_active_days", policy.min_active_days))
+
+        # Apply risk budget
+        budget.max_risk_per_trade_percent = float(
+            risk_budget_cfg.get(
+                "max_risk_per_trade_percent",
+                budget.max_risk_per_trade_percent,
+            )
+        )
+        budget.daily_loss_limit_percent = float(
+            risk_budget_cfg.get(
+                "daily_loss_limit_percent",
+                budget.daily_loss_limit_percent,
+            )
+        )
+        budget.weekly_loss_limit_percent = float(
+            risk_budget_cfg.get(
+                "weekly_loss_limit_percent",
+                budget.weekly_loss_limit_percent,
+            )
+        )
+        budget.max_drawdown_percent = float(
+            risk_budget_cfg.get(
+                "max_drawdown_percent",
+                budget.max_drawdown_percent,
+            )
+        )
+
+        # Apply default autonomy posture for the profile.
+        if level in {"manual", "assisted", "guarded_auto", "full_auto"}:
+            state.level = level
+        state.profile = normalized
+
+        return normalized
 
     def _get_week_key(self, dt: Optional[datetime] = None) -> str:
         stamp = dt or datetime.now()
@@ -288,11 +411,16 @@ class RiskManagementService:
         user_id: str,
         probation: Optional[Dict] = None,
         risk_budget: Optional[Dict] = None,
+        profile: Optional[str] = None,
         level: Optional[str] = None,
     ) -> Dict:
         policy = self._get_or_create_probation_policy(user_id)
         budget = self._get_or_create_risk_budget(user_id)
         state = self._get_or_create_autonomy_state(user_id)
+
+        # If a profile is supplied, apply its presets first. Explicit
+        # probation / risk_budget / level parameters can still override.
+        applied_profile = self._apply_profile_presets(user_id, profile)
 
         if isinstance(probation, dict):
             policy.min_paper_trades = int(probation.get("min_paper_trades", policy.min_paper_trades))
@@ -322,6 +450,10 @@ class RiskManagementService:
             normalized = level.strip().lower()
             if normalized in {"manual", "assisted", "guarded_auto", "full_auto"}:
                 state.level = normalized
+        # If caller did not send an explicit level but a profile was applied,
+        # keep the state's profile and level as chosen by the preset.
+        if applied_profile and not isinstance(level, str):
+            state.profile = applied_profile
 
         return await self.get_autonomy_guardrails(user_id=user_id)
 
@@ -485,10 +617,30 @@ class RiskManagementService:
         state = self._get_or_create_autonomy_state(user_id)
         self._apply_budget_and_autonomy(user_id)
         week_key = self._get_week_key()
+        daily = self.daily_stats.get(user_id)
+        daily_pnl = daily.total_profit_loss if daily else 0.0
+        max_drawdown = daily.max_drawdown if daily else 0.0
+        weekly_pnl = self.weekly_profit_loss.get(user_id, {}).get(week_key, 0.0)
+
+        # Simple, opinionated risk guardian view for the UI.
+        guardian_status = "stable"
+        guardian_reason = "Within budget limits"
+        if state.paused and state.pause_reason:
+            guardian_status = "paused"
+            guardian_reason = state.pause_reason
+        else:
+            near_daily = daily_pnl <= -(0.7 * budget.daily_loss_limit_percent)
+            near_weekly = weekly_pnl <= -(0.7 * budget.weekly_loss_limit_percent)
+            near_drawdown = max_drawdown >= (0.7 * budget.max_drawdown_percent)
+            if near_daily or near_weekly or near_drawdown:
+                guardian_status = "near_limit"
+                guardian_reason = "Approaching loss/drawdown budget thresholds"
+
         return {
             "user_id": user_id,
             "autonomy_state": {
                 "level": state.level,
+                "profile": state.profile,
                 "probation_passed": state.probation_passed,
                 "paused": state.paused,
                 "pause_reason": state.pause_reason,
@@ -507,6 +659,13 @@ class RiskManagementService:
                 "max_drawdown_percent": budget.max_drawdown_percent,
                 "weekly_pnl_percent": self.weekly_profit_loss.get(user_id, {}).get(week_key, 0.0),
             },
+            "risk_guardian": {
+                "status": guardian_status,
+                "reason": guardian_reason,
+                "daily_pnl_percent": daily_pnl,
+                "weekly_pnl_percent": weekly_pnl,
+                "max_drawdown_percent": max_drawdown,
+            },
         }
 
     async def can_execute_autonomous_trade(
@@ -515,6 +674,7 @@ class RiskManagementService:
         trade_params: Dict,
         paper_summary: Optional[Dict] = None,
         deep_study: Optional[Dict] = None,
+        macro_events: Optional[List[Dict]] = None,
     ) -> Tuple[bool, str, Dict]:
         state = self._get_or_create_autonomy_state(user_id)
         budget = self._get_or_create_risk_budget(user_id)
@@ -535,6 +695,28 @@ class RiskManagementService:
             return False, state.pause_reason or "Autonomy paused by guardrails", {
                 "autonomy_level": state.level,
                 "paused": state.paused,
+            }
+
+        # Macro Event Shield: globally pause or downgrade autonomy around
+        # high-impact economic events.
+        try:
+            shield_data = macro_event_service.compute_shield_for_user(user_id)
+        except Exception:
+            shield_data = {"shield_active": False}
+
+        if shield_data.get("shield_active"):
+            state.paused = True
+            state.pause_reason = str(
+                shield_data.get("reason")
+                or "Macro event shield active around high-impact event"
+            )
+            state.pause_until = None
+            if state.level in {"full_auto", "guarded_auto"}:
+                state.level = "assisted"
+            return False, state.pause_reason, {
+                "autonomy_level": state.level,
+                "paused": state.paused,
+                "macro_event_shield": shield_data,
             }
 
         is_paper_trade = bool(trade_params.get("is_paper_trade", False))

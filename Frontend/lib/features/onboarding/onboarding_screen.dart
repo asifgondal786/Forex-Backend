@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_colors.dart';
 import '../../providers/mode_provider.dart';
 import '../../routes/app_routes.dart';
 
@@ -244,13 +243,13 @@ class _ModeCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: selected
-              ? option.color.withOpacity(isDark ? 0.15 : 0.08)
+              ? option.color.withValues(alpha: isDark ? 0.15 : 0.08)
               : (isDark ? const Color(0xFF181B22) : Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: selected ? option.color : Colors.transparent, width: 1.8),
           boxShadow: selected
-              ? [BoxShadow(color: option.color.withOpacity(0.18), blurRadius: 12, offset: const Offset(0, 4))]
-              : [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 8, offset: const Offset(0, 2))],
+              ? [BoxShadow(color: option.color.withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 4))]
+              : [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Row(
           children: [
@@ -258,7 +257,7 @@ class _ModeCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: option.color.withOpacity(0.15),
+                color: option.color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(option.icon, color: option.color, size: 22),
