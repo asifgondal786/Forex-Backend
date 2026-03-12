@@ -16,6 +16,7 @@ from .services.execution_intelligence_service import ExecutionIntelligenceServic
 from .services.security_compliance_service import SecurityComplianceService
 from .services.enhanced_notification_service import EnhancedNotificationService
 from .services.paper_trading_engine import PaperTradingEngine
+from .services.macro_event_service import macro_event_service
 from .services.natural_language_service import NaturalLanguageService
 from .services.broker_execution_service import broker_execution_service
 from .services.subscription_service import subscription_service
@@ -60,6 +61,7 @@ class RiskLimitsRequest(BaseModel):
 class AutonomyGuardrailsConfigRequest(BaseModel):
     user_id: str
     level: Optional[str] = None
+    profile: Optional[str] = None  # beginner, intermediate, pro, custom
     probation: Optional[Dict] = None
     risk_budget: Optional[Dict] = None
 
@@ -108,6 +110,7 @@ async def execute_trade_with_risk_check(
     pair = str(trade_params.get("pair") or "EUR/USD").strip().upper()
     deep_study = await notification_svc.get_deep_study(pair=pair, max_headlines_per_source=3)
     paper_summary = await paper_trading.get_paper_account_summary(user_id)
+    macro_events = macro_event_service.get_upcoming_events(window_hours=48)
     is_paper_trade = bool(trade_payload.get("is_paper_trade", False))
 
     if not is_paper_trade:
@@ -130,6 +133,7 @@ async def execute_trade_with_risk_check(
         trade_params=trade_payload,
         paper_summary=paper_summary,
         deep_study=deep_study,
+        macro_events=macro_events,
     )
     if not guard_passed:
         risk_assessment = await risk_manager.get_risk_assessment(user_id)
@@ -287,6 +291,7 @@ async def configure_autonomy_guardrails(
         user_id=request.user_id,
         probation=request.probation,
         risk_budget=request.risk_budget,
+        profile=request.profile,
         level=request.level,
     )
 
@@ -306,11 +311,13 @@ async def explain_before_execute(request: ExplainBeforeExecuteRequest):
     pair = str(request.trade_params.get("pair") or "EUR/USD").strip().upper()
     deep_study = await notification_svc.get_deep_study(pair=pair, max_headlines_per_source=3)
     paper_summary = await paper_trading.get_paper_account_summary(request.user_id)
+    macro_events = macro_event_service.get_upcoming_events(window_hours=48)
     guard_passed, guard_reason, guard_context = await risk_manager.can_execute_autonomous_trade(
         user_id=request.user_id,
         trade_params=request.trade_params,
         paper_summary=paper_summary,
         deep_study=deep_study,
+        macro_events=macro_events,
     )
     risk_assessment = await risk_manager.get_risk_assessment(request.user_id)
     card = await risk_manager.build_explain_before_execute(
@@ -511,6 +518,21 @@ async def analyze_market_with_gemini():
     
     return await forex_service.analyze_market_with_gemini(rates, news)
 
+
+@router.get("/market/macro-events")
+async def get_macro_events(window_hours: int = 24, only_high_impact: bool = True):
+    """
+    Get upcoming macroeconomic events used by Macro Event Shield.
+    """
+    events = macro_event_service.get_upcoming_events(
+        window_hours=window_hours,
+        only_high_impact=only_high_impact,
+    )
+    shield_preview = macro_event_service.compute_shield_for_user(user_id="preview")
+    return {
+        "events": events,
+        "shield_preview": shield_preview,
+    }
 
 @router.post("/market/predict")
 async def predict_price_movements(pair: str, historical_data: List[Dict]):
