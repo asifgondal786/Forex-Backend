@@ -7,9 +7,11 @@ import os
 from typing import Any, Optional
 
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
 except ImportError:
     genai = None
+    genai_types = None
 
 
 def _extract_json_block(raw_text: str) -> str:
@@ -37,7 +39,9 @@ class GeminiClient:
         self.api_key = configured_key
         self._available = bool(configured_key) and genai is not None
         if self._available:
-            genai.configure(api_key=configured_key)
+            self._client = genai.Client(api_key=configured_key)
+        else:
+            self._client = None
 
     @property
     def available(self) -> bool:
@@ -46,8 +50,10 @@ class GeminiClient:
     def generate_text(self, *, model_name: str, prompt: str) -> str:
         if not self.available:
             return ""
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
+        response = self._client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+        )
         return (getattr(response, "text", "") or "").strip()
 
     def generate_json(
