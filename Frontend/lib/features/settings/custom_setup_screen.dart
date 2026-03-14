@@ -1,3 +1,4 @@
+// STEP 1: Add import at top
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/widgets/app_background.dart';

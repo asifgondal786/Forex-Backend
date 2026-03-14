@@ -1,4 +1,4 @@
-import '../../core/utils/date_formatter.dart';
+﻿import '../../core/utils/date_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
@@ -327,7 +327,7 @@ class _TaskHistoryCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
-                value: task.progress,
+                initialValue: task.progress,
                 minHeight: 8,
                 backgroundColor: Colors.white.withValues(alpha: 0.1),
                 valueColor: const AlwaysStoppedAnimation<Color>(

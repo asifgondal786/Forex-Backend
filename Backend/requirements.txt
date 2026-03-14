@@ -1,4 +1,4 @@
-﻿# FastAPI and Web Framework
+# FastAPI and Web Framework
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.19
@@ -33,7 +33,7 @@ email-validator==2.1.0
 firebase-admin==6.5.0
 
 # Google Generative AI (Gemini)
-google-generativeai>=0.8.0
+google-genai>=1.0.0
 
 # Testing
 pytest==8.3.4

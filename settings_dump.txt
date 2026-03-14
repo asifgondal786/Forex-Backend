@@ -1,5 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import '../../shared/widgets/mode_switcher_widget.dart';
+import '../../providers/mode_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:forex_companion/config/theme.dart';
 import 'package:provider/provider.dart';
@@ -95,14 +96,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (userProvider.error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Profile updated successfully'),
+          content: Text('âœ… Profile updated successfully'),
           backgroundColor: AppColors.primaryGreen,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error: ${userProvider.error}'),
+          content: Text('âŒ Error: ${userProvider.error}'),
           backgroundColor: AppColors.stopButton,
         ),
       );
@@ -769,7 +770,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     Switch(
-                      value: _autonomousModeEnabled,
+                      initialValue: _autonomousModeEnabled,
                       onChanged: busy ? null : _onAutonomousModeChanged,
                       activeThumbColor: AppColors.primaryGreen,
                       activeTrackColor: AppColors.primaryGreen.withValues(alpha: 0.35),
@@ -806,15 +807,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   items: const [
                     DropdownMenuItem(
-                      value: 'conservative',
+                      initialValue: 'conservative',
                       child: Text('Conservative', style: TextStyle(color: Colors.white)),
                     ),
                     DropdownMenuItem(
-                      value: 'balanced',
+                      initialValue: 'balanced',
                       child: Text('Balanced', style: TextStyle(color: Colors.white)),
                     ),
                     DropdownMenuItem(
-                      value: 'aggressive',
+                      initialValue: 'aggressive',
                       child: Text('Aggressive', style: TextStyle(color: Colors.white)),
                     ),
                   ],
@@ -831,7 +832,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
                 Slider(
-                  value: _autonomousMinConfidence,
+                  initialValue: _autonomousMinConfidence,
                   min: 0.4,
                   max: 0.95,
                   divisions: 11,
@@ -1073,7 +1074,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           Switch(
-            value: selected,
+            initialValue: selected,
             onChanged: enabled
                 ? null
                 : (value) => _onNotificationChannelChanged(keyName, value),

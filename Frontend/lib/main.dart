@@ -1,3 +1,5 @@
+import 'providers/quick_actions_provider.dart';
+import 'providers/custom_setup_provider.dart';
 import 'providers/mode_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -16,6 +18,9 @@ import 'providers/header_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/account_connection_provider.dart';
 import 'providers/agent_orchestrator_provider.dart';
+import 'providers/market_watch_provider.dart';
+import 'providers/trade_signals_provider.dart';
+import 'providers/news_events_provider.dart';
 import 'core/utils/runtime_url_resolver.dart';
 import 'helpers/mock_data_helper.dart';
 
@@ -25,22 +30,20 @@ const bool useFirebaseAuth = true;
 // Use anonymous sign-in so API requests have a Firebase ID token in dev
 const bool useAnonymousAuth = false;
 
-// Toggle Firestore-backed tasks on the client (backend is now the source of truth)
+// Toggle Firestore-backed tasks on the client (backend is now source of truth)
 const bool useFirestoreTasks = false;
 
-// Set to true for UI development without a backend. Overrides task/API usage.
+// Set to true for UI development without a backend.
 const bool useMockData = false;
 
 void _validateUrlConfigOnBoot() {
   if (kDebugMode) return;
-
   final apiBaseUrl = ApiService.baseUrl;
   assertSecureRuntimeUrl(
     apiBaseUrl,
     label: 'API_BASE_URL',
     allowHttpInRelease: false,
   );
-
   resolveAppWebUrl(
     const String.fromEnvironment('APP_WEB_URL', defaultValue: ''),
   );
@@ -51,7 +54,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _validateUrlConfigOnBoot();
 
-  // Initialize Firebase if enabled
   bool firebaseReady = false;
   if (useFirebaseAuth) {
     try {
@@ -86,33 +88,43 @@ Future<void> main() async {
 
 class ForexCompanionApp extends StatelessWidget {
   final bool firebaseReady;
-
   const ForexCompanionApp({super.key, required this.firebaseReady});
 
   @override
   Widget build(BuildContext context) {
-    // Initialize services
     final apiService = ApiService();
     final firebaseService =
         (useFirebaseAuth && firebaseReady) ? FirebaseService() : null;
 
     return MultiProvider(
       providers: [
-        // Services
+        // ── Services ─────────────────────────────────────────────────
         Provider<ApiService>.value(value: apiService),
         if (firebaseService != null)
           Provider<FirebaseService>.value(value: firebaseService),
-
         Provider<LiveUpdatesService>(
-        create: (_) => LiveUpdatesService(),
-        dispose: (_, service) => service.dispose(),
-    ),
-      ChangeNotifierProvider(create: (_) => ModeProvider()..load()),
+          create: (_) => LiveUpdatesService(),
+          dispose: (_, service) => service.dispose(),
+        ),
 
-    // Theme Provider
+        // ── Core providers ────────────────────────────────────────────
+        ChangeNotifierProvider(create: (_) => ModeProvider()..load()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
 
-        // Providers
+        // ── Quick actions (loads persisted dismiss state on boot) ──────
+        ChangeNotifierProvider(
+          create: (_) => QuickActionsProvider()..load(),
+        ),
+
+        // ── Custom setup preferences ──────────────────────────────────
+        ChangeNotifierProvider(create: (_) => CustomSetupProvider()),
+
+        // ── Mode-specific live data providers ─────────────────────────
+        ChangeNotifierProvider(create: (_) => MarketWatchProvider()),
+        ChangeNotifierProvider(create: (_) => TradeSignalsProvider()),
+        ChangeNotifierProvider(create: (_) => NewsEventsProvider()),
+
+        // ── Feature providers ─────────────────────────────────────────
         ChangeNotifierProvider(
           create: (_) {
             final provider = TaskProvider(
@@ -120,18 +132,14 @@ class ForexCompanionApp extends StatelessWidget {
               firebaseService: firebaseService,
               useFirebase: useFirestoreTasks && firebaseReady && !useMockData,
             );
-            if (useMockData) {
-              MockDataHelper.loadMockData(provider);
-            }
+            if (useMockData) MockDataHelper.loadMockData(provider);
             return provider;
           },
         ),
         ChangeNotifierProvider(
           create: (_) {
             final provider = UserProvider(apiService: apiService);
-            if (useMockData) {
-              provider.setUser(MockDataHelper.generateMockUser());
-            }
+            if (useMockData) provider.setUser(MockDataHelper.generateMockUser());
             return provider;
           },
         ),
@@ -145,27 +153,20 @@ class ForexCompanionApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(
-          create: (_) {
-            final provider = AccountConnectionProvider();
-            // Load connections when provider is created
-            provider.loadConnections();
-            return provider;
-          },
+          create: (_) => AccountConnectionProvider()..loadConnections(),
         ),
         ChangeNotifierProvider(
           create: (_) => AgentOrchestratorProvider(apiService: apiService),
         ),
       ],
       child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: 'Forex Companion',
-            debugShowCheckedModeBanner: false,
-            theme: themeProvider.getThemeData(),
-            routes: AppRoutes.routes,
-            initialRoute: '/',
-          );
-        },
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: 'Forex Companion',
+          debugShowCheckedModeBanner: false,
+          theme: themeProvider.getThemeData(),
+          routes: AppRoutes.routes,
+          initialRoute: '/',
+        ),
       ),
     );
   }

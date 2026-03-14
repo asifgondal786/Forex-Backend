@@ -1,4 +1,4 @@
-/// Reusable dropdown for switching mode — used in SettingsScreen.
+﻿/// Reusable dropdown for switching mode â€” used in SettingsScreen.
 /// Drop this widget anywhere in the settings UI.
 ///
 /// Usage:
@@ -48,14 +48,14 @@ class ModeSwitcherWidget extends StatelessWidget {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<AppMode>(
-              value: current,
+              initialValue: current,
               isExpanded: true,
               borderRadius: BorderRadius.circular(12),
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               items: _options.map((opt) {
                 final (mode, label, icon, color) = opt;
                 return DropdownMenuItem<AppMode>(
-                  value: mode,
+                  initialValue: mode,
                   child: Row(
                     children: [
                       Container(

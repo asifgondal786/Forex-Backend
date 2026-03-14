@@ -122,10 +122,10 @@ class AppTheme {
         indicator: BoxDecoration(
           color: _glassFill(accentCyan, 0.18),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accentCyan.withOpacity(0.35), width: 1),
+          border: Border.all(color: accentCyan.withValues(alpha: 0.35), width: 1),
           boxShadow: [
             BoxShadow(
-              color: accentCyan.withOpacity(0.35),
+              color: accentCyan.withValues(alpha: 0.35),
               blurRadius: 14,
               spreadRadius: 0,
             ),
@@ -133,12 +133,12 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: cardBackground.withOpacity(0.6),
+        color: cardBackground.withValues(alpha: 0.6),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: accentCyan.withOpacity(0.2),
+            color: accentCyan.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -148,11 +148,11 @@ class AppTheme {
         fillColor: cardBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: accentCyan.withOpacity(0.3)),
+          borderSide: BorderSide(color: accentCyan.withValues(alpha: 0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: accentCyan.withOpacity(0.3)),
+          borderSide: BorderSide(color: accentCyan.withValues(alpha: 0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -176,30 +176,30 @@ class AppTheme {
 
     return ButtonStyle(
       padding:
-          padding == null ? null : MaterialStateProperty.all(padding),
-      foregroundColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.disabled)) {
-          return resolvedForeground.withOpacity(0.5);
+          padding == null ? null : WidgetStateProperty.all(padding),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return resolvedForeground.withValues(alpha: 0.5);
         }
         return resolvedForeground;
       }),
-      backgroundColor: MaterialStateProperty.resolveWith((states) {
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
         final opacity =
-            states.contains(MaterialState.disabled) ? fillOpacity * 0.6 : fillOpacity;
+            states.contains(WidgetState.disabled) ? fillOpacity * 0.6 : fillOpacity;
         return _glassFill(resolvedTint, opacity);
       }),
-      shadowColor: MaterialStateProperty.all(
-        resolvedTint.withOpacity(glowOpacity),
+      shadowColor: WidgetStateProperty.all(
+        resolvedTint.withValues(alpha: glowOpacity),
       ),
-      elevation: MaterialStateProperty.resolveWith((states) {
-        return states.contains(MaterialState.disabled) ? 0 : elevation;
+      elevation: WidgetStateProperty.resolveWith((states) {
+        return states.contains(WidgetState.disabled) ? 0 : elevation;
       }),
       overlayColor:
-          MaterialStateProperty.all(resolvedTint.withOpacity(0.12)),
-      side: MaterialStateProperty.all(
-        BorderSide(color: resolvedTint.withOpacity(0.35), width: 1),
+          WidgetStateProperty.all(resolvedTint.withValues(alpha: 0.12)),
+      side: WidgetStateProperty.all(
+        BorderSide(color: resolvedTint.withValues(alpha: 0.35), width: 1),
       ),
-      shape: MaterialStateProperty.all(
+      shape: WidgetStateProperty.all(
         RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
         ),
@@ -223,8 +223,8 @@ class AppTheme {
       glowOpacity: 0.3,
       elevation: 1,
     ).copyWith(
-      side: MaterialStateProperty.all(
-        BorderSide(color: resolvedTint.withOpacity(0.4), width: 1.2),
+      side: WidgetStateProperty.all(
+        BorderSide(color: resolvedTint.withValues(alpha: 0.4), width: 1.2),
       ),
     );
   }
@@ -245,8 +245,8 @@ class AppTheme {
       glowOpacity: 0.25,
       elevation: 0,
     ).copyWith(
-      side: MaterialStateProperty.all(
-        BorderSide(color: resolvedTint.withOpacity(0.25), width: 1),
+      side: WidgetStateProperty.all(
+        BorderSide(color: resolvedTint.withValues(alpha: 0.25), width: 1),
       ),
     );
   }
@@ -269,20 +269,20 @@ class AppTheme {
 
   static Color _glassFill(Color tint, double opacity) {
     final blended = Color.lerp(tint, Colors.white, 0.18) ?? tint;
-    return blended.withOpacity(opacity);
+    return blended.withValues(alpha: opacity);
   }
 
   // Box Decorations
   static BoxDecoration get glassCardDecoration => BoxDecoration(
-        color: cardBackground.withOpacity(0.3),
+        color: cardBackground.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: accentCyan.withOpacity(0.2),
+          color: accentCyan.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentCyan.withOpacity(0.1),
+            color: accentCyan.withValues(alpha: 0.1),
             blurRadius: 20,
             spreadRadius: 0,
           ),
@@ -293,7 +293,7 @@ class AppTheme {
         gradient: primaryGradient,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: accentCyan.withOpacity(0.3),
+          color: accentCyan.withValues(alpha: 0.3),
           width: 1,
         ),
       );

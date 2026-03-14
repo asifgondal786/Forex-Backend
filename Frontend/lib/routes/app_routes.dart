@@ -3,7 +3,7 @@ import '../features/dashboard/mode_router.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import '../features/embodied_agent/embodied_agent_screen.dart';
+// import '../features/embodied_agent/embodied_agent_screen.dart';
 import '../features/auth/auth_entry_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';

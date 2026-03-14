@@ -88,6 +88,13 @@ class ApiService {
     return value;
   }
 
+  static Map<String, String> _buildBaseHeaders() {
+    return const <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+  }
+
   static String _normalizeEmail(String rawEmail) {
     return rawEmail
         .replaceAll(_invisibleChars, '')
@@ -114,21 +121,17 @@ class ApiService {
     final filtered = <String, T>{};
     for (final pair in pairs) {
       if (rates.containsKey(pair)) {
-        filtered[pair] = rates[pair];
+        filtered[pair] = rates[pair]!;        // ← added !
         continue;
       }
       final compact = pair.replaceAll('/', '');
       if (rates.containsKey(compact)) {
-        filtered[compact] = rates[compact];
+        filtered[compact] = rates[compact]!;  // ← added !
       }
     }
     return filtered.isNotEmpty ? filtered : rates;
   }
-
-  Map<String, String> get _baseHeaders => {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json',
-      };
+  
 
   static bool get _isLocalApiTarget {
     try {
@@ -181,7 +184,7 @@ class ApiService {
 
   Future<Map<String, String>> _buildHeaders() async {
     _assertReleaseTransportSecurity();
-    final headers = <String, String>{..._baseHeaders};
+    final headers = <String, String>{..._buildBaseHeaders()};
 
     final devUserId = _resolveDevUserForCurrentContext();
     if (devUserId != null && devUserId.isNotEmpty) {
@@ -310,7 +313,7 @@ class ApiService {
       final response = await _client
           .post(
             Uri.parse('$baseUrl/auth/password-reset'),
-            headers: _baseHeaders,
+            headers: await _buildHeaders(),
             body: json.encode({'email': normalizedEmail}),
           )
           .timeout(_authTimeout);
@@ -343,7 +346,7 @@ class ApiService {
       final response = await _client
           .post(
             Uri.parse('$baseUrl/auth/email-verification'),
-            headers: _baseHeaders,
+            headers: await _buildHeaders(),
             body: json.encode({'email': normalizedEmail}),
           )
           .timeout(_authTimeout);

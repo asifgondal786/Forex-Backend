@@ -86,10 +86,10 @@ class _ConfidenceGaugeState extends State<ConfidenceGauge>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00FFC2).withOpacity(0.2),
+                      color: const Color(0xFF00FFC2).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFF00FFC2).withOpacity(0.5),
+                        color: const Color(0xFF00FFC2).withValues(alpha: 0.5),
                       ),
                     ),
                     child: const Text(
@@ -132,7 +132,7 @@ class ConfidenceGaugePainter extends CustomPainter {
     final strokeWidth = 15.0;
 
     final backgroundPaint = Paint()
-      ..color = backgroundColor.withOpacity(0.3)
+      ..color = backgroundColor.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
@@ -140,7 +140,7 @@ class ConfidenceGaugePainter extends CustomPainter {
     canvas.drawCircle(center, radius, backgroundPaint);
 
     final glowPaint = Paint()
-      ..color = glowColor.withOpacity(0.3)
+      ..color = glowColor.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth + 10
       ..strokeCap = StrokeCap.round

@@ -1,12 +1,37 @@
+// lib/features/dashboard/mode_router.dart
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// Paste these changes into your existing mode_router.dart
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 1. ADD these imports (replacing any conflicting ones):
+//
+//    import '../market_watch/market_watch_screen.dart';
+//    import '../ai_chat/ai_chat_screen.dart';
+//    import '../embodied_agent/embodied_agent_screen.dart';
+//    import '../trade_signals/trade_signals_screen.dart';
+//    import '../news/news_events_screen.dart';
+//    import '../custom_setup/custom_setup_screen.dart';   // ← NEW
+//
+// 2. In your switch/if block that maps AppMode → screen, add:
+//
+//    case AppMode.customSetup:           // ← was routing to SettingsScreen
+//      return const CustomSetupScreen();
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// FULL REFERENCE IMPLEMENTATION (replace the whole file if easier):
+// ─────────────────────────────────────────────────────────────────────────────
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/mode_provider.dart';
-import '../embodied_agent/embodied_agent_screen.dart';
+import '../market_watch/market_watch_screen.dart';
 import '../ai_chat/ai_chat_screen.dart';
-import '../settings/settings_screen.dart';
+import '../embodied_agent/embodied_agent_screen.dart';
+import '../trade_signals/trade_signals_screen.dart';
+import '../news/news_events_screen.dart' ;
+import '../custom_setup/custom_setup_screen.dart'; // ← NEW
 
-/// Sits at /dashboard and renders the right screen based on [ModeProvider].
-/// Switching mode in Settings instantly re-routes without a full Navigator push.
 class ModeRouter extends StatelessWidget {
   const ModeRouter({super.key});
 
@@ -15,26 +40,13 @@ class ModeRouter extends StatelessWidget {
     final mode = context.watch<ModeProvider>().mode;
 
     return switch (mode) {
-      // Market Watch → main dashboard (forex feed is already the hero widget)
-      AppMode.marketWatch  => const EmbodiedAgentScreen(),
-
-      // AI Chat → raw Gemini chat
-      AppMode.aiChat       => const AiChatScreen(),
-
-      // AI Copilot → same chat screen for now; copilot enhancements in Phase 5
-      AppMode.aiCopilot    => const AiChatScreen(),
-
-      // Trade Signals → main dashboard (signals panel already lives here)
-      AppMode.tradeSignals => const EmbodiedAgentScreen(),
-
-      // News & Events → main dashboard (news_sentiment_widget already here)
-      AppMode.newsEvents   => const EmbodiedAgentScreen(),
-
-      // Custom Setup → settings so user can configure preferences
-      AppMode.customSetup  => const SettingsScreen(),
-
-      // Fallback
-      null                 => const EmbodiedAgentScreen(),
+      AppMode.marketWatch   => const MarketWatchScreen(),
+      AppMode.aiChat        => const AiChatScreen(),
+      AppMode.aiCopilot     => const EmbodiedAgentScreen(),
+      AppMode.tradeSignals  => const TradeSignalsScreen(),
+      AppMode.newsEvents    => const NewsEventsScreen(),
+      AppMode.customSetup   => const CustomSetupScreen(), // ← WAS: SettingsScreen
+      null                  => const EmbodiedAgentScreen(),
     };
   }
 }

@@ -1,305 +1,218 @@
-import 'dart:async';
+// lib/features/news/news_events_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/widgets/app_background.dart';
-import '../../routes/app_routes.dart';
-import '../../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../../providers/news_events_provider.dart';
+import '../../providers/mode_provider.dart';
+import '../../core/widgets/quick_actions_overlay.dart';
 
-const _kSelectedPairs = 'tajir_selected_pairs';
-const _kRiskPreset    = 'tajir_risk_preset';
+// ── palette ──────────────────────────────────────────────────────────────────
+const _kBg       = Color(0xFF0A0E1A);
+const _kSurface  = Color(0xFF111827);
+const _kCard     = Color(0xFF161D2E);
+const _kBorder   = Color(0xFF1E2A3D);
+const _kGold     = Color(0xFFD4A853);
+const _kGreen    = Color(0xFF00C896);
+const _kGreenDim = Color(0xFF003D2E);
+const _kRed      = Color(0xFFFF4560);
+const _kRedDim   = Color(0xFF3D0010);
+const _kAmber    = Color(0xFFF59E0B);
+const _kAmberDim = Color(0xFF3D2600);
+const _kBlue     = Color(0xFF3B82F6);
+const _kBlueDim  = Color(0xFF0D1F4A);
+const _kText     = Color(0xFFE2E8F0);
+const _kSubtext  = Color(0xFF64748B);
+const _kDivider  = Color(0xFF1E2A3D);
 
-// ─────────────────────────────────────────────────────────────
-//  Model
-// ─────────────────────────────────────────────────────────────
-enum _SignalType { buy, sell, hold, wait }
-
-extension _SignalTypeExt on _SignalType {
-  String get label => name.toUpperCase();
-  Color get color {
-    switch (this) {
-      case _SignalType.buy:  return const Color(0xFF00C896);
-      case _SignalType.sell: return const Color(0xFFFF4D6D);
-      case _SignalType.hold: return const Color(0xFFF0A500);
-      case _SignalType.wait: return const Color(0xFF8A8880);
-    }
-  }
-  Color get bgColor {
-    switch (this) {
-      case _SignalType.buy:  return const Color(0xFF001F17);
-      case _SignalType.sell: return const Color(0xFF1F0008);
-      case _SignalType.hold: return const Color(0xFF1A1200);
-      case _SignalType.wait: return const Color(0xFF141619);
-    }
-  }
-  IconData get icon {
-    switch (this) {
-      case _SignalType.buy:  return Icons.trending_up_rounded;
-      case _SignalType.sell: return Icons.trending_down_rounded;
-      case _SignalType.hold: return Icons.pause_circle_outline_rounded;
-      case _SignalType.wait: return Icons.schedule_rounded;
-    }
-  }
-}
-
-class _Signal {
-  final String pair;
-  final _SignalType type;
-  final double confidence;  // 0.0 – 1.0
-  final String reason;
-  final String? entryPrice;
-  final String? tp;
-  final String? sl;
-  final String timeframe;
-  final DateTime generatedAt;
-  final List<String> tags;
-
-  const _Signal({
-    required this.pair,
-    required this.type,
-    required this.confidence,
-    required this.reason,
-    this.entryPrice,
-    this.tp,
-    this.sl,
-    required this.timeframe,
-    required this.generatedAt,
-    this.tags = const [],
-  });
-
-  factory _Signal.fromApi(Map<String, dynamic> data) {
-    final typeStr = (data['signal'] ?? data['type'] ?? 'wait').toString().toLowerCase();
-    final type = typeStr.contains('buy')
-        ? _SignalType.buy
-        : typeStr.contains('sell')
-            ? _SignalType.sell
-            : typeStr.contains('hold')
-                ? _SignalType.hold
-                : _SignalType.wait;
-
-    final rawConf = data['confidence'] ?? data['confidence_score'] ?? 0.5;
-    final conf    = rawConf is num ? rawConf.toDouble().clamp(0.0, 1.0) : 0.5;
-
-    final tags = (data['tags'] as List?)?.map((t) => t.toString()).toList() ?? [];
-
-    return _Signal(
-      pair:        data['pair'] ?? data['symbol'] ?? 'UNKNOWN',
-      type:        type,
-      confidence:  conf,
-      reason:      data['reason'] ?? data['reasoning'] ?? data['explanation'] ?? 'AI analysis in progress.',
-      entryPrice:  data['entry_price']?.toString(),
-      tp:          data['take_profit']?.toString() ?? data['tp']?.toString(),
-      sl:          data['stop_loss']?.toString()   ?? data['sl']?.toString(),
-      timeframe:   data['timeframe'] ?? 'H1',
-      generatedAt: DateTime.tryParse(data['generated_at'] ?? '') ?? DateTime.now(),
-      tags:        tags,
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  Screen
-// ─────────────────────────────────────────────────────────────
-class TradeSignalsScreen extends StatefulWidget {
-  const TradeSignalsScreen({super.key});
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen
+// The original used NestedScrollView which makes it impossible to insert a
+// plain widget (overlay) between header slivers and body.
+// We switch to a simple Column so overlay sits between tab bar and content.
+// ─────────────────────────────────────────────────────────────────────────────
+class NewsEventsScreen extends StatefulWidget {
+  const NewsEventsScreen({super.key});
 
   @override
-  State<TradeSignalsScreen> createState() => _TradeSignalsScreenState();
+  State<NewsEventsScreen> createState() => _NewsEventsScreenState();
 }
 
-class _TradeSignalsScreenState extends State<TradeSignalsScreen> {
-  final ApiService _api = ApiService();
-
-  List<String>  _pairs      = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
-  String        _riskPreset = 'Balanced';
-  List<_Signal> _signals    = [];
-  bool          _loading    = true;
-  String?       _error;
-  String        _filter     = 'all'; // 'all' | 'buy' | 'sell' | 'strong'
-  Timer?        _timer;
+class _NewsEventsScreenState extends State<NewsEventsScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _fadeCtrl;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    _fadeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500))
+      ..forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NewsEventsProvider>().init();
+    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _fadeCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _init() async {
-    await _loadPrefs();
-    await _fetch();
-    _timer = Timer.periodic(const Duration(minutes: 5), (_) => _fetch());
-  }
-
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final pairs = prefs.getStringList(_kSelectedPairs);
-    setState(() {
-      if (pairs != null && pairs.isNotEmpty) _pairs = pairs;
-      _riskPreset = prefs.getString(_kRiskPreset) ?? 'Balanced';
-    });
-  }
-
-  Future<void> _fetch() async {
-    if (!mounted) return;
-    setState(() => _loading = _signals.isEmpty);
-    try {
-      // Calls the existing signal/analysis endpoint
-      final raw = await _api.getTradeSignals(pairs: _pairs);
-      final list = (raw['signals'] as List?) ?? [];
-      final signals = list
-          .map((s) => _Signal.fromApi(s as Map<String, dynamic>))
-          .toList();
-      if (mounted) {
-        setState(() {
-          _signals = signals;
-          _loading = false;
-          _error   = null;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          if (_signals.isEmpty) _error = 'Could not load signals. Pull to refresh.';
-        });
-      }
-    }
-  }
-
-  List<_Signal> get _filtered {
-    switch (_filter) {
-      case 'buy':    return _signals.where((s) => s.type == _SignalType.buy).toList();
-      case 'sell':   return _signals.where((s) => s.type == _SignalType.sell).toList();
-      case 'strong': return _signals.where((s) => s.confidence >= 0.75).toList();
-      default:       return _signals;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return AppBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: _buildAppBar(isDark),
-        body: _buildBody(isDark),
-      ),
-    );
-  }
+    return Consumer<NewsEventsProvider>(
+      builder: (ctx, provider, _) {
+        return Scaffold(
+          backgroundColor: _kBg,
+          body: FadeTransition(
+            opacity:
+                CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut),
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Pinned app bar ───────────────────────────────────
+                  _AppBar(provider: provider),
 
-  PreferredSizeWidget _buildAppBar(bool isDark) {
-    return AppBar(
-      backgroundColor: isDark ? const Color(0xFF0A0C10) : Colors.white,
-      elevation: 0,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Trade Signals',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.3),
-          ),
-          Text(
-            '${_signals.length} signals · refreshes every 5 min',
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF8A8880),
-              fontFamily: 'monospace',
+                  // ── News / Calendar tab switcher ─────────────────────
+                  _TabBar(provider: provider),
+
+                  // ── Quick actions overlay (dismissable) ──────────────
+                  QuickActionsOverlay(
+                    modeKey: 'newsEvents',
+                    accentColor: _kBlue,
+                    title: 'QUICK ACTIONS',
+                    onAction: (action) {
+                      switch (action.routeOrAction) {
+                        case 'tab_calendar':
+                          provider.setTab('Calendar');
+                          break;
+                        case 'filter_high':
+                          provider.setImpactFilter('High');
+                          break;
+                        case 'filter_bullish':
+                          provider.setSentimentFilter('Bullish');
+                          break;
+                        case 'switch_chat':
+                          ctx.read<ModeProvider>().setMode(AppMode.aiChat);
+                          Navigator.pushNamedAndRemoveUntil(
+                              context, '/dashboard', (_) => false);
+                          break;
+                        default:
+                          if (action.isRoute) {
+                            Navigator.pushNamed(
+                                context, action.routeOrAction);
+                          }
+                      }
+                    },
+                  ),
+
+                  // ── Body ─────────────────────────────────────────────
+                  Expanded(
+                    child: provider.isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                                color: _kGold))
+                        : provider.tab == 'News'
+                            ? _NewsTab(provider: provider)
+                            : _CalendarTab(provider: provider),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.tune_rounded, size: 20),
-          onPressed: () => Navigator.pushNamed(context, AppRoutes.customSetup),
-        ),
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, size: 20),
-          onPressed: () {
-            setState(() { _loading = true; });
-            _fetch();
-          },
-        ),
-      ],
+        );
+      },
     );
   }
+}
 
-  Widget _buildBody(bool isDark) {
-    if (_loading && _signals.isEmpty) return _buildLoading();
-    if (_error != null && _signals.isEmpty) return _buildError(isDark);
+// ─────────────────────────────────────────────────────────────────────────────
+// App bar (plain Container — no Sliver needed in Column layout)
+// ─────────────────────────────────────────────────────────────────────────────
+class _AppBar extends StatelessWidget {
+  const _AppBar({required this.provider});
+  final NewsEventsProvider provider;
 
-    return RefreshIndicator(
-      color: const Color(0xFFF0A500),
-      onRefresh: _fetch,
-      child: Column(
-        children: [
-          _buildFilterBar(isDark),
-          Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmpty(isDark)
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _SignalCard(
-                      signal: _filtered[i],
-                      riskPreset: _riskPreset,
-                      isDark: isDark,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterBar(bool isDark) {
-    final filters = [
-      ('all',    'All'),
-      ('buy',    'Buy'),
-      ('sell',   'Sell'),
-      ('strong', 'Strong ≥75%'),
-    ];
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      height: 48,
-      color: isDark ? const Color(0xFF0F1115) : const Color(0xFFF5F4F0),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: _kDivider)),
+      ),
+      child: Row(children: [
+        Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+                color: _kBlue, shape: BoxShape.circle)),
+        const SizedBox(width: 10),
+        const Text('News & Events',
+            style: TextStyle(
+                color: _kText,
+                fontSize: 18,
+                fontWeight: FontWeight.w700)),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded,
+              color: _kSubtext, size: 20),
+          onPressed: provider.refresh,
+        ),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab bar
+// ─────────────────────────────────────────────────────────────────────────────
+class _TabBar extends StatelessWidget {
+  const _TabBar({required this.provider});
+  final NewsEventsProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: _kBg,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Row(
-        children: filters.map((f) {
-          final active = _filter == f.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
+        children: ['News', 'Calendar'].map((t) {
+          final active = provider.tab == t;
+          return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _filter = f.$1),
+              onTap: () => provider.setTab(t),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                duration: const Duration(milliseconds: 200),
+                margin: EdgeInsets.only(right: t == 'News' ? 6 : 0),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: active
-                      ? const Color(0xFFF0A500)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
+                      ? _kBlue.withValues(alpha: 0.15)
+                      : _kCard,
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: active
-                        ? const Color(0xFFF0A500)
-                        : (isDark ? const Color(0xFF2A2D35) : const Color(0xFFD3D1C7)),
-                    width: 0.5,
+                        ? _kBlue.withValues(alpha: 0.4)
+                        : _kBorder,
                   ),
                 ),
-                child: Text(
-                  f.$2,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: active
-                        ? Colors.black
-                        : (isDark ? const Color(0xFF8A8880) : const Color(0xFF888780)),
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      t == 'News'
+                          ? Icons.newspaper_rounded
+                          : Icons.calendar_today_rounded,
+                      color: active ? _kBlue : _kSubtext,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(t,
+                        style: TextStyle(
+                            color: active ? _kBlue : _kSubtext,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                  ],
                 ),
               ),
             ),
@@ -308,360 +221,506 @@ class _TradeSignalsScreenState extends State<TradeSignalsScreen> {
       ),
     );
   }
-
-  Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(color: Color(0xFFF0A500), strokeWidth: 2),
-          SizedBox(height: 16),
-          Text('Generating signals…',
-              style: TextStyle(color: Color(0xFF8A8880), fontFamily: 'monospace')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.analytics_outlined, color: Color(0xFF8A8880), size: 40),
-          const SizedBox(height: 16),
-          Text(_error ?? 'Something went wrong',
-              style: const TextStyle(color: Color(0xFF8A8880)), textAlign: TextAlign.center),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: () {
-              setState(() { _loading = true; _error = null; });
-              _fetch();
-            },
-            icon: const Icon(Icons.refresh_rounded, size: 16),
-            label: const Text('Retry'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFF0A500),
-              side: const BorderSide(color: Color(0xFFF0A500), width: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmpty(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.search_off_rounded, color: Color(0xFF8A8880), size: 36),
-          const SizedBox(height: 12),
-          Text(
-            'No $_filter signals right now',
-            style: const TextStyle(color: Color(0xFF8A8880), fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Signal Card
-// ─────────────────────────────────────────────────────────────
-class _SignalCard extends StatefulWidget {
-  final _Signal signal;
-  final String riskPreset;
-  final bool isDark;
-
-  const _SignalCard({
-    required this.signal,
-    required this.riskPreset,
-    required this.isDark,
-  });
-
-  @override
-  State<_SignalCard> createState() => _SignalCardState();
-}
-
-class _SignalCardState extends State<_SignalCard> {
-  bool _expanded = false;
+// ─────────────────────────────────────────────────────────────────────────────
+// News tab
+// ─────────────────────────────────────────────────────────────────────────────
+class _NewsTab extends StatelessWidget {
+  const _NewsTab({required this.provider});
+  final NewsEventsProvider provider;
 
   @override
   Widget build(BuildContext context) {
-    final s      = widget.signal;
-    final isDark = widget.isDark;
-    final ageMin = DateTime.now().difference(s.generatedAt).inMinutes;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141619) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: _expanded
-              ? s.type.color.withValues(alpha: 0.6)
-              : (isDark ? const Color(0xFF2A2D35) : const Color(0xFFD3D1C7)),
-          width: _expanded ? 1 : 0.5,
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: _FilterRow(provider: provider),
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          // ── Header row ──
-          InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-              child: Row(
-                children: [
-                  // Signal badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: s.type.bgColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: s.type.color.withValues(alpha: 0.4),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(s.type.icon, color: s.type.color, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          s.type.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
-                            color: s.type.color,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s.pair,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        Text(
-                          '${s.timeframe} · ${ageMin < 1 ? 'just now' : '${ageMin}m ago'}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF8A8880),
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Confidence ring
-                  _ConfidenceRing(confidence: s.confidence, color: s.type.color),
-                  const SizedBox(width: 8),
-                  Icon(
-                    _expanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    color: const Color(0xFF8A8880),
-                    size: 20,
-                  ),
-                ],
+        if (provider.articles.isEmpty)
+          const SliverFillRemaining(
+              child: _EmptyState('No news articles'))
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _NewsCard(article: provider.articles[i]),
+                ),
+                childCount: provider.articles.length,
               ),
             ),
           ),
+      ],
+    );
+  }
+}
 
-          // ── Reason (always visible, truncated) ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-            child: Text(
-              s.reason,
-              maxLines: _expanded ? 6 : 2,
-              overflow: TextOverflow.ellipsis,
+// ─────────────────────────────────────────────────────────────────────────────
+// Filter row — impact + sentiment chips
+// ─────────────────────────────────────────────────────────────────────────────
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({required this.provider});
+  final NewsEventsProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 30,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              _chip('All', provider.impactFilter == 'All', _kBlue,
+                  () => provider.setImpactFilter('All')),
+              _chip('High', provider.impactFilter == 'High', _kRed,
+                  () => provider.setImpactFilter('High')),
+              _chip('Medium', provider.impactFilter == 'Medium', _kAmber,
+                  () => provider.setImpactFilter('Medium')),
+              _chip('Low', provider.impactFilter == 'Low', _kGreen,
+                  () => provider.setImpactFilter('Low')),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 30,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              _chip('All', provider.sentimentFilter == 'All', _kBlue,
+                  () => provider.setSentimentFilter('All')),
+              _chip('Bullish', provider.sentimentFilter == 'Bullish',
+                  _kGreen, () => provider.setSentimentFilter('Bullish')),
+              _chip('Bearish', provider.sentimentFilter == 'Bearish',
+                  _kRed, () => provider.setSentimentFilter('Bearish')),
+              _chip('Neutral', provider.sentimentFilter == 'Neutral',
+                  _kSubtext,
+                  () => provider.setSentimentFilter('Neutral')),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _chip(
+          String label, bool active, Color color, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.only(right: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: active ? color.withValues(alpha: 0.15) : _kCard,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: active
+                    ? color.withValues(alpha: 0.4)
+                    : _kBorder),
+          ),
+          child: Text(label,
               style: TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: isDark ? const Color(0xFF9E9C95) : const Color(0xFF5F5E5A),
-              ),
-            ),
-          ),
+                  color: active ? color : _kSubtext,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+        ),
+      );
+}
 
-          // ── Expanded: levels + tags + action ──
-          if (_expanded) ...[
-            Divider(
-              height: 0.5,
-              color: isDark ? const Color(0xFF2A2D35) : const Color(0xFFD3D1C7),
-            ),
+// ─────────────────────────────────────────────────────────────────────────────
+// News card (expandable)
+// ─────────────────────────────────────────────────────────────────────────────
+class _NewsCard extends StatefulWidget {
+  const _NewsCard({required this.article});
+  final NewsArticle article;
+
+  @override
+  State<_NewsCard> createState() => _NewsCardState();
+}
+
+class _NewsCardState extends State<_NewsCard> {
+  bool _expanded = false;
+
+  Color get _impactColor => switch (widget.article.impact) {
+        NewsImpact.high   => _kRed,
+        NewsImpact.medium => _kAmber,
+        NewsImpact.low    => _kGreen,
+      };
+  Color get _impactDim => switch (widget.article.impact) {
+        NewsImpact.high   => _kRedDim,
+        NewsImpact.medium => _kAmberDim,
+        NewsImpact.low    => _kGreenDim,
+      };
+  String get _impactLabel => switch (widget.article.impact) {
+        NewsImpact.high   => 'HIGH',
+        NewsImpact.medium => 'MED',
+        NewsImpact.low    => 'LOW',
+      };
+  Color get _sentColor => switch (widget.article.sentiment) {
+        NewsSentiment.bullish => _kGreen,
+        NewsSentiment.bearish => _kRed,
+        NewsSentiment.neutral => _kSubtext,
+      };
+  IconData get _sentIcon => switch (widget.article.sentiment) {
+        NewsSentiment.bullish => Icons.arrow_upward_rounded,
+        NewsSentiment.bearish => Icons.arrow_downward_rounded,
+        NewsSentiment.neutral => Icons.remove_rounded,
+      };
+  String get _sentLabel => switch (widget.article.sentiment) {
+        NewsSentiment.bullish => 'BULLISH',
+        NewsSentiment.bearish => 'BEARISH',
+        NewsSentiment.neutral => 'NEUTRAL',
+      };
+
+  String _timeAgo() {
+    final diff = DateTime.now().difference(widget.article.publishedAt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        decoration: BoxDecoration(
+          color: _kCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _expanded
+                ? _impactColor.withValues(alpha: 0.3)
+                : _kBorder,
+            width: _expanded ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (s.entryPrice != null || s.tp != null || s.sl != null)
-                    _LevelsRow(
-                      entry: s.entryPrice,
-                      tp: s.tp,
-                      sl: s.sl,
-                      isDark: isDark,
-                    ),
-                  if (s.tags.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: s.tags.map((tag) => _TagChip(tag: tag, isDark: isDark)).toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.pushNamed(context, AppRoutes.dashboard),
-                          icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                          label: const Text('Open Copilot'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFF0A500),
-                            side: const BorderSide(color: Color(0xFFF0A500), width: 0.5),
-                            textStyle: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    _Badge(_impactLabel, _impactColor, _impactDim),
+                    const SizedBox(width: 6),
+                    _Badge(_sentLabel, _sentColor,
+                        _sentColor.withValues(alpha: 0.1),
+                        icon: _sentIcon),
+                    const Spacer(),
+                    Text(widget.article.source,
+                        style: const TextStyle(
+                            color: _kSubtext,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 6),
+                    Text(_timeAgo(),
+                        style: const TextStyle(
+                            color: _kSubtext, fontSize: 10)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Text(widget.article.headline,
+                      style: const TextStyle(
+                          color: _kText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.4)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    const Icon(Icons.currency_exchange_rounded,
+                        color: _kSubtext, size: 11),
+                    const SizedBox(width: 4),
+                    Text(
+                        'Affects: ${widget.article.affectedPairs}',
+                        style: const TextStyle(
+                            color: _kSubtext, fontSize: 10)),
+                  ]),
                 ],
               ),
             ),
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 220),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: const SizedBox.shrink(),
+              secondChild: Container(
+                margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _kSurface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kBorder),
+                ),
+                child: Text(widget.article.summary,
+                    style: TextStyle(
+                        color: _kText.withValues(alpha: 0.8),
+                        fontSize: 12,
+                        height: 1.6)),
+              ),
+            ),
+            if (!_expanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                child: Row(children: const [
+                  Icon(Icons.expand_more_rounded,
+                      color: _kSubtext, size: 14),
+                  SizedBox(width: 4),
+                  Text('Read more',
+                      style: TextStyle(color: _kSubtext, fontSize: 10)),
+                ]),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Confidence Ring (simple linear progress bar style)
-// ─────────────────────────────────────────────────────────────
-class _ConfidenceRing extends StatelessWidget {
-  final double confidence;
-  final Color color;
-  const _ConfidenceRing({required this.confidence, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final pct = (confidence * 100).round();
-    return Column(
-      children: [
-        Text(
-          '$pct%',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            fontFamily: 'monospace',
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 36,
-          child: LinearProgressIndicator(
-            value: confidence,
-            backgroundColor: color.withValues(alpha: 0.15),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 3,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LevelsRow extends StatelessWidget {
-  final String? entry;
-  final String? tp;
-  final String? sl;
-  final bool isDark;
-  const _LevelsRow({this.entry, this.tp, this.sl, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (entry != null) _Level(label: 'Entry', value: entry!, color: const Color(0xFF8A8880), isDark: isDark),
-        if (entry != null && (tp != null || sl != null)) const SizedBox(width: 12),
-        if (tp != null)    _Level(label: 'TP',    value: tp!,    color: const Color(0xFF00C896), isDark: isDark),
-        if (tp != null && sl != null) const SizedBox(width: 12),
-        if (sl != null)    _Level(label: 'SL',    value: sl!,    color: const Color(0xFFFF4D6D), isDark: isDark),
-      ],
-    );
-  }
-}
-
-class _Level extends StatelessWidget {
+class _Badge extends StatelessWidget {
+  const _Badge(this.label, this.color, this.bg, {this.icon});
   final String label;
-  final String value;
-  final Color color;
-  final bool isDark;
-  const _Level({required this.label, required this.value, required this.color, required this.isDark});
+  final Color color, bg;
+  final IconData? icon;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 0.5),
-      ),
-      child: Column(
-        children: [
-          Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700)),
-          Text(value, style: TextStyle(fontSize: 12, color: color, fontFamily: 'monospace', fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 9),
+            const SizedBox(width: 3),
+          ],
+          Text(label,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5)),
+        ]),
+      );
 }
 
-class _TagChip extends StatelessWidget {
-  final String tag;
-  final bool isDark;
-  const _TagChip({required this.tag, required this.isDark});
+// ─────────────────────────────────────────────────────────────────────────────
+// Calendar tab
+// ─────────────────────────────────────────────────────────────────────────────
+class _CalendarTab extends StatelessWidget {
+  const _CalendarTab({required this.provider});
+  final NewsEventsProvider provider;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        children: [
+          if (provider.upcomingEvents.isNotEmpty) ...[
+            _CalSection(
+                title: 'Upcoming Events',
+                icon: Icons.schedule_rounded,
+                color: _kGold,
+                events: provider.upcomingEvents),
+            const SizedBox(height: 20),
+          ],
+          if (provider.pastEvents.isNotEmpty)
+            _CalSection(
+                title: 'Released Today',
+                icon: Icons.check_circle_outline_rounded,
+                color: _kSubtext,
+                events: provider.pastEvents),
+        ],
+      );
+}
+
+class _CalSection extends StatelessWidget {
+  const _CalSection(
+      {required this.title,
+      required this.icon,
+      required this.color,
+      required this.events});
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<EconomicEvent> events;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 7),
+            Text(title,
+                style: TextStyle(
+                    color: color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 10),
+          ...events.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _EventCard(event: e),
+              )),
+        ],
+      );
+}
+
+class _EventCard extends StatelessWidget {
+  const _EventCard({required this.event});
+  final EconomicEvent event;
+
+  Color get _impactColor => switch (event.impact) {
+        NewsImpact.high   => _kRed,
+        NewsImpact.medium => _kAmber,
+        NewsImpact.low    => _kGreen,
+      };
+
+  String _fmtTime(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
+  String _timeUntil(DateTime dt) {
+    final diff = dt.difference(DateTime.now());
+    if (diff.isNegative) return 'Released';
+    if (diff.inMinutes < 60) return 'in ${diff.inMinutes}m';
+    return 'in ${diff.inHours}h ${diff.inMinutes.remainder(60)}m';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isUpcoming = event.isUpcoming;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E2028) : const Color(0xFFF0EEE8),
-        borderRadius: BorderRadius.circular(4),
+        color: _kCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: isUpcoming
+                ? _impactColor.withValues(alpha: 0.25)
+                : _kBorder),
       ),
-      child: Text(
-        tag,
-        style: TextStyle(
-          fontSize: 11,
-          fontFamily: 'monospace',
-          color: isDark ? const Color(0xFF8A8880) : const Color(0xFF5F5E5A),
+      child: Row(children: [
+        Container(
+            width: 3,
+            height: 44,
+            decoration: BoxDecoration(
+                color: _impactColor,
+                borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(event.title,
+                  style: const TextStyle(
+                      color: _kText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
+              Row(children: [
+                _currencyBadge(event.currency),
+                const SizedBox(width: 6),
+                Text(event.country,
+                    style: const TextStyle(
+                        color: _kSubtext, fontSize: 10)),
+              ]),
+            ],
+          ),
         ),
-      ),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(_fmtTime(event.scheduledAt),
+              style: const TextStyle(
+                  color: _kText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 3),
+          Text(
+            isUpcoming ? _timeUntil(event.scheduledAt) : 'Released',
+            style: TextStyle(
+                color: isUpcoming ? _kGold : _kSubtext,
+                fontSize: 10,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            if (event.forecast != null) ...[
+              _DataTag('F', event.forecast!, _kBlue),
+              const SizedBox(width: 4),
+            ],
+            if (event.actual != null)
+              _DataTag('A', event.actual!, _kGreen)
+            else if (event.previous != null)
+              _DataTag('P', event.previous!, _kSubtext),
+          ]),
+        ]),
+      ]),
     );
   }
+
+  Widget _currencyBadge(String code) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+            color: _kBlueDim,
+            borderRadius: BorderRadius.circular(4)),
+        child: Text(code,
+            style: const TextStyle(
+                color: _kBlue,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5)),
+      );
+}
+
+class _DataTag extends StatelessWidget {
+  const _DataTag(this.prefix, this.value, this.color);
+  final String prefix, value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$prefix:',
+              style: const TextStyle(color: _kSubtext, fontSize: 9)),
+          const SizedBox(width: 2),
+          Text(value,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700)),
+        ],
+      );
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.article_outlined,
+              color: _kSubtext, size: 40),
+          const SizedBox(height: 12),
+          Text(message,
+              style:
+                  const TextStyle(color: _kSubtext, fontSize: 14)),
+        ]),
+      );
 }

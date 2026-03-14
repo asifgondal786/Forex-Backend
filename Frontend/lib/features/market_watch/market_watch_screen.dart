@@ -1,658 +1,538 @@
-import 'dart:async';
+// lib/features/market_watch/market_watch_screen.dart
+import '../../core/widgets/quick_actions_overlay.dart';
+import '../../providers/mode_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/widgets/app_background.dart';
-import '../../routes/app_routes.dart';
-import '../../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../../providers/market_watch_provider.dart';
 
-const _kSelectedPairs  = 'tajir_selected_pairs';
-const _kLayoutMode     = 'tajir_layout_mode';
+// ─────────────────────────────────────────────────────────────────────────────
+// Theme constants (same palette as rest of app)
+// ─────────────────────────────────────────────────────────────────────────────
+const _kBg       = Color(0xFF0A0E1A);
+// const _kSurface  = Color(0xFF111827);
+const _kCard     = Color(0xFF161D2E);
+const _kBorder   = Color(0xFF1E2A3D);
+const _kGold     = Color(0xFFD4A853);
+const _kGreen    = Color(0xFF00C896);
+const _kGreenDim = Color(0xFF003D2E);
+const _kRed      = Color(0xFFFF4560);
+const _kRedDim   = Color(0xFF3D0010);
+const _kBlue     = Color(0xFF3B82F6);
+const _kText     = Color(0xFFE2E8F0);
+const _kSubtext  = Color(0xFF64748B);
+const _kDivider  = Color(0xFF1E2A3D);
 
-// ─────────────────────────────────────────────────────────────
-//  Model
-// ─────────────────────────────────────────────────────────────
-class _PriceData {
-  final String pair;
-  final double bid;
-  final double ask;
-  final double change;     // absolute
-  final double changePct;  // percent
-  final double spread;
-  final String trend;      // 'up' | 'down' | 'flat'
-  final List<double> spark; // mini sparkline last 12 ticks
-
-  const _PriceData({
-    required this.pair,
-    required this.bid,
-    required this.ask,
-    required this.change,
-    required this.changePct,
-    required this.spread,
-    required this.trend,
-    required this.spark,
-  });
-
-  factory _PriceData.fromApi(String pair, Map<String, dynamic> data) {
-    final bid       = _parseDouble(data['bid'] ?? data['price'] ?? data['rate'] ?? 0);
-    final ask       = _parseDouble(data['ask'] ?? (bid * 1.0002));
-    final change    = _parseDouble(data['change'] ?? data['change_abs'] ?? 0);
-    final changePct = _parseDouble(data['change_pct'] ?? data['change_percent'] ?? 0);
-    final spread    = ((ask - bid) * 10000).roundToDouble() / 10; // pips
-    final spark     = (data['sparkline'] as List?)
-            ?.map((v) => _parseDouble(v))
-            .toList() ??
-        List.generate(12, (_) => bid);
-    final trend = changePct > 0.01
-        ? 'up'
-        : changePct < -0.01
-            ? 'down'
-            : 'flat';
-    return _PriceData(
-      pair: pair,
-      bid: bid,
-      ask: ask,
-      change: change,
-      changePct: changePct,
-      spread: spread,
-      trend: trend,
-      spark: spark,
-    );
-  }
-
-  static double _parseDouble(dynamic v) {
-    if (v == null) return 0;
-    if (v is double) return v;
-    if (v is int) return v.toDouble();
-    return double.tryParse(v.toString()) ?? 0;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  Screen
-// ─────────────────────────────────────────────────────────────
 class MarketWatchScreen extends StatefulWidget {
   const MarketWatchScreen({super.key});
-
   @override
   State<MarketWatchScreen> createState() => _MarketWatchScreenState();
 }
 
-class _MarketWatchScreenState extends State<MarketWatchScreen> {
-  final ApiService _api = ApiService();
-
-  List<String>      _pairs     = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
-  String            _layout    = 'grid';
-  List<_PriceData>  _prices    = [];
-  bool              _loading   = true;
-  String?           _error;
-  String            _sortField = 'pair'; // 'pair' | 'change' | 'spread'
-  bool              _sortAsc   = true;
-  Timer?            _timer;
+class _MarketWatchScreenState extends State<MarketWatchScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _fadeCtrl;
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _init();
+    _fadeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500))
+      ..forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MarketWatchProvider>().init();
+    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _fadeCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _init() async {
-    await _loadPrefs();
-    await _fetch();
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _fetch());
-  }
-
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final pairs = prefs.getStringList(_kSelectedPairs);
-    if (pairs != null && pairs.isNotEmpty) {
-      setState(() {
-        _pairs  = pairs;
-        _layout = prefs.getString(_kLayoutMode) ?? 'grid';
-      });
-    }
-  }
-
-  Future<void> _fetch() async {
-    try {
-      // ApiService.getForexRates returns Map<String, dynamic> with pair data
-      final raw = await _api.getForexRates(pairs: _pairs);
-      final rates = raw['rates'] as Map<String, dynamic>? ?? raw;
-      final data = <_PriceData>[];
-      for (final pair in _pairs) {
-        final key = pair.replaceAll('/', '');
-        final entry = rates[key] ?? rates[pair];
-        if (entry is Map<String, dynamic>) {
-          data.add(_PriceData.fromApi(pair, entry));
-        } else if (entry is num) {
-          final existing = _prices.firstWhere(
-            (p) => p.pair == pair,
-            orElse: () => _PriceData(
-              pair: pair,
-              bid: 0,
-              ask: 0,
-              change: 0,
-              changePct: 0,
-              spread: 0,
-              trend: 'flat',
-              spark: [],
-            ),
-          );
-          final bid = entry.toDouble();
-          final prevBid = existing.bid;
-          final change = prevBid == 0 ? 0.0 : bid - prevBid;
-          final changePct = prevBid == 0 ? 0.0 : (change / prevBid) * 100;
-          final spark = <double>[
-            if (existing.spark.isNotEmpty) ...existing.spark
-            else if (existing.bid != 0) ...List.filled(12, existing.bid),
-          ];
-          if (spark.isEmpty) {
-            spark.addAll(List.filled(12, bid));
-          }
-          spark.add(bid);
-          if (spark.length > 12) {
-            spark.removeRange(0, spark.length - 12);
-          }
-          data.add(_PriceData.fromApi(pair, {
-            'bid': bid,
-            'ask': bid * 1.0002,
-            'change': change,
-            'change_pct': changePct,
-            'sparkline': spark,
-          }));
-        } else {
-          // graceful fallback: keep last price or placeholder
-          final existing = _prices.firstWhere(
-            (p) => p.pair == pair,
-            orElse: () => _PriceData(
-              pair: pair,
-              bid: 0,
-              ask: 0,
-              change: 0,
-              changePct: 0,
-              spread: 0,
-              trend: 'flat',
-              spark: [],
-            ),
-          );
-          data.add(existing);
-        }
-      }
-      if (mounted) {
-        setState(() {
-          _prices  = _sorted(data);
-          _loading = false;
-          _error   = null;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error   = 'Failed to load rates. Pull to refresh.';
-        });
-      }
-    }
-  }
-
-  List<_PriceData> _sorted(List<_PriceData> data) {
-    final list = List<_PriceData>.from(data);
-    list.sort((a, b) {
-      int cmp;
-      switch (_sortField) {
-        case 'change':
-          cmp = a.changePct.compareTo(b.changePct);
-        case 'spread':
-          cmp = a.spread.compareTo(b.spread);
-        default:
-          cmp = a.pair.compareTo(b.pair);
-      }
-      return _sortAsc ? cmp : -cmp;
-    });
-    return list;
-  }
-
-  void _setSort(String field) {
-    setState(() {
-      if (_sortField == field) {
-        _sortAsc = !_sortAsc;
-      } else {
-        _sortField = field;
-        _sortAsc   = field == 'pair';
-      }
-      _prices = _sorted(_prices);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return AppBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: _buildAppBar(isDark),
-        body: _buildBody(isDark),
+    return Consumer<MarketWatchProvider>(
+      builder: (ctx, provider, _) => Scaffold(
+        backgroundColor: _kBg,
+        body: FadeTransition(
+          opacity: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut),
+          child: CustomScrollView(
+            slivers: [
+              _AppBar(provider: provider),
+              SliverToBoxAdapter(child: _StatsBar(provider: provider)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: _SearchBar(
+                    controller: _searchCtrl,
+                    onChanged: provider.setSearch,
+                  ),
+                ),
+              ),
+
+              // STEP 2: Inside build(), in the SliverList, add as FIRST item before
+//         the _StatsBar SliverToBoxAdapter:
+SliverToBoxAdapter(
+  child: QuickActionsOverlay(
+    modeKey: 'marketWatch',
+    accentColor: const Color(0xFF00C896),  // green
+    title: 'QUICK ACTIONS',
+    onAction: (action) {
+      switch (action.routeOrAction) {
+        case 'filter_favourites':
+          provider.setFilter('Favourites');
+          break;
+        case 'filter_movers':
+          provider.setFilter('Bullish');
+          break;
+        case 'switch_signals':
+          context.read<ModeProvider>().setMode(AppMode.tradeSignals);
+          Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (_) => false);
+          break;
+        default:
+          if (action.isRoute) Navigator.pushNamed(context, action.routeOrAction);
+      }
+    },
+  ),
+),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: _FilterRow(provider: provider),
+                ),
+              ),
+              if (provider.isLoading)
+                const SliverFillRemaining(
+                    child: Center(
+                        child: CircularProgressIndicator(color: _kGold)))
+              else if (provider.quotes.isEmpty)
+                const SliverFillRemaining(child: _EmptyState())
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _PairCard(
+                          quote: provider.quotes[i],
+                          onFavTap: () => provider
+                              .toggleFavourite(provider.quotes[i].symbol),
+                        ),
+                      ),
+                      childCount: provider.quotes.length,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
+}
 
-  PreferredSizeWidget _buildAppBar(bool isDark) {
-    return AppBar(
-      backgroundColor: isDark ? const Color(0xFF0A0C10) : Colors.white,
+// ─────────────────────────────────────────────────────────────────────────────
+// App bar
+// ─────────────────────────────────────────────────────────────────────────────
+class _AppBar extends StatelessWidget {
+  const _AppBar({required this.provider});
+  final MarketWatchProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverAppBar(
+      pinned: true,
+      backgroundColor: _kBg,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Market Watch',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.3),
-          ),
-          Text(
-            '${_pairs.length} pairs · updates every 30s',
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF8A8880),
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
+      automaticallyImplyLeading: false,
+      title: Row(children: [
+        Container(width: 8, height: 8,
+            decoration: const BoxDecoration(color: _kGreen, shape: BoxShape.circle)),
+        const SizedBox(width: 10),
+        const Text('Market Watch',
+            style: TextStyle(color: _kText, fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(width: 8),
+        // Live pulse dot
+        _LiveDot(),
+      ]),
       actions: [
-        IconButton(
-          icon: Icon(
-            _layout == 'grid' ? Icons.view_list_rounded : Icons.grid_view_rounded,
-            size: 20,
-          ),
-          tooltip: 'Toggle layout',
-          onPressed: () => setState(() => _layout = _layout == 'grid' ? 'list' : 'grid'),
-        ),
-        IconButton(
-          icon: const Icon(Icons.tune_rounded, size: 20),
-          tooltip: 'Setup',
-          onPressed: () => Navigator.pushNamed(context, AppRoutes.customSetup),
-        ),
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, size: 20),
-          tooltip: 'Refresh',
-          onPressed: () {
-            setState(() => _loading = true);
-            _fetch();
-          },
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: Text('LIVE',
+              style: TextStyle(color: _kGreen.withValues(alpha: 0.7),
+                  fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 2)),
         ),
       ],
-    );
-  }
-
-  Widget _buildBody(bool isDark) {
-    if (_loading && _prices.isEmpty) return _buildLoading();
-    if (_error != null && _prices.isEmpty) return _buildError(isDark);
-
-    return RefreshIndicator(
-      color: const Color(0xFFF0A500),
-      onRefresh: _fetch,
-      child: Column(
-        children: [
-          if (_layout == 'list') _buildSortBar(isDark),
-          Expanded(
-            child: _layout == 'grid'
-                ? _buildGrid(isDark)
-                : _buildList(isDark),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSortBar(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDark ? const Color(0xFF0F1115) : const Color(0xFFF5F4F0),
-      child: Row(
-        children: [
-          _SortButton(label: 'Pair',   field: 'pair',   active: _sortField == 'pair',   asc: _sortAsc, onTap: () => _setSort('pair'),   isDark: isDark),
-          const Spacer(),
-          _SortButton(label: 'Change', field: 'change', active: _sortField == 'change', asc: _sortAsc, onTap: () => _setSort('change'), isDark: isDark),
-          const SizedBox(width: 24),
-          _SortButton(label: 'Spread', field: 'spread', active: _sortField == 'spread', asc: _sortAsc, onTap: () => _setSort('spread'), isDark: isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGrid(bool isDark) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.4,
-      ),
-      itemCount: _prices.length,
-      itemBuilder: (_, i) => _PriceGridCard(data: _prices[i], isDark: isDark),
-    );
-  }
-
-  Widget _buildList(bool isDark) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: _prices.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 6),
-      itemBuilder: (_, i) => _PriceListTile(data: _prices[i], isDark: isDark),
-    );
-  }
-
-  Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(color: Color(0xFFF0A500), strokeWidth: 2),
-          SizedBox(height: 16),
-          Text('Loading market data…',
-              style: TextStyle(color: Color(0xFF8A8880), fontFamily: 'monospace')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.signal_wifi_off_rounded, color: Color(0xFF8A8880), size: 40),
-          const SizedBox(height: 16),
-          Text(
-            _error ?? 'Something went wrong',
-            style: const TextStyle(color: Color(0xFF8A8880), fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: () {
-              setState(() { _loading = true; _error = null; });
-              _fetch();
-            },
-            icon: const Icon(Icons.refresh_rounded, size: 16),
-            label: const Text('Retry'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFF0A500),
-              side: const BorderSide(color: Color(0xFFF0A500), width: 0.5),
-            ),
-          ),
-        ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: _kDivider),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Price Grid Card
-// ─────────────────────────────────────────────────────────────
-class _PriceGridCard extends StatelessWidget {
-  final _PriceData data;
-  final bool isDark;
-
-  const _PriceGridCard({required this.data, required this.isDark});
+// ─────────────────────────────────────────────────────────────────────────────
+// Stats bar
+// ─────────────────────────────────────────────────────────────────────────────
+class _StatsBar extends StatelessWidget {
+  const _StatsBar({required this.provider});
+  final MarketWatchProvider provider;
 
   @override
   Widget build(BuildContext context) {
-    final isUp   = data.trend == 'up';
-    final isDown = data.trend == 'down';
-    final changeColor = isUp
-        ? const Color(0xFF00C896)
-        : isDown
-            ? const Color(0xFFFF4D6D)
-            : const Color(0xFF8A8880);
-
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141619) : Colors.white,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2D35) : const Color(0xFFD3D1C7),
-          width: 0.5,
-        ),
+        border: Border.all(color: _kBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  data.pair,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    letterSpacing: 0.5,
-                  ),
-                ),
+      child: Row(children: [
+        _StatCell(
+            label: 'Pairs',
+            value: '${provider.quotes.length}',
+            color: _kGold),
+        _divider(),
+        _StatCell(
+            label: 'Bullish',
+            value: '${provider.bullishCount}',
+            color: _kGreen),
+        _divider(),
+        _StatCell(
+            label: 'Bearish',
+            value: '${provider.bearishCount}',
+            color: _kRed),
+        _divider(),
+        _StatCell(label: 'Updated', value: 'Live', color: _kBlue),
+      ]),
+    );
+  }
+
+  Widget _divider() =>
+      Container(width: 1, height: 28, color: _kDivider, margin: const EdgeInsets.symmetric(horizontal: 8));
+}
+
+class _StatCell extends StatelessWidget {
+  const _StatCell({required this.label, required this.value, required this.color});
+  final String label, value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Column(children: [
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(color: _kSubtext, fontSize: 10)),
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search
+// ─────────────────────────────────────────────────────────────────────────────
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({required this.controller, required this.onChanged});
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(color: _kText, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Search pairs…',
+          hintStyle: const TextStyle(color: _kSubtext, fontSize: 14),
+          prefixIcon: const Icon(Icons.search_rounded, color: _kSubtext, size: 18),
+          filled: true,
+          fillColor: _kCard,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: _kBorder)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: _kBorder)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: _kGold.withValues(alpha: 0.5))),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filter row
+// ─────────────────────────────────────────────────────────────────────────────
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({required this.provider});
+  final MarketWatchProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    const tabs = ['All', 'Favourites', 'Bullish', 'Bearish'];
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: tabs.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final active = provider.filter == tabs[i];
+          final color = tabs[i] == 'Bullish' ? _kGreen
+              : tabs[i] == 'Bearish' ? _kRed
+              : tabs[i] == 'Favourites' ? _kGold
+              : _kBlue;
+          return GestureDetector(
+            onTap: () => provider.setFilter(tabs[i]),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: active ? color.withValues(alpha: 0.15) : _kCard,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: active ? color.withValues(alpha: 0.5) : _kBorder),
               ),
-              _TrendBadge(trend: data.trend),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            data.bid == 0 ? '—' : data.bid.toStringAsFixed(_decimalPlaces(data.pair)),
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'monospace',
-              letterSpacing: -0.5,
+              child: Text(tabs[i],
+                  style: TextStyle(
+                      color: active ? color : _kSubtext,
+                      fontSize: 12, fontWeight: FontWeight.w600)),
             ),
-          ),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                data.changePct == 0
-                    ? '—'
-                    : '${data.changePct >= 0 ? '+' : ''}${data.changePct.toStringAsFixed(3)}%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'monospace',
-                  color: changeColor,
-                ),
-              ),
-              Text(
-                data.spread == 0 ? '' : '${data.spread.toStringAsFixed(1)}p',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  color: Color(0xFF8A8880),
-                ),
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Price List Tile
-// ─────────────────────────────────────────────────────────────
-class _PriceListTile extends StatelessWidget {
-  final _PriceData data;
-  final bool isDark;
-
-  const _PriceListTile({required this.data, required this.isDark});
+// ─────────────────────────────────────────────────────────────────────────────
+// Pair card
+// ─────────────────────────────────────────────────────────────────────────────
+class _PairCard extends StatelessWidget {
+  const _PairCard({required this.quote, required this.onFavTap});
+  final PairQuote quote;
+  final VoidCallback onFavTap;
 
   @override
   Widget build(BuildContext context) {
-    final isUp   = data.trend == 'up';
-    final isDown = data.trend == 'down';
-    final changeColor = isUp
-        ? const Color(0xFF00C896)
-        : isDown
-            ? const Color(0xFFFF4D6D)
-            : const Color(0xFF8A8880);
+    final up = quote.isBullish;
+    final color = up ? _kGreen : _kRed;
+    final dimColor = up ? _kGreenDim : _kRedDim;
+    final priceStr = _formatPrice(quote.mid, quote.symbol);
+    final changeStr =
+        '${up ? '+' : ''}${quote.changePercent.toStringAsFixed(2)}%';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141619) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2D35) : const Color(0xFFD3D1C7),
-          width: 0.5,
-        ),
+        color: _kCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(
-              data.pair,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'monospace',
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data.bid == 0
-                      ? '—'
-                      : data.bid.toStringAsFixed(_decimalPlaces(data.pair)),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-                Text(
-                  data.ask == 0
-                      ? ''
-                      : 'Ask: ${data.ask.toStringAsFixed(_decimalPlaces(data.pair))}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    color: Color(0xFF8A8880),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                data.changePct == 0
-                    ? '—'
-                    : '${data.changePct >= 0 ? '+' : ''}${data.changePct.toStringAsFixed(3)}%',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'monospace',
-                  color: changeColor,
-                ),
-              ),
-              Text(
-                data.spread == 0 ? '' : 'Spread ${data.spread.toStringAsFixed(1)}p',
+      child: Row(children: [
+        // ── Flag badges ─────────────────────────────────────────────
+        _FlagPair(base: quote.base, quote: quote.quote),
+        const SizedBox(width: 12),
+        // ── Symbol + spread ─────────────────────────────────────────
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(quote.symbol,
                 style: const TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  color: Color(0xFF8A8880),
-                ),
-              ),
-            ],
+                    color: _kText, fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 3),
+            Row(children: [
+              Text('Spread: ',
+                  style: const TextStyle(color: _kSubtext, fontSize: 10)),
+              Text(_formatSpread(quote.spread, quote.symbol),
+                  style: const TextStyle(
+                      color: _kSubtext, fontSize: 10, fontWeight: FontWeight.w600)),
+            ]),
+          ]),
+        ),
+        // ── Price + change ──────────────────────────────────────────
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(priceStr,
+              style: const TextStyle(
+                  color: _kText, fontSize: 16, fontWeight: FontWeight.w800,
+                  fontFeatures: [FontFeature.tabularFigures()])),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: dimColor,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                  color: color, size: 10),
+              const SizedBox(width: 3),
+              Text(changeStr,
+                  style: TextStyle(
+                      color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+            ]),
           ),
-          const SizedBox(width: 10),
-          _TrendBadge(trend: data.trend),
-        ],
-      ),
+        ]),
+        const SizedBox(width: 8),
+        // ── H/L + favourite ─────────────────────────────────────────
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          _HLRow(label: 'H', value: _formatPrice(quote.high24h, quote.symbol), color: _kGreen),
+          const SizedBox(height: 4),
+          _HLRow(label: 'L', value: _formatPrice(quote.low24h, quote.symbol), color: _kRed),
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: onFavTap,
+            child: Icon(
+              quote.isFavourite ? Icons.star_rounded : Icons.star_outline_rounded,
+              color: quote.isFavourite ? _kGold : _kSubtext,
+              size: 18,
+            ),
+          ),
+        ]),
+      ]),
     );
+  }
+
+  String _formatPrice(double price, String symbol) {
+    if (symbol.contains('JPY')) return price.toStringAsFixed(3);
+    return price.toStringAsFixed(5);
+  }
+
+  String _formatSpread(double spread, String symbol) {
+    if (symbol.contains('JPY')) return (spread * 100).toStringAsFixed(1) + ' p';
+    return (spread * 10000).toStringAsFixed(1) + ' p';
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Helper widgets
-// ─────────────────────────────────────────────────────────────
-class _TrendBadge extends StatelessWidget {
-  final String trend;
-  const _TrendBadge({required this.trend});
+class _HLRow extends StatelessWidget {
+  const _HLRow({required this.label, required this.value, required this.color});
+  final String label, value;
+  final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    if (trend == 'flat') return const SizedBox.shrink();
-    final up = trend == 'up';
-    return Icon(
-      up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
-      color: up ? const Color(0xFF00C896) : const Color(0xFFFF4D6D),
-      size: 22,
-    );
-  }
-}
-
-class _SortButton extends StatelessWidget {
-  final String label;
-  final String field;
-  final bool active;
-  final bool asc;
-  final VoidCallback onTap;
-  final bool isDark;
-
-  const _SortButton({
-    required this.label,
-    required this.field,
-    required this.active,
-    required this.asc,
-    required this.onTap,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-              fontFamily: 'monospace',
-              color: active ? const Color(0xFFF0A500) : const Color(0xFF8A8880),
-              letterSpacing: 0.5,
+          Text(label,
+              style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 3),
+          Text(value, style: const TextStyle(color: _kSubtext, fontSize: 9)),
+        ],
+      );
+}
+
+class _FlagPair extends StatelessWidget {
+  const _FlagPair({required this.base, required this.quote});
+  final String base, quote;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 38,
+        height: 38,
+        child: Stack(children: [
+          Positioned(
+            top: 0, left: 0,
+            child: _CurrencyBadge(code: base, size: 26),
+          ),
+          Positioned(
+            bottom: 0, right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: _kCard, width: 1.5),
+                shape: BoxShape.circle,
+              ),
+              child: _CurrencyBadge(code: quote, size: 22),
             ),
           ),
-          if (active) ...[
-            const SizedBox(width: 2),
-            Icon(
-              asc ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-              size: 10,
-              color: const Color(0xFFF0A500),
-            ),
-          ],
-        ],
+        ]),
+      );
+}
+
+class _CurrencyBadge extends StatelessWidget {
+  const _CurrencyBadge({required this.code, required this.size});
+  final String code;
+  final double size;
+
+  static const _colors = {
+    'EUR': Color(0xFF0052A5), 'GBP': Color(0xFF012169),
+    'USD': Color(0xFF3C3B6E), 'JPY': Color(0xFFBC002D),
+    'AUD': Color(0xFF003087), 'CAD': Color(0xFFD52B1E),
+    'CHF': Color(0xFFFF0000), 'NZD': Color(0xFF00247D),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(
+        color: _colors[code] ?? _kSubtext,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(code.substring(0, 1),
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: size * 0.38,
+                fontWeight: FontWeight.w800)),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Utilities
-// ─────────────────────────────────────────────────────────────
-int _decimalPlaces(String pair) {
-  // JPY pairs have 3 decimal places, others 5
-  return pair.contains('JPY') ? 3 : 5;
+// ─────────────────────────────────────────────────────────────────────────────
+// Misc
+// ─────────────────────────────────────────────────────────────────────────────
+class _LiveDot extends StatefulWidget {
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(seconds: 1))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _ctrl,
+        child: Container(
+          width: 7, height: 7,
+          decoration: const BoxDecoration(
+              color: _kGreen, shape: BoxShape.circle),
+        ),
+      );
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.search_off_rounded, color: _kSubtext, size: 40),
+          const SizedBox(height: 12),
+          const Text('No pairs match your filter',
+              style: TextStyle(color: _kSubtext, fontSize: 14)),
+        ]),
+      );
 }

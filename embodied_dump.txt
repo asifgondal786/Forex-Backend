@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -584,19 +584,19 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
                   dropdownColor: const Color(0xFF0B1220),
                   items: const [
                     DropdownMenuItem<String>(
-                      value: 'beginner',
+                      initialValue: 'beginner',
                       child: Text('Beginner (safest)'),
                     ),
                     DropdownMenuItem<String>(
-                      value: 'intermediate',
+                      initialValue: 'intermediate',
                       child: Text('Intermediate'),
                     ),
                     DropdownMenuItem<String>(
-                      value: 'pro',
+                      initialValue: 'pro',
                       child: Text('Pro'),
                     ),
                     DropdownMenuItem<String>(
-                      value: 'custom',
+                      initialValue: 'custom',
                       child: Text('Custom'),
                     ),
                   ],
@@ -623,7 +623,7 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
             items: AgentAutonomyMode.values
                 .map(
                   (mode) => DropdownMenuItem<AgentAutonomyMode>(
-                    value: mode,
+                    initialValue: mode,
                     child: Text(mode.label),
                   ),
                 )
@@ -640,7 +640,7 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
           const SizedBox(height: 14),
           _buildSliderRow(
             label: 'Risk per trade',
-            value: agent.draftRiskPerTradePercent,
+            initialValue: agent.draftRiskPerTradePercent,
             min: 0.25,
             max: 3.0,
             suffix: '%',
@@ -649,7 +649,7 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
           const SizedBox(height: 12),
           _buildSliderRow(
             label: 'Daily loss cap',
-            value: agent.draftDailyLossPercent,
+            initialValue: agent.draftDailyLossPercent,
             min: 0.5,
             max: 8.0,
             suffix: '%',
@@ -798,7 +798,7 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
                 items: agent.supportedLanguages.entries
                     .map(
                       (entry) => DropdownMenuItem<String>(
-                        value: entry.key,
+                        initialValue: entry.key,
                         child: Text(
                           entry.value,
                           overflow: TextOverflow.ellipsis,
@@ -1023,32 +1023,32 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
         children: [
           _SafetyRow(
             label: 'Max risk per trade',
-            value: '${g.maxRiskPerTradePercent.toStringAsFixed(2)}%',
+            initialValue: '${g.maxRiskPerTradePercent.toStringAsFixed(2)}%',
             color: const Color(0xFF3B82F6),
           ),
           _SafetyRow(
             label: 'Daily loss limit',
-            value: '${g.dailyLossLimitPercent.toStringAsFixed(2)}%',
+            initialValue: '${g.dailyLossLimitPercent.toStringAsFixed(2)}%',
             color: const Color(0xFFEF4444),
           ),
           _SafetyRow(
             label: 'Weekly loss limit',
-            value: '${g.weeklyLossLimitPercent.toStringAsFixed(2)}%',
+            initialValue: '${g.weeklyLossLimitPercent.toStringAsFixed(2)}%',
             color: const Color(0xFFF59E0B),
           ),
           _SafetyRow(
             label: 'Hard max drawdown',
-            value: '${g.hardMaxDrawdownPercent.toStringAsFixed(2)}%',
+            initialValue: '${g.hardMaxDrawdownPercent.toStringAsFixed(2)}%',
             color: const Color(0xFF8B5CF6),
           ),
           _SafetyRow(
             label: 'Profile',
-            value: g.profile.isEmpty ? 'custom' : g.profile,
+            initialValue: g.profile.isEmpty ? 'custom' : g.profile,
             color: const Color(0xFF38BDF8),
           ),
           _SafetyRow(
             label: 'Risk Guardian',
-            value: g.riskGuardianStatus,
+            initialValue: g.riskGuardianStatus,
             color: g.riskGuardianStatus == 'paused'
                 ? const Color(0xFFEF4444)
                 : g.riskGuardianStatus == 'near_limit'
@@ -1122,7 +1122,7 @@ class _EmbodiedAgentScreenState extends State<EmbodiedAgentScreen> {
             ],
           ),
           Slider(
-            value: value.clamp(min, max).toDouble(),
+            initialValue: value.clamp(min, max).toDouble(),
             min: min,
             max: max,
             onChanged: onChanged,

@@ -242,7 +242,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryBlue.withOpacity(0.35),
+                  color: AppColors.primaryBlue.withValues(alpha: 0.35),
                   blurRadius: 14,
                   spreadRadius: 2,
                 ),
@@ -281,9 +281,9 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withOpacity(0.12)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: Row(
                 children: const [
@@ -383,12 +383,12 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.03),
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.03),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +405,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
           Text(
             subtitle,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 12,
             ),
           ),
@@ -719,16 +719,16 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'ML + DL engines track charts, news signal. Track charts, news and signal.',
-            style: TextStyle(color: Colors.white.withOpacity(0.7), height: 1.4),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), height: 1.4),
           ),
           const SizedBox(height: 16),
           _buildCapabilityRow(
@@ -756,10 +756,10 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withOpacity(0.12),
+              color: const Color(0xFF10B981).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF10B981).withOpacity(0.3),
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
               ),
             ),
             child: const Text(
@@ -796,7 +796,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, size: 16, color: Colors.white70),
@@ -811,7 +811,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                 Icon(
                   Icons.open_in_new,
                   size: 14,
-                  color: Colors.white.withOpacity(0.45),
+                  color: Colors.white.withValues(alpha: 0.45),
                 ),
               ],
             ),

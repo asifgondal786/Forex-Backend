@@ -40,7 +40,7 @@ class GlassmorphismCard extends StatelessWidget {
         boxShadow: showGlow
             ? [
                 BoxShadow(
-                  color: (borderColor ?? const Color(0xFF00D9FF)).withOpacity(0.2),
+                  color: (borderColor ?? const Color(0xFF00D9FF)).withValues(alpha: 0.2),
                   blurRadius: 20,
                   spreadRadius: 0,
                 ),
@@ -53,19 +53,19 @@ class GlassmorphismCard extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF1E2A3E).withOpacity(opacity),
+              color: const Color(0xFF1E2A3E).withValues(alpha: opacity),
               borderRadius: BorderRadius.circular(borderRadius),
               border: Border.all(
-                color: borderColor?.withOpacity(0.3) ??
-                    const Color(0xFF00D9FF).withOpacity(0.2),
+                color: borderColor?.withValues(alpha: 0.3) ??
+                    const Color(0xFF00D9FF).withValues(alpha: 0.2),
                 width: borderWidth,
               ),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withOpacity(0.1),
-                  Colors.white.withOpacity(0.05),
+                  Colors.white.withValues(alpha: 0.1),
+                  Colors.white.withValues(alpha: 0.05),
                 ],
               ),
             ),
@@ -116,13 +116,13 @@ class GradientCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius),
         border: showBorder
             ? Border.all(
-                color: const Color(0xFF00D9FF).withOpacity(0.3),
+                color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
                 width: 1,
               )
             : null,
         boxShadow: [
           BoxShadow(
-            color: gradientColors.first.withOpacity(0.3),
+            color: gradientColors.first.withValues(alpha: 0.3),
             blurRadius: 15,
             spreadRadius: 0,
           ),

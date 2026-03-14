@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(36),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF3B82F6).withOpacity(0.4),
+                            color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
                             blurRadius: 36,
                             spreadRadius: 9,
                           ),
@@ -220,11 +220,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: BorderSide(
-                          color: Colors.white.withOpacity(0.08),
+                          color: Colors.white.withValues(alpha: 0.08),
                           width: 1,
                         ),
                       ),
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       child: Padding(
                         padding: EdgeInsets.all(isMobile ? 24 : 32),
                         child: Column(
@@ -254,9 +254,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.15),
+                                  color: Colors.red.withValues(alpha: 0.15),
                                   border: Border.all(
-                                    color: Colors.red.withOpacity(0.4),
+                                    color: Colors.red.withValues(alpha: 0.4),
                                   ),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -333,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         child: CircularProgressIndicator(
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                            Colors.white.withOpacity(0.8),
+                                            Colors.white.withValues(alpha: 0.8),
                                           ),
                                           strokeWidth: 2.5,
                                         ),
@@ -477,7 +477,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             prefixIcon: Icon(icon, color: const Color(0xFF3B82F6), size: 20),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -485,7 +485,7 @@ class _LoginScreenState extends State<LoginScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
@@ -546,7 +546,7 @@ class _LoginScreenState extends State<LoginScreen> {
               },
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -554,7 +554,7 @@ class _LoginScreenState extends State<LoginScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
