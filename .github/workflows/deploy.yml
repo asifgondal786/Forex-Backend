@@ -53,7 +53,7 @@ jobs:
       - name: Build Flutter Web (release)
         run: |
           flutter build web \
-            --release \
+            --release \\\n            --dart-define=API_BASE_URL=https://forex-backend-production-bc44.up.railway.app \\\n            --dart-define=APP_WEB_URL=https://forexcompanion-e5a28.web.app \\\n            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
              \
             
 
@@ -180,3 +180,4 @@ jobs:
           echo "🚀 Tajir deploy complete"
           echo "   Frontend: https://forexcompanion-e5a28.web.app"
           echo "   Backend:  https://forex-backend-production-bc44.up.railway.app"
+

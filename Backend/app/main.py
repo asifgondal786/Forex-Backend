@@ -230,13 +230,13 @@ def _validate_env_urls() -> None:
             raise RuntimeError(f"CORS origin must use HTTPS in production: {origin}")
 
 # Import routers
-from .users import router  # noqa: E402 as users_router
-from .websocket_routes import  # noqa: E402 router as websocket_router
-from .engagement_routes import  # noqa: E402 router as engagement_router
-from .auth_status_routes import  # noqa: E402 router as auth_status_router
-from .header_routes import  # noqa: E402 router as header_router
-from .notifications_routes import  # noqa: E402 router as notifications_router
-from .settings_routes import  # noqa: E402 router as settings_router
+from .users import router as users_router  # noqa: E402
+from .websocket_routes import router as websocket_router  # noqa: E402
+from .engagement_routes import router as engagement_router  # noqa: E402
+from .auth_status_routes import router as auth_status_router  # noqa: E402
+from .header_routes import router as header_router  # noqa: E402
+from .notifications_routes import router as notifications_router  # noqa: E402
+from .settings_routes import router as settings_router  # noqa: E402
 
 try:
     from .ai_task_routes import router as ai_task_router
@@ -301,24 +301,24 @@ except ImportError:
     AI_PROXY_AVAILABLE = False
     print("[WARN] AI proxy routes not available")
 
-from .enhanced_websocket_manager import  # noqa: E402 ws_manager
-from .forex_data_service import  # noqa: E402 forex_service
-from .services.task_queue_service import  # noqa: E402 task_queue_service
-from .services.redis_store import  # noqa: E402 redis_store
-from .services.rate_limiter import  # noqa: E402 RateLimiter
-from fastapi.routing import APIRouter  # noqa: E402 as _APIRouter
-from .services.observability import  # noqa: E402 health_checker
-from .utils.firestore_client import  # noqa: E402 (
+from .enhanced_websocket_manager import ws_manager  # noqa: E402
+from .forex_data_service import forex_service  # noqa: E402
+from .services.task_queue_service import task_queue_service  # noqa: E402
+from .services.redis_store import redis_store  # noqa: E402
+from .services.rate_limiter import RateLimiter  # noqa: E402
+from fastapi.routing import APIRouter as _APIRouter  # noqa: E402
+from .services.observability import health_checker  # noqa: E402
+from .utils.firestore_client import (  # noqa: E402
     check_firebase_authorized_domain,
     get_firebase_config_status,
     init_firebase,
 )
-from .schemas.api_response import  # noqa: E402 (
+from .schemas.api_response import (  # noqa: E402
     error_payload,
     is_api_response_payload,
     success_payload,
 )
-from .security import  # noqa: E402 verify_http_request
+from .security import verify_http_request  # noqa: E402
 
 
 @asynccontextmanager
@@ -1265,4 +1265,5 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+
 
