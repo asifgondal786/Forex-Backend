@@ -1,4 +1,15 @@
-import 'dart:async';
+#!/usr/bin/env python3
+"""
+Writes the corrected voice_assistant_service_web.dart directly into the project.
+Run from D:\Tajir\Frontend:
+    python ..\scripts\write_voice_service.py
+"""
+from pathlib import Path
+import sys
+
+TARGET = Path("lib/services/voice_assistant_service_web.dart")
+
+CONTENT = r'''import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
@@ -347,3 +358,12 @@ class _WebVoiceAssistantService implements VoiceAssistantService {
 
 VoiceAssistantService createVoiceAssistantServiceImpl() =>
     _WebVoiceAssistantService();
+'''
+
+if not TARGET.parent.exists():
+    print(f"ERROR: {TARGET.parent} not found. Run from D:\\Tajir\\Frontend")
+    sys.exit(1)
+
+TARGET.write_text(CONTENT, encoding='utf-8')
+print(f"✅ Written: {TARGET.resolve()}")
+print("Run: flutter analyze")

@@ -241,6 +241,7 @@ class _WebVoiceAssistantService implements VoiceAssistantService {
       _stopRecognitionInternal();
     }
 
+    // Use addEventListener — package:web stream getters are JSFunction, not Stream
     void onResult(web.Event event) {
       final e = event as web.SpeechRecognitionEvent;
       final results = e.results;
