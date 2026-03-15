@@ -54,8 +54,8 @@ jobs:
         run: |
           flutter build web \
             --release \
-            --web-renderer canvaskit \
-            --dart-define=FLUTTER_WEB_USE_SKIA=true
+             \
+            
 
       # Only deploy on push to main (not on PRs)
       - name: Deploy to Firebase Hosting

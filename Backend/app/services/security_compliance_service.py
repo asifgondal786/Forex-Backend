@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
 import hashlib
-import json
 
 
 class APIKeyScope(Enum):
@@ -49,10 +48,10 @@ class APIKeyCredential:
     expires_at: Optional[datetime] = None
     scope: APIKeyScope = APIKeyScope.TRADE_ONLY
     is_active: bool = True
-    
+
     # Encrypted storage (never store raw keys)
     key_hash: str = ""  # SHA256 hash of encrypted key
-    
+
     # Usage statistics
     total_trades_executed: int = 0
     api_calls_made: int = 0
@@ -65,22 +64,22 @@ class AuditLogEntry:
     user_id: str
     action: AuditActionType
     timestamp: datetime
-    
+
     # Action details
     pair: Optional[str] = None
     trade_id: Optional[str] = None
     quantity: Optional[float] = None
     price: Optional[float] = None
-    
+
     # Actor information
     api_key_id: Optional[str] = None
     ip_address: Optional[str] = None
     session_id: Optional[str] = None
-    
+
     # Status
     success: bool = True
     error_message: Optional[str] = None
-    
+
     # Additional context
     metadata: Dict = field(default_factory=dict)
 
@@ -91,7 +90,7 @@ class UserLegalAcknowledgement:
     acknowledgement_id: str
     user_id: str
     timestamp: datetime
-    
+
     # Acknowledged items
     risk_disclaimer_accepted: bool = False
     trading_losses_understood: bool = False
@@ -99,11 +98,11 @@ class UserLegalAcknowledgement:
     api_key_usage_acknowledged: bool = False
     data_privacy_accepted: bool = False
     terms_of_service_accepted: bool = False
-    
+
     # Signature (digital)
     signature_hash: Optional[str] = None
     ip_address: Optional[str] = None
-    
+
     # Version tracking
     agreement_version: str = "1.0"
     expiry_date: Optional[datetime] = None
@@ -115,17 +114,17 @@ class ComplianceReport:
     user_id: str
     report_date: datetime
     status: ComplianceStatus
-    
+
     # Metrics
     daily_trade_count: int
     daily_volume: float
     unusual_activity: bool
-    
+
     # Risk assessment
     current_drawdown: float
     leverage_usage: float
     account_equity: float
-    
+
     # Optional fields (with defaults)
     violations_detected: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -135,7 +134,7 @@ class SecurityComplianceService:
     """
     Comprehensive security and compliance management
     """
-    
+
     def __init__(self):
         self.api_keys: Dict[str, APIKeyCredential] = {}
         self.audit_logs: List[AuditLogEntry] = []
@@ -157,18 +156,18 @@ class SecurityComplianceService:
         Create a new API key credential
         NEVER stores raw credentials - only encrypted hashes
         """
-        
+
         key_id = f"key_{user_id}_{datetime.now().timestamp()}"
-        
+
         # In production: encrypt the API key before storing
         # For now: store hash
         dummy_key = f"{broker}_{user_id}_{key_id}"
         key_hash = hashlib.sha256(dummy_key.encode()).hexdigest()
-        
+
         expires_at = None
         if expires_in_days:
             expires_at = datetime.now() + timedelta(days=expires_in_days)
-        
+
         api_key = APIKeyCredential(
             key_id=key_id,
             user_id=user_id,
@@ -178,9 +177,9 @@ class SecurityComplianceService:
             expires_at=expires_at,
             key_hash=key_hash
         )
-        
+
         self.api_keys[key_id] = api_key
-        
+
         # Log the action
         await self._log_audit(
             user_id=user_id,
@@ -192,7 +191,7 @@ class SecurityComplianceService:
                 "key_id": key_id[:20] + "..."  # Masked
             }
         )
-        
+
         return {
             "success": True,
             "key_id": key_id,
@@ -207,20 +206,20 @@ class SecurityComplianceService:
         """Revoke an API key"""
         if key_id not in self.api_keys:
             return {"error": "API key not found"}
-        
+
         api_key = self.api_keys[key_id]
         if api_key.user_id != user_id:
             return {"error": "Unauthorized"}
-        
+
         api_key.is_active = False
-        
+
         await self._log_audit(
             user_id=user_id,
             action=AuditActionType.API_KEY_REVOKED,
             success=True,
             metadata={"key_id": key_id[:20] + "..."}
         )
-        
+
         return {
             "success": True,
             "message": f"API key {key_id} revoked",
@@ -230,7 +229,7 @@ class SecurityComplianceService:
     async def get_user_api_keys(self, user_id: str) -> List[Dict]:
         """Get all API keys for a user (censored)"""
         user_keys = [k for k in self.api_keys.values() if k.user_id == user_id]
-        
+
         return [
             {
                 "key_id": k.key_id[:20] + "...",
@@ -261,7 +260,7 @@ class SecurityComplianceService:
     ) -> str:
         """Log an auditable action"""
         log_id = f"audit_{user_id}_{datetime.now().timestamp()}"
-        
+
         entry = AuditLogEntry(
             log_id=log_id,
             user_id=user_id,
@@ -273,9 +272,9 @@ class SecurityComplianceService:
             error_message=error_message,
             metadata=metadata or {}
         )
-        
+
         self.audit_logs.append(entry)
-        
+
         # Alert on critical actions
         if action in [
             AuditActionType.KILL_SWITCH_ACTIVATED,
@@ -285,7 +284,7 @@ class SecurityComplianceService:
             if user_id not in self.compliance_alerts:
                 self.compliance_alerts[user_id] = []
             self.compliance_alerts[user_id].append(f"[SECURITY] {action.value} at {datetime.now().isoformat()}")
-        
+
         return log_id
 
     async def log_trade_execution(
@@ -314,25 +313,25 @@ class SecurityComplianceService:
     async def get_audit_log(self, user_id: str, limit: int = 50, days: int = 30) -> List[Dict]:
         """Get audit log for a user"""
         cutoff_date = datetime.now() - timedelta(days=days)
-        
+
         logs = [
-            l for l in self.audit_logs
-            if l.user_id == user_id and l.timestamp > cutoff_date
+            log for log in self.audit_logs
+            if log.user_id == user_id and log.timestamp > cutoff_date
         ]
-        
+
         logs = sorted(logs, key=lambda x: x.timestamp, reverse=True)[:limit]
-        
+
         return [
             {
-                "log_id": l.log_id,
-                "action": l.action.value,
-                "timestamp": l.timestamp.isoformat(),
-                "success": l.success,
-                "pair": l.pair,
-                "trade_id": l.trade_id[:20] + "..." if l.trade_id else None,
-                "error_message": l.error_message,
+                "log_id": log.log_id,
+                "action": log.action.value,
+                "timestamp": log.timestamp.isoformat(),
+                "success": log.success,
+                "pair": log.pair,
+                "trade_id": log.trade_id[:20] + "..." if log.trade_id else None,
+                "error_message": log.error_message,
             }
-            for l in logs
+            for log in logs
         ]
 
     # ========================================================================
@@ -354,15 +353,15 @@ class SecurityComplianceService:
         Create legal acknowledgement for compliance
         User must explicitly accept all risks and terms
         """
-        
+
         if not all([risk_disclaimer, losses_understood, autonomous_trading, api_usage, privacy, terms]):
             return {
                 "success": False,
                 "error": "All acknowledgements must be accepted to proceed"
             }
-        
+
         ack_id = f"ack_{user_id}_{datetime.now().timestamp()}"
-        
+
         acknowledgement = UserLegalAcknowledgement(
             acknowledgement_id=ack_id,
             user_id=user_id,
@@ -376,16 +375,16 @@ class SecurityComplianceService:
             ip_address=ip_address,
             expiry_date=datetime.now() + timedelta(days=365)
         )
-        
+
         self.legal_acknowledgements[user_id] = acknowledgement
-        
+
         # Log the action
         await self._log_audit(
             user_id=user_id,
             action=AuditActionType.AUTOMATION_ENABLED,
             metadata={"acknowledgement_id": ack_id}
         )
-        
+
         return {
             "success": True,
             "acknowledgement_id": ack_id,
@@ -397,16 +396,16 @@ class SecurityComplianceService:
     async def get_legal_status(self, user_id: str) -> Dict:
         """Get legal compliance status"""
         ack = self.legal_acknowledgements.get(user_id)
-        
+
         if not ack:
             return {
                 "compliant": False,
                 "message": "Legal acknowledgements not completed",
                 "action_required": "Complete legal agreement before enabling automation"
             }
-        
+
         is_valid = ack.expiry_date > datetime.now() if ack.expiry_date else True
-        
+
         return {
             "compliant": is_valid,
             "acknowledged_at": ack.timestamp.isoformat(),
@@ -427,27 +426,27 @@ class SecurityComplianceService:
 
     async def generate_compliance_report(self, user_id: str) -> Dict:
         """Generate comprehensive compliance report"""
-        logs = [l for l in self.audit_logs if l.user_id == user_id]
+        logs = [log for log in self.audit_logs if log.user_id == user_id]
         violations = []
         warnings = []
-        
+
         # Check for suspicious patterns
-        trades_today = len([l for l in logs if l.action == AuditActionType.TRADE_EXECUTED and
-                           (datetime.now() - l.timestamp).days == 0])
-        
+        trades_today = len([log for log in logs if log.action == AuditActionType.TRADE_EXECUTED and
+                           (datetime.now() - log.timestamp).days == 0])
+
         if trades_today > 20:
             warnings.append(f"High trade frequency today: {trades_today} trades")
-        
+
         # Check for multiple kill switch activations
-        kill_switches = len([l for l in logs if l.action == AuditActionType.KILL_SWITCH_ACTIVATED and
-                            (datetime.now() - l.timestamp).days <= 7])
-        
+        kill_switches = len([log for log in logs if log.action == AuditActionType.KILL_SWITCH_ACTIVATED and
+                            (datetime.now() - log.timestamp).days <= 7])
+
         if kill_switches > 2:
             violations.append("Multiple kill switch activations detected")
-        
+
         # Check legal status
         legal_status = await self.get_legal_status(user_id)
-        
+
         report = ComplianceReport(
             user_id=user_id,
             report_date=datetime.now(),
@@ -461,7 +460,7 @@ class SecurityComplianceService:
             leverage_usage=0,
             account_equity=0
         )
-        
+
         return {
             "status": report.status.value,
             "report_date": report.report_date.isoformat(),
@@ -476,7 +475,7 @@ class SecurityComplianceService:
                 "warnings": report.warnings,
                 "legal_compliant": legal_status["compliant"],
             },
-            "audit_trail_size": len([l for l in logs if l.user_id == user_id]),
+            "audit_trail_size": len([log for log in logs if log.user_id == user_id]),
         }
 
     async def get_security_dashboard(self, user_id: str) -> Dict:
@@ -484,7 +483,7 @@ class SecurityComplianceService:
         api_keys = await self.get_user_api_keys(user_id)
         legal_status = await self.get_legal_status(user_id)
         alerts = self.compliance_alerts.get(user_id, [])
-        
+
         return {
             "security_status": {
                 "api_keys_active": len([k for k in api_keys if k["is_active"]]),

@@ -16,7 +16,6 @@ import uuid
 import asyncio
 import logging
 import importlib
-from collections import defaultdict, deque
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 from .config.audit import log_config_snapshot
@@ -231,13 +230,13 @@ def _validate_env_urls() -> None:
             raise RuntimeError(f"CORS origin must use HTTPS in production: {origin}")
 
 # Import routers
-from .users import router as users_router
-from .websocket_routes import router as websocket_router
-from .engagement_routes import router as engagement_router
-from .auth_status_routes import router as auth_status_router
-from .header_routes import router as header_router
-from .notifications_routes import router as notifications_router
-from .settings_routes import router as settings_router
+from .users import router  # noqa: E402 as users_router
+from .websocket_routes import  # noqa: E402 router as websocket_router
+from .engagement_routes import  # noqa: E402 router as engagement_router
+from .auth_status_routes import  # noqa: E402 router as auth_status_router
+from .header_routes import  # noqa: E402 router as header_router
+from .notifications_routes import  # noqa: E402 router as notifications_router
+from .settings_routes import  # noqa: E402 router as settings_router
 
 try:
     from .ai_task_routes import router as ai_task_router
@@ -302,24 +301,24 @@ except ImportError:
     AI_PROXY_AVAILABLE = False
     print("[WARN] AI proxy routes not available")
 
-from .enhanced_websocket_manager import ws_manager
-from .forex_data_service import forex_service
-from .services.task_queue_service import task_queue_service
-from .services.redis_store import redis_store
-from .services.rate_limiter import RateLimiter
-from fastapi.routing import APIRouter as _APIRouter
-from .services.observability import health_checker
-from .utils.firestore_client import (
+from .enhanced_websocket_manager import  # noqa: E402 ws_manager
+from .forex_data_service import  # noqa: E402 forex_service
+from .services.task_queue_service import  # noqa: E402 task_queue_service
+from .services.redis_store import  # noqa: E402 redis_store
+from .services.rate_limiter import  # noqa: E402 RateLimiter
+from fastapi.routing import APIRouter  # noqa: E402 as _APIRouter
+from .services.observability import  # noqa: E402 health_checker
+from .utils.firestore_client import  # noqa: E402 (
     check_firebase_authorized_domain,
     get_firebase_config_status,
     init_firebase,
 )
-from .schemas.api_response import (
+from .schemas.api_response import  # noqa: E402 (
     error_payload,
     is_api_response_payload,
     success_payload,
 )
-from .security import verify_http_request
+from .security import  # noqa: E402 verify_http_request
 
 
 @asynccontextmanager
@@ -328,7 +327,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("[Startup] Forex Companion AI Backend Starting...")
     logger.info("=" * 60)
-    
+
     try:
         public_api_base = _public_api_base_url()
         logger.info(f"[Startup] WebSocket: {_public_ws_endpoint()}")
@@ -337,7 +336,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"[Startup] Advanced Features: {'ACTIVE' if ADVANCED_FEATURES_AVAILABLE else 'DISABLED'}")
     except Exception as e:
         logger.warning(f"[Startup] Warning: Could not print startup info: {e}")
-    
+
     logger.info("=" * 60)
 
     # Configure optional monitoring integrations.
@@ -455,19 +454,19 @@ async def lifespan(app: FastAPI):
             )
         if os.getenv("REQUIRE_FIREBASE", "").lower() == "true":
             raise
-    
+
     # Register health checks (Phase 6: Observability)
     try:
         async def check_firebase() -> bool:
             return firebase_initialized
-        
+
         async def check_redis() -> bool:
             return redis_store.is_connected() or not redis_store.is_enabled()
-        
+
         async def check_firestore() -> bool:
             # Firestore health check would go here
             return True
-        
+
         health_checker.register_check("firebase", check_firebase)
         health_checker.register_check("redis", check_redis)
         health_checker.register_check("firestore", check_firestore)
@@ -517,7 +516,7 @@ async def lifespan(app: FastAPI):
                 if check_fail_fast:
                     raise
                 logger.warning(f"[Firebase] WARNING: Authorized-domain check skipped: {exc}")
-    
+
     forex_stream_enabled = os.getenv("FOREX_STREAM_ENABLED", "false").lower() == "true"
     forex_stream_interval = _env_int("FOREX_STREAM_INTERVAL", 10)
     task_queue_enabled = _env_bool("TASK_QUEUE_ENABLED", False)
@@ -562,7 +561,7 @@ async def lifespan(app: FastAPI):
     await redis_store.close()
     logger.info("[Shutdown] complete")
 
-    
+
 app = FastAPI(
     title="Forex Companion AI API",
     description="AI-Powered Autonomous Forex Trading System",
