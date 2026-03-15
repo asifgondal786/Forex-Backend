@@ -4,10 +4,9 @@ Sends smart, contextual notifications via multiple channels
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import asyncio
-import json
 import os
 import aiohttp
 
@@ -78,22 +77,22 @@ class Notification:
     category: NotificationCategory
     priority: NotificationPriority
     timestamp: datetime
-    
+
     # Content
     short_message: Optional[str] = None  # For SMS/Telegram
     rich_data: Dict = field(default_factory=dict)  # For in-app display
     action_url: Optional[str] = None  # For deep linking
-    
+
     # Delivery
     channels_to_send: List[NotificationChannel] = field(default_factory=list)
     delivery_status: Dict[NotificationChannel, str] = field(default_factory=dict)  # "sent", "failed", "pending"
-    
+
     # Tracking
     read: bool = False
     read_at: Optional[datetime] = None
     clicked: bool = False
     clicked_at: Optional[datetime] = None
-    
+
     # TTL - auto-expire old notifications
     expires_at: Optional[datetime] = None
 
@@ -114,7 +113,7 @@ class EnhancedNotificationService:
     """
     Multi-channel notification system with smart delivery
     """
-    
+
     def __init__(self):
         self.user_preferences: Dict[str, NotificationPreference] = {}
         self.notifications: List[Notification] = []
@@ -139,7 +138,7 @@ class EnhancedNotificationService:
         self.autonomous_high_risk_pause = (
             os.getenv("NOTIFICATIONS_AUTONOMOUS_HIGH_RISK_PAUSE", "true").lower() != "false"
         )
-        
+
         # Channel integrations (placeholders)
         self.firebase_configured = False
         self.email_configured = False
@@ -557,10 +556,10 @@ class EnhancedNotificationService:
             ),
             channel_settings=merged_channel_settings,
         )
-        
+
         self.user_preferences[user_id] = preferences
         self._persist_preferences(preferences)
-        
+
         return {
             "success": True,
             "message": "Notification preferences updated",
@@ -590,14 +589,14 @@ class EnhancedNotificationService:
         Send notification using template
         Smart delivery based on user preferences and conditions
         """
-        
+
         template = self.templates.get(template_id)
         if not template:
             return {"error": f"Template {template_id} not found"}
         requested_priority = (priority or NotificationPriority.MEDIUM.value).strip().lower()
         if requested_priority not in {member.value for member in NotificationPriority}:
             requested_priority = NotificationPriority.MEDIUM.value
-        
+
         # Get user preferences
         prefs = self.user_preferences.get(user_id) or self._load_preferences_from_firestore(user_id)
         if not prefs:
@@ -606,18 +605,18 @@ class EnhancedNotificationService:
             prefs = self.user_preferences[user_id]
         else:
             self.user_preferences[user_id] = prefs
-        
+
         # Check if category is disabled
         cat = NotificationCategory[category.upper()]
         if cat in prefs.disabled_categories:
             return {"success": False, "reason": "Category disabled by user"}
-        
+
         # Check quiet hours
         if self._is_quiet_hours(prefs):
             if requested_priority not in [NotificationPriority.CRITICAL.value, NotificationPriority.HIGH.value]:
                 # Queue for morning delivery
                 return {"success": False, "reason": "Queued for quiet hours"}
-        
+
         # Check rate limit
         hour_count = self._count_notifications_this_hour(user_id)
         if hour_count >= prefs.max_notifications_per_hour:
@@ -672,7 +671,7 @@ class EnhancedNotificationService:
         enriched_vars["study_sources_analyzed"] = deep_study.get("source_coverage", {}).get("analyzed", 0)
         enriched_vars["deep_study"] = deep_study
         enriched_vars["autonomous_policy"] = autonomous_decision
-        
+
         # Render notification from template
         title = self._render_template(template.title_template, enriched_vars)
         base_message = self._render_template(template.message_template, enriched_vars)
@@ -682,9 +681,9 @@ class EnhancedNotificationService:
             if template.short_message_template
             else message
         )
-        
+
         notification_id = f"notif_{user_id}_{datetime.now().timestamp()}"
-        
+
         notification = Notification(
             notification_id=notification_id,
             user_id=user_id,
@@ -698,16 +697,16 @@ class EnhancedNotificationService:
             channels_to_send=prefs.enabled_channels,
             expires_at=datetime.now() + timedelta(days=7)
         )
-        
+
         self.notifications.append(notification)
-        
+
         # Queue for delivery
         await self.notification_queue.put(notification)
-        
+
         # Process delivery
         await self._deliver_notification(notification)
         await self._persist_delivery_metadata(notification)
-        
+
         return {
             "success": True,
             "notification_id": notification_id,
@@ -930,7 +929,7 @@ class EnhancedNotificationService:
         Send smart, contextual alert
         Example: "Price touched 289 but conditions not met"
         """
-        
+
         alerts = {
             "price_touched_but_conditions_not_met": {
                 "template_id": "price_alert",
@@ -951,13 +950,13 @@ class EnhancedNotificationService:
                 "message_override": f"Account drawdown: {data.get('drawdown')}% (Limit: {data.get('limit')}%)"
             }
         }
-        
+
         alert = alerts.get(alert_type)
         if not alert:
             return {"error": f"Unknown alert type: {alert_type}"}
-        
+
         template_vars = {**data, "warning_text": alert.get("message_override", "")}
-        
+
         return await self.send_notification(
             user_id=user_id,
             template_id=alert["template_id"],
@@ -990,16 +989,16 @@ class EnhancedNotificationService:
                     await self._send_whatsapp(notification)
                 elif channel == NotificationChannel.SMS:
                     await self._send_sms(notification)
-                
+
                 notification.delivery_status[channel] = "sent"
             except Exception as e:
                 notification.delivery_status[channel] = f"failed: {str(e)}"
-    
+
     async def _broadcast_in_app_notification(self, notification: Notification):
         """Broadcast in-app notification to connected clients via WebSocket"""
         try:
             from ..enhanced_websocket_manager import ws_manager
-            
+
             # Broadcast notification to all connected clients
             await ws_manager.broadcast(
                 message=notification.title,
@@ -1018,7 +1017,7 @@ class EnhancedNotificationService:
                     "rich_data": notification.rich_data,
                 }
             )
-            print(f"[WS] Broadcasted notification to all clients")
+            print("[WS] Broadcasted notification to all clients")
         except Exception as e:
             print(f"[WS] Failed to broadcast notification: {e}")
 
@@ -1027,7 +1026,7 @@ class EnhancedNotificationService:
         if not self.firebase_configured:
             print(f"[PUSH] {notification.title}: {notification.message}")
             return
-        
+
         # Production: Use FCM API
         # fcm_client.send_notification(notification.user_id, notification.title, notification.message)
         print(f"[PUSH] Sent to {notification.user_id}")
@@ -1238,11 +1237,11 @@ class EnhancedNotificationService:
         """Check if currently in quiet hours"""
         if not prefs.quiet_hours_start or not prefs.quiet_hours_end:
             return False
-        
+
         now = datetime.now().time()
         start = datetime.strptime(prefs.quiet_hours_start, "%H:%M").time()
         end = datetime.strptime(prefs.quiet_hours_end, "%H:%M").time()
-        
+
         if start < end:
             return start <= now < end
         else:
@@ -1252,8 +1251,8 @@ class EnhancedNotificationService:
         """Count notifications sent this hour"""
         now = datetime.now()
         hour_ago = now - timedelta(hours=1)
-        
-        return len([n for n in self.notifications 
+
+        return len([n for n in self.notifications
                    if n.user_id == user_id and hour_ago < n.timestamp < now])
 
     def _render_template(self, template: str, variables: Dict) -> str:
@@ -1265,8 +1264,8 @@ class EnhancedNotificationService:
 
     def _extract_pair(self, template_vars: Dict) -> str:
         pair_fields = ["pair", "currency_pair", "symbol"]
-        for field in pair_fields:
-            raw_value = template_vars.get(field)
+        for field_name in pair_fields:
+            raw_value = template_vars.get(field_name)
             if isinstance(raw_value, str) and "/" in raw_value:
                 return raw_value.strip().upper()
 
@@ -1417,7 +1416,7 @@ class EnhancedNotificationService:
         if not prefs:
             return {"error": "Preferences not configured"}
         self.user_preferences[user_id] = prefs
-        
+
         return {
             "channels": {
                 channel.value: channel in prefs.enabled_channels
@@ -1447,12 +1446,12 @@ class EnhancedNotificationService:
         prefs = self.user_preferences.get(user_id)
         if not prefs or not prefs.digest_mode:
             return {"error": "Digest mode not enabled"}
-        
+
         cutoff = datetime.now() - timedelta(days=1 if period == "daily" else 7)
-        
-        user_notifs = [n for n in self.notifications 
+
+        user_notifs = [n for n in self.notifications
                       if n.user_id == user_id and n.timestamp > cutoff]
-        
+
         grouped = {}
         for notif in user_notifs:
             cat = notif.category.value
@@ -1463,7 +1462,7 @@ class EnhancedNotificationService:
                 "message": notif.message,
                 "timestamp": notif.timestamp.isoformat()
             })
-        
+
         return {
             "period": period,
             "generated_at": datetime.now().isoformat(),

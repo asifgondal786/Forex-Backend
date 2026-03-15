@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 import os
 from typing import Mapping
-from urllib.parse import urlparse
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 

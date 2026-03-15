@@ -3,7 +3,7 @@ Advanced Features API Routes
 Integrates all autonomous trading features
 Risk Management, Explainability, Execution Intelligence, Paper Trading, NLP
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -255,7 +255,7 @@ async def activate_kill_switch(user_id: str):
     EMERGENCY: Activate kill switch to stop all trading immediately
     """
     result = await risk_manager.activate_kill_switch(user_id)
-    
+
     # Send critical notification
     await notification_svc.send_notification(
         user_id=user_id,
@@ -264,7 +264,7 @@ async def activate_kill_switch(user_id: str):
         priority="critical",
         warning_text="KILL SWITCH ACTIVATED - All trading disabled"
     )
-    
+
     return result
 
 
@@ -512,10 +512,10 @@ async def analyze_market_with_gemini():
     Returns sentiment, volatility, risk assessment, and key currency pairs to watch
     """
     from .forex_data_service import forex_service
-    
+
     rates = await forex_service.get_currency_rates()
     news = await forex_service.get_forex_factory_news()
-    
+
     return await forex_service.analyze_market_with_gemini(rates, news)
 
 
@@ -540,7 +540,7 @@ async def predict_price_movements(pair: str, historical_data: List[Dict]):
     Use Google Generative AI (Gemini) to predict future price movements for a currency pair
     """
     from .forex_data_service import forex_service
-    
+
     return await forex_service.predict_price_movements(pair, historical_data)
 
 
@@ -550,7 +550,7 @@ async def analyze_news_impact(news: List[Dict], currency_pairs: List[str]):
     Use Google Generative AI (Gemini) to analyze news impact on currency pairs
     """
     from .services.ai_analysis_service import AIAnalysisService
-    
+
     ai_analysis = AIAnalysisService()
     return await ai_analysis.analyze_news_impact(news, currency_pairs)
 
@@ -561,7 +561,7 @@ async def analyze_news_sentiment(news_text: str):
     Use Google Generative AI (Gemini) to analyze sentiment from raw news text
     """
     from .services.ai_analysis_service import AIAnalysisService
-    
+
     ai_analysis = AIAnalysisService()
     return await ai_analysis.analyze_news_sentiment(news_text)
 
@@ -587,11 +587,11 @@ async def generate_trading_signal_with_gemini(
         rsi=market_condition['rsi'],
         macd=market_condition['macd']
     )
-    
+
     signal = await ai_engine.generate_trading_signal_with_gemini(
         pair, condition, user_strategy, historical_data
     )
-    
+
     return {
         "success": True,
         "signal": {
@@ -749,11 +749,11 @@ async def send_notification(request: Dict):
     template_id = request.get("template_id", "price_alert")
     category = request.get("category", "PRICE_ALERT")
     priority = request.get("priority", "medium")
-    
+
     # Extract template variables from request body
-    kwargs = {k: v for k, v in request.items() 
+    kwargs = {k: v for k, v in request.items()
              if k not in ["user_id", "template_id", "category", "priority"]}
-    
+
     return await notification_svc.send_notification(
         user_id=user_id,
         template_id=template_id,
@@ -856,7 +856,7 @@ async def parse_natural_language_command(text: str):
     parsed = await nlp_svc.parse_command(text)
     result = await nlp_svc.execute_parsed_command(parsed)
     response = await nlp_svc.generate_nlp_response(parsed, result)
-    
+
     return {
         "success": result.get("success"),
         "command_type": result.get("command_type"),
@@ -885,7 +885,7 @@ async def get_copilot_status(user_id: str):
     dev_mode = os.getenv("ALLOW_DEV_USER_ID", "").lower() == "true"
     is_dev_user = user_id.startswith("dev_")
     copilot_active = legal_status.get("compliant", False) or (dev_mode and is_dev_user)
-    
+
     return {
         "user_id": user_id,
         "copilot_active": copilot_active,
@@ -912,22 +912,22 @@ async def get_features_status(user_id: str):
     try:
         # Get copilot status
         copilot_status = await get_copilot_status(user_id)
-        
+
         # Get market data
         from .forex_data_service import forex_service
         sentiment = await forex_service.get_market_sentiment()
-        
+
         # Get active orders
         active_orders = await execution_svc.get_active_orders(user_id)
-        
+
         # Get risk assessment
         risk_assessment = await risk_manager.get_risk_assessment(user_id)
-        
+
         # Get prediction history
         predictions = await explainability_svc.get_prediction_history(limit=5)
         smart_triggers_active = copilot_status.get("features", {}).get("conditional_orders", False)
         autonomous_actions_active = copilot_status.get("copilot_active", False)
-        
+
         return {
             "success": True,
             "timestamp": datetime.now().isoformat(),

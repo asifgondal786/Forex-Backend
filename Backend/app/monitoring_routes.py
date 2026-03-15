@@ -4,7 +4,7 @@ Exposes metrics, health checks, and observability data
 """
 
 from fastapi import APIRouter, Depends
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from datetime import datetime, timezone
 
 from app.services.observability import (
@@ -47,7 +47,7 @@ async def health_check() -> Dict[str, Any]:
     - Overall readiness status
     """
     results = await health_checker.run_all_checks()
-    
+
     return {
         "status": "success",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -91,7 +91,7 @@ async def get_current_trace(
     Useful for debugging request issues.
     """
     trace_ctx = get_trace_context()
-    
+
     return {
         "status": "success",
         "trace": trace_ctx.to_dict(),
@@ -112,7 +112,7 @@ async def get_endpoint_stats(
     - Last called timestamp
     """
     summary = metrics_collector.get_summary()
-    
+
     return {
         "status": "success",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -134,7 +134,7 @@ async def get_performance_report(
     - Error analysis
     """
     summary = metrics_collector.get_summary()
-    
+
     return {
         "status": "success",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -163,7 +163,7 @@ async def get_diagnostics(
     summary = metrics_collector.get_summary()
     health = await health_checker.run_all_checks()
     trace_ctx = get_trace_context()
-    
+
     return {
         "status": "success",
         "timestamp": datetime.now(timezone.utc).isoformat(),

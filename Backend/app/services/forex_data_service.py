@@ -1,5 +1,5 @@
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime
 import asyncio
 import random
 
@@ -27,12 +27,12 @@ class ForexDataService:
         """
         from_currency, to_currency = currency_pair.split('/')
         url = f"{EXCHANGE_RATE_API_URL}{self._api_key}/latest/{from_currency}"
-        
+
         try:
             response = await self._client.get(url)
             response.raise_for_status()
             data = response.json()
-            
+
             if data.get("result") == "success":
                 rate = data["conversion_rates"].get(to_currency)
                 if rate:
@@ -81,11 +81,11 @@ class ForexDataService:
             "AUD/USD": 0.6650,
         }
         base = base_prices.get(currency_pair, 1.0)
-        
+
         # Simulate some random fluctuation
         price = base + random.uniform(-0.005, 0.005)
         spread = random.uniform(0.0001, 0.0005)
-        
+
         return {
             "price": round(price, 4),
             "timestamp": datetime.now(),
@@ -97,7 +97,7 @@ class ForexDataService:
 async def main():
     """ Main function for testing the service. """
     service = ForexDataService()
-    
+
     # --- Test Real-time Price ---
     print("--- Fetching Real-time Price ---")
     eur_usd_price = await service.get_realtime_price("EUR/USD")
@@ -114,6 +114,6 @@ async def main():
             print(f"Timestamp: {timestamp}, Open: {values['1. open']}, Close: {values['4. close']}")
     else:
         print("As expected, historical data not available on the free plan.")
-            
+
 if __name__ == "__main__":
     asyncio.run(main())

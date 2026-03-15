@@ -33,30 +33,30 @@ class NotificationService:
         # - Sending a push notification via Firebase Cloud Messaging.
         # - Sending an email via SendGrid or a similar service.
         # - Pushing a message to a user-specific WebSocket channel.
-        
+
         log_message = f"[{notification_type.name.upper()}] Notification for User '{user_id}': {message}"
-        
+
         print(log_message)
-        
+
         # Simulate an async operation
         await asyncio.sleep(0.01)
-        
+
         # Returning true for now to indicate mock success
         return True
 
 async def main():
     """ Test function for NotificationService. """
     service = NotificationService()
-    
+
     print("\n--- Testing Notifications ---")
-    
+
     # Test sending different types of notifications
     await service.send_notification(
         "user_001",
         "Your trade for EUR/USD has been successfully executed.",
         NotificationType.SUCCESS
     )
-    
+
     await service.send_notification(
         "user_002",
         "Market volatility is high for GBP/JPY. Consider reviewing your positions.",
@@ -68,7 +68,7 @@ async def main():
         "Failed to execute trade: Insufficient funds.",
         NotificationType.ERROR
     )
-    
+
     await service.send_notification(
         "user_003",
         "A new AI analysis report for AUD/USD is available.",

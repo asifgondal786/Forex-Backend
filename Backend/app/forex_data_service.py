@@ -451,21 +451,21 @@ class ForexDataService:
         try:
             if not GEMINI_AVAILABLE:
                 return self.get_default_sentiment(rates)
-                
+
             model = genai.GenerativeModel("gemini-1.5-flash")
-            
+
             # Format news for analysis
             news_text = "\n".join([
                 f"- {news_item['currency']}: {news_item['event']} (Impact: {news_item['impact']})"
                 for news_item in news
             ])
-            
+
             # Format rates for analysis
             rates_text = "\n".join([
                 f"- {pair}: {rate:.5f}"
                 for pair, rate in rates.items()
             ])
-            
+
             prompt = f"""
             You are a professional forex market analyst with deep expertise in technical and fundamental analysis.
             
@@ -487,20 +487,20 @@ class ForexDataService:
             
             Format your response as JSON with clear, actionable insights.
             """
-            
+
             response = model.generate_content(prompt)
-            
+
             import json
             try:
                 analysis = json.loads(response.text)
                 analysis["timestamp"] = datetime.now().isoformat()
                 analysis["major_pairs"] = rates
-            except:
+            except Exception:
                 analysis = self.get_default_sentiment(rates)
                 analysis["ai_analysis"] = response.text
-                
+
             return analysis
-            
+
         except Exception as e:
             print(f"Gemini analysis failed: {e}")
             return self.get_default_sentiment(rates)
@@ -526,15 +526,15 @@ class ForexDataService:
                     "message": "Gemini is unavailable (missing package or API key)",
                     "prediction": None
                 }
-                
+
             model = genai.GenerativeModel("gemini-1.5-flash")
-            
+
             # Format historical data for analysis
             data_text = "\n".join([
                 f"- Time: {data['timestamp']}, Price: {data['close']:.5f}"
                 for data in historical_data[-50:]  # Last 50 data points
             ])
-            
+
             prompt = f"""
             You are an expert technical analyst specializing in forex price prediction.
             
@@ -553,15 +553,15 @@ class ForexDataService:
             
             Format your response as JSON.
             """
-            
+
             response = model.generate_content(prompt)
-            
+
             import json
             try:
                 prediction = json.loads(response.text)
                 prediction["pair"] = pair
                 prediction["timestamp"] = datetime.now().isoformat()
-            except:
+            except Exception:
                 prediction = {
                     "direction": "neutral",
                     "confidence": 50,
@@ -571,13 +571,13 @@ class ForexDataService:
                     "indicators": ["Cannot parse structured response"],
                     "risk": "medium"
                 }
-                
+
             return {
                 "success": True,
                 "message": "Prediction generated successfully",
                 "prediction": prediction
             }
-            
+
         except Exception as e:
             return {
                 "success": False,

@@ -194,12 +194,12 @@ class TaskCreateRequest(BaseModel):
     description: str
     task_type: str  # "market_analysis", "auto_trade", "forecast", "portfolio_monitor"
     priority: str = "medium"  # low, medium, high
-    
+
     # Trading parameters
     currency_pairs: Optional[List[str]] = ["EUR/USD", "GBP/USD", "USD/JPY"]
     auto_trade_enabled: bool = False
     user_limits: Optional[Dict] = None  # max_loss, take_profit, etc.
-    
+
     # Analysis parameters
     analysis_period_hours: int = 24
     include_forecast: bool = True
@@ -231,7 +231,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
     Execute comprehensive market analysis task
     Steps: Fetch Data → Analyze Trends → Generate Report
     """
-    
+
     try:
         await _update_task(task_id, status="running", startTime=_now())
         # Step 1: Fetch live market data
@@ -241,12 +241,12 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
             progress=0.2,
             message="Collecting live forex rates and economic calendar..."
         )
-        
+
         await ai_engine.initialize()
         rates = await ai_engine.fetch_live_rates()
         calendar = await ai_engine.fetch_economic_calendar()
         await _complete_step(task_id, "Fetch Data")
-        
+
         # Step 2: Analyze each currency pair
         await ws_manager.send_task_progress(
             task_id=task_id,
@@ -254,26 +254,26 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
             progress=0.4,
             message=f"Analyzing {len(params.currency_pairs)} currency pairs..."
         )
-        
+
         analysis_results = {}
-        
+
         for pair in params.currency_pairs:
             # Simulate historical prices (in production, fetch from API)
-            historical_prices = [rates.get(pair, 1.0) * (1 + (i/1000 - 0.05)) 
+            historical_prices = [rates.get(pair, 1.0) * (1 + (i/1000 - 0.05))
                                 for i in range(100)]
-            
+
             # Analyze market conditions
             market_condition = await ai_engine.analyze_market_conditions(
                 pair, historical_prices
             )
-            
+
             # Generate trading signal
             signal = await ai_engine.generate_trading_signal(
-                pair, 
+                pair,
                 market_condition,
                 params.user_limits or {}
             )
-            
+
             # Forecast if requested
             forecast = None
             if params.include_forecast:
@@ -282,7 +282,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
                     historical_prices,
                     params.forecast_horizon_hours
                 )
-            
+
             analysis_results[pair] = {
                 "current_price": market_condition.current_price,
                 "trend": market_condition.trend,
@@ -298,7 +298,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
                 },
                 "forecast": forecast
             }
-            
+
             # Send update for this pair
             await ws_manager.send_update(
                 task_id=task_id,
@@ -307,7 +307,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
                 data=analysis_results[pair],
                 user_id=params.user_id
             )
-        
+
         await _complete_step(task_id, "Analyze Markets")
         await _complete_step(task_id, "Generate Signals")
 
@@ -318,10 +318,10 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
             progress=0.8,
             message="Creating detailed market analysis report..."
         )
-        
+
         await asyncio.sleep(2)  # Simulate report generation
         await _complete_step(task_id, "Create Report")
-        
+
         # Step 4: Complete
         await ws_manager.send_task_complete(
             task_id=task_id,
@@ -345,7 +345,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
             message=f"Task completed: {params.title}",
             activity_type="decision",
         )
-        
+
     except Exception as e:
         await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         await _update_task(task_id, status="failed", endTime=_now())
@@ -358,11 +358,11 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
     Execute automated trading task
     Monitors markets 24/7 and executes trades based on AI signals
     """
-    
+
     try:
         await _update_task(task_id, status="running", startTime=_now())
         await ai_engine.initialize()
-        
+
         await ws_manager.send_task_progress(
             task_id=task_id,
             step="Initializing",
@@ -370,11 +370,11 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             message="Setting up autonomous trading engine..."
         )
         await _complete_step(task_id, "Initialize Engine")
-        
+
         # Validate user limits
         if not params.user_limits:
             raise ValueError("Trading limits required for auto-trading")
-        
+
         await ws_manager.send_task_progress(
             task_id=task_id,
             step="Monitoring Markets",
@@ -382,39 +382,39 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             message=f"AI is now monitoring {len(params.currency_pairs)} pairs 24/7..."
         )
         await _complete_step(task_id, "Monitor Markets")
-        
+
         # Continuous monitoring loop (simplified for demo)
         for i in range(5):  # In production, this runs indefinitely
             # Fetch current rates
             rates = await ai_engine.fetch_live_rates()
-            
+
             # Check each pair for trading opportunities
             for pair in params.currency_pairs:
                 if pair not in rates:
                     continue
-                
+
                 # Simulate historical data
-                historical_prices = [rates[pair] * (1 + (j/1000 - 0.05)) 
+                historical_prices = [rates[pair] * (1 + (j/1000 - 0.05))
                                     for j in range(100)]
-                
+
                 # Analyze and generate signal
                 market_condition = await ai_engine.analyze_market_conditions(
                     pair, historical_prices
                 )
-                
+
                 signal = await ai_engine.generate_trading_signal(
                     pair,
                     market_condition,
                     params.user_limits
                 )
-                
+
                 # Execute trade if signal is strong
                 if signal.action in ["BUY", "SELL"] and signal.confidence > 0.7:
                     trade_result = await ai_engine.execute_auto_trade(
                         signal,
                         params.user_limits
                     )
-                    
+
                     if trade_result["executed"]:
                         await ws_manager.send_update(
                             task_id=task_id,
@@ -424,10 +424,10 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                             user_id=params.user_id
                         )
                         await _complete_step(task_id, "Execute Trades")
-            
+
             # Monitor open positions
             closed_trades = await ai_engine.monitor_positions(rates)
-            
+
             for trade in closed_trades:
                 profit_emoji = "💰" if trade["profit"] > 0 else "📉"
                 await ws_manager.send_update(
@@ -438,7 +438,7 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                     user_id=params.user_id
                 )
                 await _complete_step(task_id, "Manage Positions")
-            
+
             # Update progress
             await ws_manager.send_task_progress(
                 task_id=task_id,
@@ -446,9 +446,9 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                 progress=0.3 + (i * 0.1),
                 message=f"Active positions: {len(ai_engine.active_positions)} | Monitoring continues..."
             )
-            
+
             await asyncio.sleep(10)  # Check every 10 seconds
-        
+
         # Task completion
         await ws_manager.send_task_complete(
             task_id=task_id,
@@ -471,7 +471,7 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             message=f"Task completed: {params.title}",
             activity_type="decision",
         )
-        
+
     except Exception as e:
         await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         await _update_task(task_id, status="failed", endTime=_now())
@@ -484,22 +484,22 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
     Execute price forecasting task
     Predicts future price movements using AI
     """
-    
+
     try:
         await _update_task(task_id, status="running", startTime=_now())
         await ai_engine.initialize()
-        
+
         await ws_manager.send_task_progress(
             task_id=task_id,
             step="Collecting Data",
             progress=0.2,
             message="Gathering historical price data..."
         )
-        
+
         rates = await ai_engine.fetch_live_rates()
         await _complete_step(task_id, "Collect Historical Data")
         forecasts = {}
-        
+
         await ws_manager.send_task_progress(
             task_id=task_id,
             step="Generating Forecasts",
@@ -507,21 +507,21 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
             message="AI is analyzing patterns and predicting future movements..."
         )
         await _complete_step(task_id, "Train AI Model")
-        
+
         for pair in params.currency_pairs:
             # Simulate historical prices
-            historical_prices = [rates.get(pair, 1.0) * (1 + (i/1000 - 0.05)) 
+            historical_prices = [rates.get(pair, 1.0) * (1 + (i/1000 - 0.05))
                                 for i in range(100)]
-            
+
             # Generate forecast
             forecast = await ai_engine.forecast_price_movement(
                 pair,
                 historical_prices,
                 params.forecast_horizon_hours
             )
-            
+
             forecasts[pair] = forecast
-            
+
             await ws_manager.send_update(
                 task_id=task_id,
                 message=f"📊 {pair}: Predicted {forecast['expected_change_percent']:+.2f}% change in next {params.forecast_horizon_hours}h",
@@ -529,7 +529,7 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
                 data=forecast,
                 user_id=params.user_id
             )
-        
+
         await _complete_step(task_id, "Generate Predictions")
 
         await ws_manager.send_task_complete(
@@ -553,7 +553,7 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
             message=f"Task completed: {params.title}",
             activity_type="decision",
         )
-        
+
     except Exception as e:
         await ws_manager.send_error(task_id, str(e), user_id=params.user_id)
         await _update_task(task_id, status="failed", endTime=_now())
@@ -605,7 +605,7 @@ async def create_task(
     - forecast: AI price prediction and trend analysis
     - portfolio_monitor: Real-time portfolio tracking and alerts
     """
-    
+
     task_id = str(uuid.uuid4())
     task = task.model_copy(update={"user_id": user_id})
     await _log_activity(
@@ -613,7 +613,7 @@ async def create_task(
         message=f"Task created: {task.title}",
         activity_type="monitor",
     )
-    
+
     # Define task steps based on type
     steps_map = {
         "market_analysis": [
@@ -635,7 +635,7 @@ async def create_task(
             {"name": "Create Forecast Report", "isCompleted": False}
         ]
     }
-    
+
     steps = steps_map.get(task.task_type, steps_map["market_analysis"])
 
     now = _now()
@@ -661,7 +661,7 @@ async def create_task(
     service = _get_task_service()
     await asyncio.to_thread(service.create_task, task_id, task_data)
     task_response = TaskResponse(**_normalize_task(task_id, task_data))
-    
+
     dispatch_mode = await _enqueue_or_fallback(
         background_tasks=background_tasks,
         task_type=task.task_type,
@@ -679,7 +679,7 @@ async def create_task(
             user_id=user_id,
             data={"dispatch": "queued", "task_type": task.task_type},
         )
-    
+
     return task_response
 
 
@@ -779,7 +779,7 @@ async def get_live_rates():
     await ai_engine.initialize()
     rates = await ai_engine.fetch_live_rates()
     await ai_engine.close()
-    
+
     return {
         "timestamp": datetime.now().isoformat(),
         "rates": rates
@@ -792,7 +792,7 @@ async def get_economic_calendar():
     await ai_engine.initialize()
     calendar = await ai_engine.fetch_economic_calendar()
     await ai_engine.close()
-    
+
     return {
         "events": calendar
     }

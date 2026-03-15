@@ -50,7 +50,7 @@ async def connect_forex_account(
     try:
         username = request.username
         password = request.password
-        
+
         if not username or not password:
             raise HTTPException(status_code=400, detail="Username and password are required")
 
@@ -60,7 +60,7 @@ async def connect_forex_account(
                 user_id=user_id,
                 feature="live_broker_execution",
             )
-        
+
         connection = broker_execution_service.connect_forex_account(
             user_id=user_id,
             username=username,
@@ -160,10 +160,10 @@ async def disconnect_account(
     """Disconnect an account"""
     try:
         account_id = request.account_id
-        
+
         if not account_id:
             raise HTTPException(status_code=400, detail="Account ID is required")
-        
+
         removed = broker_execution_service.disconnect_account(
             user_id=user_id,
             account_id=account_id,
@@ -220,7 +220,7 @@ async def get_trading_info():
             "used_margin": 45.67,
             "margin_level": "87%"
         }
-        
+
         return JSONResponse(content={
             "success": True,
             "trading_info": info
