@@ -6,17 +6,13 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel in-progress runs on new push to same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 1: Flutter Frontend — Analyze → Build Web → Deploy to Firebase Hosting
-  # ─────────────────────────────────────────────────────────────────────────────
   frontend:
-    name: 🐦 Flutter Frontend
+    name: ?? Flutter Frontend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,28 +32,27 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # Task 1 gate: must stay at 0 errors
       - name: flutter analyze (0 errors gate)
         run: |
           flutter analyze --no-fatal-infos 2>&1 | tee analyze_output.txt
           if grep -E "^error" analyze_output.txt; then
-            echo "❌ flutter analyze found errors — blocking deploy"
+            echo "flutter analyze found errors - blocking deploy"
             exit 1
           fi
-          echo "✅ flutter analyze clean"
+          echo "flutter analyze clean"
 
       - name: Run Flutter tests
         run: flutter test --no-pub
-        continue-on-error: true   # tests may not exist yet; remove once test suite is added
+        continue-on-error: true
 
       - name: Build Flutter Web (release)
         run: |
           flutter build web \
-            --release \\\n            --dart-define=API_BASE_URL=https://forex-backend-production-bc44.up.railway.app \\\n            --dart-define=APP_WEB_URL=https://forexcompanion-e5a28.web.app \\\n            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
-             \
-            
+            --release \
+            --dart-define=API_BASE_URL=https://forex-backend-production-bc44.up.railway.app \
+            --dart-define=APP_WEB_URL=https://forexcompanion-e5a28.web.app \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
 
-      # Only deploy on push to main (not on PRs)
       - name: Deploy to Firebase Hosting
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -68,11 +63,8 @@ jobs:
           projectId: forexcompanion-e5a28
           entryPoint: Frontend
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2: FastAPI Backend — Lint → Test → Railway deploys automatically
-  # ─────────────────────────────────────────────────────────────────────────────
   backend:
-    name: 🐍 FastAPI Backend
+    name: ?? FastAPI Backend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -92,7 +84,6 @@ jobs:
     env:
       REDIS_URL: redis://localhost:6379
       REDIS_ENABLED: "true"
-      # Supabase / Firebase creds not needed for unit tests — use mocks
       DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       FIREBASE_PROJECT_ID: forexcompanion-e5a28
@@ -115,42 +106,24 @@ jobs:
         run: pip install pytest pytest-asyncio httpx ruff
 
       - name: Ruff lint (fast Python linter)
-        run: ruff check app/ --select E,F,W --ignore E501
+        run: ruff check app/ --config ruff.toml
 
       - name: Run pytest
         run: |
-          pytest tests/ -v \
-            --tb=short \
-            --asyncio-mode=auto \
-            -x \
-            2>&1 | tee pytest_output.txt || true
-          # Fail the job only if tests/ directory exists AND tests fail
           if [ -d tests ] && [ "$(find tests -name '*.py' | wc -l)" -gt 0 ]; then
             pytest tests/ --tb=short --asyncio-mode=auto -q
           else
-            echo "⚠️  No tests found — skipping. Add tests/test_*.py to enable."
+            echo "No tests found - skipping."
           fi
 
-      # Railway watches main branch and auto-deploys on push.
-      # This step just triggers a manual redeploy via API as a safety net
-      # if you ever need to force-redeploy without a code change.
       - name: Notify Railway deploy (push to main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          echo "✅ Backend CI passed. Railway will auto-deploy from main."
-          echo "   Service URL: https://forex-backend-production-bc44.up.railway.app/healthz"
-          # Optional: hit Railway redeploy API
-          # curl -s -X POST \
-          #   -H "Authorization: Bearer ${{ secrets.RAILWAY_API_KEY }}" \
-          #   "https://backboard.railway.app/graphql/v2" \
-          #   -H "Content-Type: application/json" \
-          #   -d '{"query":"mutation { serviceInstanceRedeploy(id: \"YOUR_SERVICE_ID\") }"}' 
+          echo "Backend CI passed. Railway will auto-deploy from main."
+          echo "Service URL: https://forex-backend-production-bc44.up.railway.app/healthz"
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 3: Health Check — Ping production after both jobs pass (main only)
-  # ─────────────────────────────────────────────────────────────────────────────
   health-check:
-    name: 🏥 Production Health Check
+    name: ?? Production Health Check
     runs-on: ubuntu-latest
     needs: [frontend, backend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -164,21 +137,13 @@ jobs:
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             https://forex-backend-production-bc44.up.railway.app/healthz)
           if [ "$STATUS" -ne 200 ]; then
-            echo "❌ Backend health check failed — HTTP $STATUS"
+            echo "Backend health check failed - HTTP $STATUS"
             exit 1
           fi
-          echo "✅ Backend healthy — HTTP $STATUS"
-
-      - name: Check backend /api/v1 versioned route
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://forex-backend-production-bc44.up.railway.app/api/health)
-          echo "ℹ️  /api/health returned HTTP $STATUS (informational)"
+          echo "Backend healthy - HTTP $STATUS"
 
       - name: Summary
         run: |
-          echo "🚀 Tajir deploy complete"
-          echo "   Frontend: https://forexcompanion-e5a28.web.app"
-          echo "   Backend:  https://forex-backend-production-bc44.up.railway.app"
-
-
+          echo "Tajir deploy complete"
+          echo "Frontend: https://forexcompanion-e5a28.web.app"
+          echo "Backend:  https://forex-backend-production-bc44.up.railway.app"
