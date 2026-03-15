@@ -306,6 +306,7 @@ from .enhanced_websocket_manager import ws_manager
 from .forex_data_service import forex_service
 from .services.task_queue_service import task_queue_service
 from .services.redis_store import redis_store
+from .services.rate_limiter import RateLimiter
 from .services.observability import health_checker
 from .utils.firestore_client import (
     check_firebase_authorized_domain,
@@ -844,7 +845,7 @@ _runtime_config = get_config()
 _rate_limit_enabled = _runtime_config.security.rate_limit_enabled
 _rate_limit_max = _runtime_config.security.rate_limit_max
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
-_rate_limit_store = defaultdict(deque)
+_global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
@@ -861,7 +862,7 @@ def _normalize_middleware_path(path: str) -> str:
 _auth_rate_limit_enabled = _runtime_config.security.auth_rate_limit_enabled
 _auth_rate_limit_max = _runtime_config.security.auth_rate_limit_max
 _auth_rate_limit_window = _runtime_config.security.auth_rate_limit_window_seconds
-_auth_rate_limit_store = defaultdict(deque)
+_auth_global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _auth_rate_limited_paths = {
     "/auth/password-reset",
     "/auth/email-verification",
