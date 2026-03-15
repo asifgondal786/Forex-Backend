@@ -56,3 +56,5 @@ flutter:
   
   assets:
     - assets/images/
+
+sentry_flutter: ^8.14.0
