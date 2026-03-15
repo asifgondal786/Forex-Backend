@@ -72,7 +72,7 @@ class SentryService {
       hint: hint != null ? Hint.withMap({'hint': hint}) : null,
       withScope: extras != null
           ? (scope) {
-              extras.forEach((k, v) => scope.setExtra(k, v));
+              extras.forEach((k, v) => scope.setTag(k, v.toString()));
             }
           : null,
     );
