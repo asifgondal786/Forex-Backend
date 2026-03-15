@@ -4,10 +4,8 @@ Simulates live trading without real money
 Builds user confidence before enabling real trading
 """
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
-from enum import Enum
-import random
 
 
 @dataclass
@@ -22,7 +20,7 @@ class PaperTrade:
     position_size: float  # Simulated units
     stop_loss: float
     take_profit: float
-    
+
     exit_price: Optional[float] = None
     exit_time: Optional[datetime] = None
     status: str = "open"  # "open", "closed", "stopped_out"
@@ -40,7 +38,7 @@ class PaperTradingAccount:
     current_balance: float
     available_margin: float
     created_at: datetime
-    
+
     total_trades: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
@@ -48,7 +46,7 @@ class PaperTradingAccount:
     win_rate: float = 0.0
     max_drawdown: float = 0.0
     max_profit: float = 0.0
-    
+
     open_trades: List[PaperTrade] = field(default_factory=list)
     closed_trades: List[PaperTrade] = field(default_factory=list)
 
@@ -58,11 +56,11 @@ class PaperTradingEngine:
     Paper trading simulation engine
     Helps users test strategies with live data but no real money
     """
-    
+
     def __init__(self):
         self.accounts: Dict[str, PaperTradingAccount] = {}
         self.all_trades: List[PaperTrade] = []
-        
+
         # Simulated live prices (in production, fetch from real API)
         self.live_prices = {
             "EUR/USD": 1.1050,
@@ -80,9 +78,9 @@ class PaperTradingEngine:
         starting_balance: float = 10000.0
     ) -> Dict:
         """Create a paper trading account"""
-        
+
         account_id = f"paper_{user_id}_{datetime.now().timestamp()}"
-        
+
         account = PaperTradingAccount(
             account_id=account_id,
             user_id=user_id,
@@ -91,9 +89,9 @@ class PaperTradingEngine:
             available_margin=starting_balance,
             created_at=datetime.now()
         )
-        
+
         self.accounts[user_id] = account
-        
+
         return {
             "success": True,
             "account_id": account_id,
@@ -116,14 +114,14 @@ class PaperTradingEngine:
         take_profit: float = 0
     ) -> Dict:
         """Open a simulated trade"""
-        
+
         account = self.accounts.get(user_id)
         if not account:
             return {"error": "Paper trading account not found"}
-        
+
         # Use provided price or current market price
         current_price = entry_price or self.live_prices.get(pair, 1.0)
-        
+
         # Check margin
         notional_value = position_size * current_price
         if notional_value > account.available_margin:
@@ -132,9 +130,9 @@ class PaperTradingEngine:
                 "required": notional_value,
                 "available": account.available_margin
             }
-        
+
         trade_id = f"pt_{user_id}_{datetime.now().timestamp()}"
-        
+
         trade = PaperTrade(
             trade_id=trade_id,
             user_id=user_id,
@@ -146,11 +144,11 @@ class PaperTradingEngine:
             stop_loss=stop_loss or (current_price * 0.99 if action == "BUY" else current_price * 1.01),
             take_profit=take_profit or (current_price * 1.01 if action == "BUY" else current_price * 0.99),
         )
-        
+
         account.open_trades.append(trade)
         account.available_margin -= notional_value
         self.all_trades.append(trade)
-        
+
         return {
             "success": True,
             "trade_id": trade_id,
@@ -174,40 +172,40 @@ class PaperTradingEngine:
         exit_price: Optional[float] = None
     ) -> Dict:
         """Close a paper trade"""
-        
+
         account = self.accounts.get(user_id)
         if not account:
             return {"error": "Account not found"}
-        
+
         trade = next((t for t in account.open_trades if t.trade_id == trade_id), None)
         if not trade:
             return {"error": "Trade not found"}
-        
+
         # Calculate exit price
         exit_price = exit_price or self.live_prices.get(trade.pair, trade.entry_price)
-        
+
         # Calculate P&L
         if trade.action == "BUY":
             pnl = (exit_price - trade.entry_price) * trade.position_size
         else:  # SELL
             pnl = (trade.entry_price - exit_price) * trade.position_size
-        
+
         pnl_percent = (pnl / (trade.entry_price * trade.position_size)) * 100
-        
+
         # Update trade
         trade.exit_price = exit_price
         trade.exit_time = datetime.now()
         trade.status = "closed"
         trade.profit_loss = pnl
         trade.profit_loss_percent = pnl_percent
-        
+
         # Update account
         account.open_trades.remove(trade)
         account.closed_trades.append(trade)
         account.current_balance += pnl
         account.available_margin += (trade.position_size * trade.entry_price)  # Free up margin
         account.total_trades += 1
-        
+
         if pnl > 0:
             account.winning_trades += 1
             account.max_profit = max(account.max_profit, pnl)
@@ -215,10 +213,10 @@ class PaperTradingEngine:
             account.losing_trades += 1
             drawdown = abs(pnl) / account.starting_balance * 100
             account.max_drawdown = max(account.max_drawdown, drawdown)
-        
+
         account.total_profit_loss += pnl
         account.win_rate = (account.winning_trades / max(account.total_trades, 1)) * 100
-        
+
         return {
             "success": True,
             "trade_id": trade_id,
@@ -237,11 +235,11 @@ class PaperTradingEngine:
 
     async def get_paper_account_summary(self, user_id: str) -> Dict:
         """Get paper trading account summary"""
-        
+
         account = self.accounts.get(user_id)
         if not account:
             return {"error": "Account not found"}
-        
+
         return {
             "account_id": account.account_id,
             "balance": {
@@ -267,17 +265,17 @@ class PaperTradingEngine:
 
     async def get_paper_trades(self, user_id: str, status: str = "all") -> List[Dict]:
         """Get paper trades"""
-        
+
         account = self.accounts.get(user_id)
         if not account:
             return []
-        
+
         trades = []
         if status in ["all", "open"]:
             trades.extend(account.open_trades)
         if status in ["all", "closed"]:
             trades.extend(account.closed_trades)
-        
+
         return [
             {
                 "trade_id": t.trade_id,
@@ -297,14 +295,14 @@ class PaperTradingEngine:
 
     async def update_live_prices(self, price_data: Dict[str, float]) -> Dict:
         """Update simulated live prices"""
-        
+
         for pair, price in price_data.items():
             if pair in self.live_prices:
                 self.live_prices[pair] = price
-        
+
         # Check if any stop losses or take profits should be triggered
         triggered = await self._check_trade_triggers()
-        
+
         return {
             "success": True,
             "prices_updated": len(price_data),
@@ -314,33 +312,33 @@ class PaperTradingEngine:
     async def _check_trade_triggers(self) -> int:
         """Check for stop loss / take profit triggers"""
         triggered_count = 0
-        
+
         for trade in self.all_trades:
             if trade.status != "open":
                 continue
-            
+
             current_price = self.live_prices.get(trade.pair, trade.entry_price)
-            
+
             # Check stop loss
             if trade.action == "BUY" and current_price <= trade.stop_loss:
                 await self.close_paper_trade(trade.user_id, trade.trade_id, trade.stop_loss)
                 trade.status = "stopped_out"
                 triggered_count += 1
-            
+
             elif trade.action == "SELL" and current_price >= trade.stop_loss:
                 await self.close_paper_trade(trade.user_id, trade.trade_id, trade.stop_loss)
                 trade.status = "stopped_out"
                 triggered_count += 1
-            
+
             # Check take profit
             elif trade.action == "BUY" and current_price >= trade.take_profit:
                 await self.close_paper_trade(trade.user_id, trade.trade_id, trade.take_profit)
                 triggered_count += 1
-            
+
             elif trade.action == "SELL" and current_price <= trade.take_profit:
                 await self.close_paper_trade(trade.user_id, trade.trade_id, trade.take_profit)
                 triggered_count += 1
-        
+
         return triggered_count
 
     async def compare_paper_vs_real(self, user_id: str) -> Dict:
@@ -348,11 +346,11 @@ class PaperTradingEngine:
         Compare paper trading results with real trading results
         Shows user how well they would have done
         """
-        
+
         account = self.accounts.get(user_id)
         if not account:
             return {"error": "Account not found"}
-        
+
         return {
             "paper_account": {
                 "starting_balance": account.starting_balance,
@@ -375,25 +373,25 @@ class PaperTradingEngine:
     def _get_paper_trading_recommendations(self, account: PaperTradingAccount) -> List[str]:
         """Get recommendations based on paper trading performance"""
         recommendations = []
-        
+
         if account.total_trades < 10:
             recommendations.append("Complete at least 10 trades to get meaningful statistics")
-        
+
         if account.win_rate > 60:
             recommendations.append("🟢 Strong performance! You may be ready for small real trades")
         elif account.win_rate > 50:
             recommendations.append("🟡 Decent performance. Keep paper trading to build consistency")
         else:
             recommendations.append("🔴 Win rate below 50%. Work on your strategy before real trading")
-        
+
         if account.max_drawdown > 30:
             recommendations.append("⚠️ High drawdown - consider tighter stop losses")
-        
+
         return recommendations
 
     async def get_paper_trading_guide(self) -> Dict:
         """Get guide for paper trading"""
-        
+
         return {
             "purpose": "Test your trading strategy with live market data without risking real money",
             "benefits": [

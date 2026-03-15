@@ -23,13 +23,13 @@ class TradingBotService:
         action = trade_params.get("action")  # "buy" or "sell"
         stop_loss = trade_params.get("stop_loss")
         take_profit = trade_params.get("take_profit")
-        
+
         if not all([currency_pair, action, stop_loss, take_profit]):
             raise ValueError("Missing required trade parameters.")
 
         # --- AI Validation Step ---
         ai_recommendation = await self._ai_service.get_trade_recommendation(currency_pair)
-        
+
         if ai_recommendation["recommendation"].lower() != action.lower():
             warning_message = f"AI recommends '{ai_recommendation['recommendation']}' but you chose '{action}'. Proceed with caution."
             await self._notification_service.send_notification(
@@ -47,11 +47,11 @@ class TradingBotService:
 
         entry_price = live_price_data['price']
         trade_id = f"trade_{user_id}_{datetime.now().timestamp()}"
-        
+
         # --- Placeholder for actual trade execution ---
         # In a real scenario, this would interact with a brokerage API (e.g., OANDA, MetaTrader).
         print(f"Executing {action} trade for {currency_pair} at {entry_price}")
-        
+
         trade_details = {
             "trade_id": trade_id,
             "user_id": user_id,
@@ -63,7 +63,7 @@ class TradingBotService:
             "status": "active",
             "timestamp": datetime.now()
         }
-        
+
         self._active_trades[trade_id] = trade_details
 
         # Start monitoring this trade in the background
@@ -102,11 +102,11 @@ class TradingBotService:
                 continue
 
             current_price = live_price_data['price']
-            
+
             # --- Check for stop-loss or take-profit ---
             closed = False
             close_reason = ""
-            
+
             if action == "buy":
                 if current_price <= stop_loss:
                     closed = True
@@ -114,7 +114,7 @@ class TradingBotService:
                 elif current_price >= take_profit:
                     closed = True
                     close_reason = f"Take-profit triggered at {current_price}"
-            
+
             elif action == "sell":
                 if current_price >= stop_loss:
                     closed = True
@@ -126,7 +126,7 @@ class TradingBotService:
             if closed:
                 await self.close_trade(trade_id, close_reason, current_price)
                 break
-    
+
     async def close_trade(self, trade_id: str, reason: str, close_price: float):
         """
         Closes an active trade.
@@ -146,9 +146,9 @@ class TradingBotService:
             pnl = close_price - trade["entry_price"]
         else: # sell
             pnl = trade["entry_price"] - close_price
-            
+
         trade["pnl"] = pnl
-        
+
         print(f"Closing trade {trade_id}: {reason}")
 
         await self._notification_service.send_notification(
@@ -156,9 +156,9 @@ class TradingBotService:
             f"Trade closed for {trade['currency_pair']}. Reason: {reason}. P/L: {pnl:.5f}",
             NotificationType.INFO if pnl >= 0 else NotificationType.ERROR
         )
-        
+
         # Here you might save the closed trade to a database
-        
+
         # Remove from active trades after a delay to ensure no more monitoring
         await asyncio.sleep(5)
         if trade_id in self._active_trades:
@@ -170,7 +170,7 @@ async def main():
     class MockForex(ForexDataService):
         async def get_realtime_price(self, currency_pair: str):
             return self._generate_mock_price(currency_pair)
-            
+
     class MockAI(AIAnalysisService):
         async def get_trade_recommendation(self, currency_pair: str):
             return {"recommendation": "buy", "confidence": 0.75}
@@ -178,13 +178,13 @@ async def main():
     class MockNotify(NotificationService):
         async def send_notification(self, user_id: str, message: str, notification_type: NotificationType):
             print(f"[{notification_type.name}] To {user_id}: {message}")
-            
+
     # --- Initialize Services ---
     forex = MockForex()
     ai = MockAI()
     notify = MockNotify()
     bot = TradingBotService(forex, ai, notify)
-    
+
     # --- Test Trade Execution ---
     print("--- Executing a test trade ---")
     trade_params = {
@@ -195,11 +195,11 @@ async def main():
     }
     result = await bot.execute_trade("test_user_123", trade_params)
     print(f"Trade execution result: {result}")
-    
+
     # Let it run for a bit to monitor
     print("\n--- Monitoring active trade (will run for a short period) ---")
     await asyncio.sleep(10)
-    
+
     # Manually close for testing
     trade_id = result["trade"]["trade_id"]
     print(f"\n--- Manually closing trade {trade_id} ---")

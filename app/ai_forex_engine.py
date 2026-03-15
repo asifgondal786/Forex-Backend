@@ -3,7 +3,6 @@ AI-Powered Forex Trading Engine
 Autonomous trading system that works while you sleep
 Integrates with Google Generative AI (Gemini) for intelligent decision-making
 """
-import asyncio
 import aiohttp
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
@@ -50,39 +49,39 @@ class ForexAIEngine:
     4. Historical pattern recognition
     5. Predictive forecasting
     """
-    
+
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
         self.active_positions: Dict[str, Dict] = {}
         self.user_preferences: Dict[str, Any] = {}
         self.strategy_engine = StrategyEngine()
         self.risk_engine = RiskEngine()
-        
+
     async def initialize(self):
         """Initialize the AI engine"""
         if not self.session:
             self.session = aiohttp.ClientSession()
-    
+
     async def close(self):
         """Close sessions"""
         if self.session:
             await self.session.close()
             self.session = None
-    
+
     # ========================================================================
     # REAL-TIME DATA FETCHING
     # ========================================================================
-    
+
     async def fetch_live_rates(self) -> Dict[str, float]:
         """Fetch real-time forex rates from multiple sources"""
         try:
             # Primary source: exchangerate-api.com
             url = "https://api.exchangerate-api.com/v4/latest/USD"
-            
+
             async with self.session.get(url, timeout=10) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
+
                     # Calculate major pairs
                     rates = {
                         "EUR/USD": 1 / data["rates"]["EUR"],
@@ -94,12 +93,12 @@ class ForexAIEngine:
                         "NZD/USD": 1 / data["rates"]["NZD"],
                         "EUR/GBP": data["rates"]["GBP"] / data["rates"]["EUR"],
                     }
-                    
+
                     return rates
         except Exception as e:
             print(f"Error fetching rates: {e}")
             return {}
-    
+
     async def fetch_economic_calendar(self) -> List[Dict]:
         """Fetch economic events from Forex Factory"""
         # Simulated economic calendar data
@@ -131,103 +130,103 @@ class ForexAIEngine:
             }
         ]
         return events
-    
+
     # ========================================================================
     # TECHNICAL ANALYSIS
     # ========================================================================
-    
+
     def calculate_rsi(self, prices: List[float], period: int = 14) -> float:
         """Calculate Relative Strength Index"""
         if len(prices) < period + 1:
             return 50.0
-        
+
         deltas = np.diff(prices)
         gains = np.where(deltas > 0, deltas, 0)
         losses = np.where(deltas < 0, -deltas, 0)
-        
+
         avg_gain = np.mean(gains[:period])
         avg_loss = np.mean(losses[:period])
-        
+
         if avg_loss == 0:
             return 100.0
-        
+
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
-        
+
         return rsi
-    
+
     def calculate_macd(self, prices: List[float]) -> Dict[str, float]:
         """Calculate MACD (Moving Average Convergence Divergence)"""
         if len(prices) < 26:
             return {"macd": 0, "signal": 0, "histogram": 0}
-        
+
         prices_array = np.array(prices)
-        
+
         # Calculate EMAs
         ema_12 = self._calculate_ema(prices_array, 12)
         ema_26 = self._calculate_ema(prices_array, 26)
-        
+
         macd_line = ema_12 - ema_26
         signal_line = self._calculate_ema(np.array([macd_line]), 9)
         histogram = macd_line - signal_line
-        
+
         return {
             "macd": macd_line,
             "signal": signal_line,
             "histogram": histogram
         }
-    
+
     def _calculate_ema(self, prices: np.ndarray, period: int) -> float:
         """Calculate Exponential Moving Average"""
         multiplier = 2 / (period + 1)
         ema = prices[0]
-        
+
         for price in prices[1:]:
             ema = (price * multiplier) + (ema * (1 - multiplier))
-        
+
         return ema
-    
+
     def identify_support_resistance(self, prices: List[float]) -> Tuple[float, float]:
         """Identify support and resistance levels"""
         recent_prices = prices[-50:] if len(prices) > 50 else prices
-        
+
         support = min(recent_prices)
         resistance = max(recent_prices)
-        
+
         return support, resistance
-    
+
     # ========================================================================
     # AI MARKET ANALYSIS
     # ========================================================================
-    
+
     async def analyze_market_conditions(
         self,
         pair: str,
         historical_prices: List[float]
     ) -> MarketCondition:
         """Comprehensive market analysis using AI"""
-        
+
         current_price = historical_prices[-1]
-        
+
         # Technical indicators
         rsi = self.calculate_rsi(historical_prices)
         macd = self.calculate_macd(historical_prices)
         support, resistance = self.identify_support_resistance(historical_prices)
-        
+
         # Trend identification
         sma_20 = np.mean(historical_prices[-20:])
         sma_50 = np.mean(historical_prices[-50:]) if len(historical_prices) >= 50 else sma_20
-        
+
         if sma_20 > sma_50 and current_price > sma_20:
             trend = "BULLISH"
         elif sma_20 < sma_50 and current_price < sma_20:
             trend = "BEARISH"
         else:
             trend = "SIDEWAYS"
-        
+
         # Volatility (Standard Deviation)
         volatility = float(np.std(historical_prices[-20:]))
-        
+
         return MarketCondition(
             pair=pair,
             current_price=current_price,
@@ -238,11 +237,11 @@ class ForexAIEngine:
             rsi=rsi,
             macd=macd
         )
-    
+
     # ========================================================================
     # AI TRADING SIGNALS
     # ========================================================================
-    
+
     async def generate_trading_signal_with_gemini(
         self,
         pair: str,
@@ -256,7 +255,7 @@ class ForexAIEngine:
         try:
             if not gemini_client.available:
                 return await self.generate_trading_signal(pair, market_condition, user_strategy)
-            
+
             # Format market conditions for analysis
             condition_text = f"""
             MARKET CONDITIONS FOR {pair}:
@@ -269,13 +268,13 @@ class ForexAIEngine:
             - Support: {market_condition.support_level:.5f}
             - Resistance: {market_condition.resistance_level:.5f}
             """
-            
+
             # Format historical data
             data_text = "\n".join([
                 f"- {data['timestamp']}: {data['close']:.5f}"
                 for data in historical_data[-30:]  # Last 30 candles
             ])
-            
+
             prompt = f"""
             You are an expert forex trading signal generator.
             
@@ -317,7 +316,7 @@ class ForexAIEngine:
                 reason=signal_data.get("reason", "AI analysis"),
                 timestamp=datetime.now()
             )
-            
+
         except Exception as e:
             print(f"Gemini signal generation failed: {e}")
             return await self.generate_trading_signal(pair, market_condition, user_strategy)
@@ -349,7 +348,7 @@ class ForexAIEngine:
         try:
             if not gemini_client.available:
                 return self._get_default_portfolio_analysis(portfolio_data)
-            
+
             prompt = f"""
             You are an expert portfolio analyst.
             
@@ -383,7 +382,7 @@ class ForexAIEngine:
             else:
                 analysis["timestamp"] = datetime.now().isoformat()
             return analysis
-            
+
         except Exception as e:
             print(f"Portfolio analysis failed: {e}")
             return self._get_default_portfolio_analysis(portfolio_data)
@@ -400,11 +399,11 @@ class ForexAIEngine:
             "recommendations": ["Review trading strategy", "Monitor key pairs"],
             "next_steps": ["Continue monitoring", "Consider adjustments"]
         }
-    
+
     # ========================================================================
     # AUTOMATED TRADING
     # ========================================================================
-    
+
     async def execute_auto_trade(
         self,
         signal: TradingSignal,
@@ -421,7 +420,7 @@ class ForexAIEngine:
             "max_position_size": 1000  # USD
         }
         """
-        
+
         allowed, reason = self.risk_engine.can_execute_signal(signal, min_confidence=0.6)
         if not allowed:
             return {
@@ -429,20 +428,20 @@ class ForexAIEngine:
                 "reason": reason
             }
         trade = self.risk_engine.build_trade(signal, user_limits)
-        
+
         # Store active position
         self.active_positions[signal.pair] = trade
-        
+
         return {
             "executed": True,
             "trade": trade,
             "signal": signal
         }
-    
+
     async def monitor_positions(self, current_rates: Dict[str, float]):
         """Monitor and manage active positions"""
         closed_trades = []
-        
+
         for pair, position in list(self.active_positions.items()):
             if pair not in current_rates:
                 continue
@@ -452,13 +451,13 @@ class ForexAIEngine:
             if closed_trade:
                 closed_trades.append(closed_trade)
                 del self.active_positions[pair]
-        
+
         return closed_trades
-    
+
     # ========================================================================
     # FORECASTING & PREDICTIONS
     # ========================================================================
-    
+
     async def forecast_price_movement(
         self,
         pair: str,
@@ -469,32 +468,32 @@ class ForexAIEngine:
         AI-powered price forecasting
         Predicts future price movements based on historical data
         """
-        
+
         # Simple linear regression forecast
         # In production, use LSTM, ARIMA, or transformer models
-        
+
         if len(historical_prices) < 10:
             return {"error": "Insufficient data"}
-        
+
         # Calculate trend
         x = np.arange(len(historical_prices))
         y = np.array(historical_prices)
-        
+
         # Linear regression
         coeffs = np.polyfit(x, y, 1)
         slope = coeffs[0]
-        
+
         # Forecast
         last_idx = len(historical_prices) - 1
         forecast_idx = last_idx + horizon_hours
         forecasted_price = np.polyval(coeffs, forecast_idx)
-        
+
         # Confidence based on R² score
         y_pred = np.polyval(coeffs, x)
         ss_res = np.sum((y - y_pred) ** 2)
         ss_tot = np.sum((y - np.mean(y)) ** 2)
         r_squared = 1 - (ss_res / ss_tot)
-        
+
         return {
             "pair": pair,
             "current_price": historical_prices[-1],

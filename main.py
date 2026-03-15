@@ -7,8 +7,10 @@ import os
 from fastapi import FastAPI
 from app.main import app as _app
 
+init_sentry()
 app: FastAPI = _app
 
+app.add_middleware(SentryAsgiMiddleware)
 
 if __name__ == "__main__":
     import uvicorn

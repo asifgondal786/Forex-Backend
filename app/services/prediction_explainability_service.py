@@ -4,7 +4,7 @@ Provides detailed reasoning behind AI predictions and trading decisions
 """
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from enum import Enum
 
 
@@ -41,36 +41,36 @@ class PredictionExplanation:
     action: str  # BUY, SELL, HOLD
     confidence_score: float  # 0-100%
     timestamp: datetime
-    
+
     # Sentiment
     sentiment: SentimentType
     sentiment_score: float  # -1.0 (bearish) to +1.0 (bullish)
-    
+
     # Technical indicators
     indicators: List[TechnicalIndicator]
     indicators_bullish: int
     indicators_bearish: int
     indicators_neutral: int
-    
+
     # News & Events
     upcoming_events: List[str]
     news_impact: NewsImpact
-    
+
     # Support & Resistance
     support_level: float
     resistance_level: float
     support_proximity: str  # "far", "moderate", "near"
-    
+
     # Reasoning summary
     key_reasons: List[str]
     risk_factors: List[str]
     bullish_factors: List[str]
     bearish_factors: List[str]
-    
+
     # Prediction history context
     past_accuracy_similar_conditions: float  # Historical accuracy %
     convergence_strength: float  # 0-100%, how many signals agree
-    
+
     # Optional fields (with defaults)
     recent_news: List[Dict] = field(default_factory=list)
 
@@ -95,7 +95,7 @@ class PredictionExplainabilityService:
     Service to explain AI predictions with transparency
     Builds user confidence through detailed reasoning
     """
-    
+
     def __init__(self):
         self.predictions_history: List[PredictionExplanation] = []
         self.accuracy_tracker: Dict[str, List[PredictionAccuracyTracker]] = {}
@@ -114,13 +114,13 @@ class PredictionExplainabilityService:
         """
         Generate detailed explanation for a trading prediction
         """
-        
+
         # Process technical indicators
         indicators = []
         bullish_count = 0
         bearish_count = 0
         neutral_count = 0
-        
+
         for ind_data in technical_indicators:
             indicator = TechnicalIndicator(
                 name=ind_data.get("name"),
@@ -131,14 +131,14 @@ class PredictionExplainabilityService:
                 weight=ind_data.get("weight", 1.0)
             )
             indicators.append(indicator)
-            
+
             if indicator.signal == "BUY":
                 bullish_count += 1
             elif indicator.signal == "SELL":
                 bearish_count += 1
             else:
                 neutral_count += 1
-        
+
         # Process sentiment
         sentiment_value = sentiment_data.get("score", 0)  # -1 to +1
         if sentiment_value > 0.2:
@@ -147,38 +147,38 @@ class PredictionExplainabilityService:
             sentiment = SentimentType.BEARISH
         else:
             sentiment = SentimentType.NEUTRAL
-        
+
         # Process news impact
         news_count = len(news_data.get("events", []))
         high_impact_news = len([n for n in news_data.get("events", []) if n.get("impact") == "high"])
-        
+
         if high_impact_news >= 2:
             news_impact = NewsImpact.HIGH
         elif high_impact_news >= 1 or news_count >= 3:
             news_impact = NewsImpact.MEDIUM
         else:
             news_impact = NewsImpact.LOW
-        
+
         # Build key reasons
         key_reasons = self._build_key_reasons(
-            action, bullish_count, bearish_count, sentiment, 
+            action, bullish_count, bearish_count, sentiment,
             news_impact, support_resistance
         )
-        
+
         # Build risk factors
         risk_factors = self._identify_risk_factors(
             pair, sentiment, news_impact, support_resistance
         )
-        
+
         # Calculate convergence strength
         convergence = self._calculate_convergence(
             bullish_count, bearish_count, neutral_count,
             sentiment, news_impact
         )
-        
+
         # Get historical accuracy
         historical_accuracy = await self._get_historical_accuracy(pair, action)
-        
+
         # Create explanation
         prediction_id = f"pred_{pair}_{datetime.now().timestamp()}"
         explanation = PredictionExplanation(
@@ -210,18 +210,18 @@ class PredictionExplainabilityService:
             past_accuracy_similar_conditions=historical_accuracy,
             convergence_strength=convergence
         )
-        
+
         # Store for history
         self.predictions_history.append(explanation)
-        
+
         return explanation
 
-    def _build_key_reasons(self, action: str, bullish: int, bearish: int, 
+    def _build_key_reasons(self, action: str, bullish: int, bearish: int,
                           sentiment: SentimentType, news_impact: NewsImpact,
                           support_resistance: Dict) -> List[str]:
         """Build list of key reasons for the prediction"""
         reasons = []
-        
+
         if action == "BUY":
             if bullish > bearish:
                 reasons.append(f"Technical indicators show {bullish} bullish signals vs {bearish} bearish")
@@ -231,7 +231,7 @@ class PredictionExplainabilityService:
                 reasons.append("Price near strong support level - good entry point")
             if news_impact == NewsImpact.LOW:
                 reasons.append("No major economic news in next 24 hours - stable conditions")
-        
+
         elif action == "SELL":
             if bearish > bullish:
                 reasons.append(f"Technical indicators show {bearish} bearish signals vs {bullish} bullish")
@@ -241,62 +241,62 @@ class PredictionExplainabilityService:
                 reasons.append("Price near resistance level - good exit opportunity")
             if news_impact == NewsImpact.HIGH:
                 reasons.append("High-impact economic news expected - prepare for volatility")
-        
+
         return reasons if reasons else ["Neutral technical picture with no strong directional bias"]
 
-    def _identify_risk_factors(self, pair: str, sentiment: SentimentType, 
+    def _identify_risk_factors(self, pair: str, sentiment: SentimentType,
                               news_impact: NewsImpact, support_resistance: Dict) -> List[str]:
         """Identify potential risk factors"""
         risks = []
-        
+
         if sentiment == SentimentType.NEUTRAL:
             risks.append("Mixed sentiment - market indecision may lead to whipsaws")
-        
+
         if news_impact == NewsImpact.HIGH:
             risks.append("High-impact economic news approaching - expect volatility")
-        
+
         if support_resistance.get("wide_range"):
             risks.append("Wide price range - potential for false breakouts")
-        
+
         if "JPY" in pair or "GBP" in pair:
             risks.append(f"{pair} can be volatile - consider tighter stop losses")
-        
+
         risks.append("Past performance does not guarantee future results")
-        
+
         return risks
 
     def _extract_bullish_factors(self, indicators: List[TechnicalIndicator],
                                 sentiment: SentimentType, news_data: Dict) -> List[str]:
         """Extract bullish factors"""
         factors = []
-        
+
         bullish_indicators = [i.name for i in indicators if i.signal == "BUY"]
         if bullish_indicators:
             factors.append(f"Bullish signals: {', '.join(bullish_indicators)}")
-        
+
         if sentiment == SentimentType.BULLISH:
             factors.append("Bullish market sentiment")
-        
+
         if news_data.get("major_positive"):
             factors.append("Positive economic developments")
-        
+
         return factors
 
     def _extract_bearish_factors(self, indicators: List[TechnicalIndicator],
                                 sentiment: SentimentType, news_data: Dict) -> List[str]:
         """Extract bearish factors"""
         factors = []
-        
+
         bearish_indicators = [i.name for i in indicators if i.signal == "SELL"]
         if bearish_indicators:
             factors.append(f"Bearish signals: {', '.join(bearish_indicators)}")
-        
+
         if sentiment == SentimentType.BEARISH:
             factors.append("Bearish market sentiment")
-        
+
         if news_data.get("major_negative"):
             factors.append("Negative economic developments")
-        
+
         return factors
 
     def _calculate_convergence(self, bullish: int, bearish: int, neutral: int,
@@ -308,26 +308,26 @@ class PredictionExplainabilityService:
         total = bullish + bearish + neutral
         if total == 0:
             return 50.0
-        
+
         convergence = max(bullish, bearish) / total * 100
-        
+
         # Boost convergence if sentiment and indicators agree
         if sentiment == SentimentType.BULLISH and bullish > bearish:
             convergence = min(100, convergence + 10)
         elif sentiment == SentimentType.BEARISH and bearish > bullish:
             convergence = min(100, convergence + 10)
-        
+
         return convergence
 
     def _calculate_proximity(self, current: float, support: float, resistance: float) -> str:
         """Calculate proximity to support/resistance"""
         if current <= 0:
             return "unknown"
-        
+
         to_support = abs(current - support) / current * 100
         to_resistance = abs(current - resistance) / current * 100
         min_distance = min(to_support, to_resistance)
-        
+
         if min_distance < 0.5:
             return "near"
         elif min_distance < 1.0:
@@ -339,22 +339,22 @@ class PredictionExplainabilityService:
         """Get historical accuracy for this pair/action combination"""
         if pair not in self.pair_win_rates:
             return 50.0  # Default neutral
-        
+
         rates = self.pair_win_rates[pair]
         if action == "BUY":
             return rates.get("buy_accuracy", 50.0)
         else:
             return rates.get("sell_accuracy", 50.0)
 
-    async def record_prediction_outcome(self, prediction_id: str, 
-                                       actual_entry: float, 
+    async def record_prediction_outcome(self, prediction_id: str,
+                                       actual_entry: float,
                                        actual_exit: Optional[float] = None) -> Dict:
         """Record actual outcome of a prediction"""
         prediction = next((p for p in self.predictions_history if p.prediction_id == prediction_id), None)
-        
+
         if not prediction:
             return {"error": "Prediction not found"}
-        
+
         tracker = PredictionAccuracyTracker(
             prediction_id=prediction_id,
             pair=prediction.pair,
@@ -365,22 +365,22 @@ class PredictionExplainabilityService:
             actual_exit_price=actual_exit,
             actual_time=datetime.now()
         )
-        
+
         if prediction.pair not in self.accuracy_tracker:
             self.accuracy_tracker[prediction.pair] = []
         self.accuracy_tracker[prediction.pair].append(tracker)
-        
+
         return {"success": True, "message": "Prediction outcome recorded"}
 
     async def get_prediction_history(self, pair: Optional[str] = None, limit: int = 10) -> Dict:
         """Get prediction history with formatting"""
         history = self.predictions_history
-        
+
         if pair:
             history = [p for p in history if p.pair == pair]
-        
+
         history = history[-limit:]  # Most recent
-        
+
         return {
             "predictions": [
                 {
@@ -405,10 +405,10 @@ class PredictionExplainabilityService:
     async def get_detailed_explanation(self, prediction_id: str) -> Dict:
         """Get detailed explanation panel for a prediction"""
         prediction = next((p for p in self.predictions_history if p.prediction_id == prediction_id), None)
-        
+
         if not prediction:
             return {"error": "Prediction not found"}
-        
+
         return {
             "prediction_id": prediction_id,
             "why_this_trade": {
@@ -452,19 +452,19 @@ class PredictionExplainabilityService:
     async def get_accuracy_report(self, pair: Optional[str] = None, days: int = 30) -> Dict:
         """Get prediction accuracy report"""
         trackers = []
-        
+
         if pair:
             trackers = self.accuracy_tracker.get(pair, [])
         else:
             trackers = [t for trackers_list in self.accuracy_tracker.values() for t in trackers_list]
-        
+
         if not trackers:
             return {"message": "No completed predictions to analyze"}
-        
+
         total = len(trackers)
         profitable = len([t for t in trackers if t.was_profitable])
         win_rate = (profitable / total * 100) if total > 0 else 0
-        
+
         return {
             "summary": {
                 "total_predictions": total,
@@ -486,7 +486,7 @@ class PredictionExplainabilityService:
             grouped[tracker.pair]["total"] += 1
             if tracker.was_profitable:
                 grouped[tracker.pair]["profitable"] += 1
-        
+
         return {pair: (data["profitable"] / data["total"] * 100) for pair, data in grouped.items()}
 
     def _group_by_action(self, trackers: List[PredictionAccuracyTracker]) -> Dict:
@@ -496,8 +496,8 @@ class PredictionExplainabilityService:
             grouped[tracker.action]["total"] += 1
             if tracker.was_profitable:
                 grouped[tracker.action]["profitable"] += 1
-        
+
         return {
-            action: (data["profitable"] / data["total"] * 100) if data["total"] > 0 else 0 
+            action: (data["profitable"] / data["total"] * 100) if data["total"] > 0 else 0
             for action, data in grouped.items()
         }

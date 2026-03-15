@@ -5,7 +5,7 @@ Integrates with Google Generative AI (Gemini) for intelligent condition analysis
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional
 from enum import Enum
 import asyncio
 import os
@@ -70,7 +70,7 @@ class ConditionalOrder:
     pair: str
     action: str  # BUY, SELL
     conditions: List[Condition]
-    
+
     # Optional fields (with defaults)
     all_conditions_must_match: bool = True  # AND vs OR logic
     position_size: float = 0
@@ -101,7 +101,7 @@ class ExecutionIntelligenceService:
     """
     Handles conditional automation and intelligent order execution
     """
-    
+
     def __init__(self):
         self.pending_orders: Dict[str, List[ConditionalOrder]] = {}
         self.order_history: List[ConditionalOrder] = []
@@ -155,7 +155,7 @@ class ExecutionIntelligenceService:
         Create a conditional order
         Example: "Sell USD at 289 PKR only if RSI < 70 and trend is bearish"
         """
-        
+
         # Parse conditions
         parsed_conditions = []
         for cond in conditions:
@@ -165,18 +165,18 @@ class ExecutionIntelligenceService:
                 value=cond.get("value"),
                 description=cond.get("description", "")
             ))
-        
+
         # Create order
         order_id = f"order_{user_id}_{datetime.now().timestamp()}"
         max_exec_time = datetime.now() + timedelta(hours=max_hours) if max_hours else None
-        
+
         session = None
         if session_filter:
             try:
                 session = TradingSession[session_filter.upper()]
             except KeyError:
                 pass
-        
+
         order = ConditionalOrder(
             order_id=order_id,
             user_id=user_id,
@@ -191,16 +191,16 @@ class ExecutionIntelligenceService:
             order_type=OrderType[order_type.upper()] if order_type else OrderType.MARKET,
             notes=notes
         )
-        
+
         # Store order
         if user_id not in self.pending_orders:
             self.pending_orders[user_id] = []
         self.pending_orders[user_id].append(order)
-        
+
         # Start monitoring task
         task = asyncio.create_task(self._monitor_order(order))
         self.monitoring_tasks[order_id] = task
-        
+
         return {
             "success": True,
             "order_id": order_id,
@@ -221,23 +221,23 @@ class ExecutionIntelligenceService:
             if order.max_execution_time and datetime.now() > order.max_execution_time:
                 order.status = OrderStatus.EXPIRED
                 break
-            
+
             # Check session filter
             if order.session_filter:
                 current_session = self._get_current_session()
                 if current_session != order.session_filter:
                     await asyncio.sleep(60)  # Check every minute
                     continue
-            
+
             # Check conditions (simulated)
             # In production, this would fetch live data and evaluate conditions
             conditions_met = await self._evaluate_conditions(order)
-            
+
             if conditions_met:
                 order.status = OrderStatus.TRIGGERED
                 order.executed_at = datetime.now()
                 break
-            
+
             await asyncio.sleep(30)  # Check every 30 seconds
 
     async def analyze_conditions_with_gemini(self, user_id: str, conditions: List[Dict]) -> Dict:
@@ -251,15 +251,15 @@ class ExecutionIntelligenceService:
                     "message": "Gemini is unavailable (missing package or API key)",
                     "analysis": None
                 }
-                
+
             model = genai.GenerativeModel("gemini-2.0-flash")
-            
+
             # Create prompt for Gemini
             conditions_text = "\n".join([
                 f"- {cond['description']}"
                 for cond in conditions
             ])
-            
+
             prompt = f"""
             You are an expert forex trading analyst specializing in conditional order evaluation.
             
@@ -276,27 +276,27 @@ class ExecutionIntelligenceService:
             
             Format your response in JSON with clear, actionable insights.
             """
-            
+
             response = model.generate_content(prompt)
-            
+
             # Parse JSON response
             import json
             try:
                 analysis = json.loads(response.text)
-            except:
+            except Exception:
                 analysis = {
                     "confidence": 50,
                     "risk_level": "medium",
                     "analysis": response.text,
                     "suggestions": ["Could not parse structured response"]
                 }
-                
+
             return {
                 "success": True,
                 "message": "Conditions analyzed successfully",
                 "analysis": analysis
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
@@ -315,9 +315,9 @@ class ExecutionIntelligenceService:
                     "message": "Gemini is unavailable (missing package or API key)",
                     "conditions": None
                 }
-                
+
             model = genai.GenerativeModel("gemini-1.5-pro")
-            
+
             prompt = f"""
             You are an expert forex trading condition generator.
             
@@ -349,21 +349,21 @@ class ExecutionIntelligenceService:
             
             Format your response as a JSON array of conditions.
             """
-            
+
             response = model.generate_content(prompt)
-            
+
             import json
             try:
                 conditions = json.loads(response.text)
-            except:
+            except Exception:
                 conditions = []
-                
+
             return {
                 "success": True,
                 "message": "Conditions generated successfully",
                 "conditions": conditions
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
@@ -380,7 +380,7 @@ class ExecutionIntelligenceService:
     def _get_current_session(self) -> TradingSession:
         """Determine current trading session based on UTC time"""
         hour = datetime.utcnow().hour
-        
+
         # Asian: 22:00 - 08:00 (previous day)
         if hour >= 22 or hour < 8:
             return TradingSession.ASIAN
@@ -416,7 +416,7 @@ class ExecutionIntelligenceService:
                         "max_execution_time": order.max_execution_time.isoformat() if order.max_execution_time else None,
                         "executed_at": order.executed_at.isoformat() if order.executed_at else None,
                     }
-        
+
         return {"error": "Order not found"}
 
     async def cancel_order(self, order_id: str) -> Dict:
@@ -436,14 +436,14 @@ class ExecutionIntelligenceService:
                             "reason": "User initiated cancellation"
                         }
                     }
-        
+
         return {"error": "Order not found"}
 
     async def get_active_orders(self, user_id: str) -> Dict:
         """Get all active conditional orders for a user"""
         orders = self.pending_orders.get(user_id, [])
         active = [o for o in orders if o.status == OrderStatus.PENDING]
-        
+
         return {
             "orders": [
                 {
@@ -462,7 +462,7 @@ class ExecutionIntelligenceService:
     async def get_session_analysis(self) -> Dict:
         """Get analysis for all trading sessions"""
         current_session = self._get_current_session()
-        
+
         return {
             "current_session": current_session.value,
             "sessions": {
@@ -504,14 +504,14 @@ class ExecutionIntelligenceService:
         Create a time-bound order that only executes within specified window
         Example: "Execute this limit order only within next 12 hours"
         """
-        
+
         condition = Condition(
             condition_type="time",
             operator="<=",
             value=execution_window_hours,
             description=f"Execute within next {execution_window_hours} hours"
         )
-        
+
         result = await self.create_conditional_order(
             user_id=user_id,
             pair=pair,
@@ -529,7 +529,7 @@ class ExecutionIntelligenceService:
             session_filter=session_preference,
             order_type="limit"
         )
-        
+
         return result
 
     async def create_session_aware_order(
@@ -546,7 +546,7 @@ class ExecutionIntelligenceService:
         Create order that only executes during specified trading session
         Useful for pairs that trade best in specific sessions
         """
-        
+
         return await self.create_conditional_order(
             user_id=user_id,
             pair=pair,
@@ -568,7 +568,7 @@ class ExecutionIntelligenceService:
         """Get comprehensive execution intelligence panel for UI"""
         current_session = self._get_current_session()
         stats = self.session_stats[current_session]
-        
+
         return {
             "current_trading_environment": {
                 "session": current_session.value.upper(),
@@ -599,7 +599,7 @@ class ExecutionIntelligenceService:
         """Get order execution history"""
         all_orders = [o for o in self.order_history if o.user_id == user_id]
         recent = all_orders[-limit:]
-        
+
         return [
             {
                 "order_id": o.order_id,

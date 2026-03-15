@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
-import asyncio
 import os
 import json
 import hashlib
@@ -104,7 +103,7 @@ class RiskManagementService:
     """
     Comprehensive risk management and trading safety governance system
     """
-    
+
     # Conservative presets for different user archetypes.
     # These are intentionally opinionated and can be tuned later or persisted to a DB.
     _PROFILE_PRESETS = {
@@ -832,11 +831,11 @@ class RiskManagementService:
         self._get_or_create_autonomy_state(user_id)
         if user_id not in self.weekly_profit_loss:
             self.weekly_profit_loss[user_id] = {}
-        
+
         # Initialize today's stats
         today = datetime.now().strftime("%Y-%m-%d")
         self.daily_stats[user_id] = DailyTradingStats(date=today)
-        
+
         return {
             "status": "success",
             "message": f"Risk limits initialized for user {user_id}",
@@ -854,10 +853,10 @@ class RiskManagementService:
         """
         if not self.user_limits.get(user_id):
             return False, "User risk limits not configured"
-        
+
         if self.kill_switch_active.get(user_id, False):
             return False, "KILL SWITCH ACTIVE - All trading disabled"
-        
+
         limits = self.user_limits[user_id]
         is_paper_trade = bool(trade_params.get("is_paper_trade", False))
         action = str(trade_params.get("action", "")).upper()
@@ -910,22 +909,22 @@ class RiskManagementService:
         # Check 1: Position size limit
         if position_size > limits.max_trade_size:
             return False, f"Position size {position_size} exceeds max {limits.max_trade_size}"
-        
+
         # Check 2: Open positions limit
         open_positions = len(self.active_trades.get(user_id, []))
         if open_positions >= limits.max_open_positions:
             return False, f"Already have {open_positions} open positions (max: {limits.max_open_positions})"
-        
+
         # Check 3: Daily loss limit
         today = datetime.now().strftime("%Y-%m-%d")
         daily_stat = self.daily_stats.get(user_id)
         if daily_stat and daily_stat.total_profit_loss < -limits.daily_loss_limit:
             return False, f"Daily loss limit reached: {daily_stat.total_profit_loss}% (limit: -{limits.daily_loss_limit}%)"
-        
+
         # Check 4: Mandatory Stop-Loss & Take-Profit
         if limits.mandatory_stop_loss and not trade_params.get("stop_loss"):
             return False, "Stop-Loss is mandatory but not set"
-        
+
         if limits.mandatory_take_profit and not trade_params.get("take_profit"):
             return False, "Take-Profit is mandatory but not set"
 
@@ -945,14 +944,14 @@ class RiskManagementService:
         Execute trade with all safety checks and logging
         """
         is_valid, reason = await self.validate_trade(user_id, trade_params)
-        
+
         if not is_valid:
             return {
                 "success": False,
                 "error": reason,
                 "risk_check_failed": True
             }
-        
+
         # Create trade record
         trade_id = f"trade_{user_id}_{datetime.now().timestamp()}"
         trade = TradeExecution(
@@ -969,23 +968,23 @@ class RiskManagementService:
             reason=trade_params.get("reason"),
             is_paper_trade=trade_params.get("is_paper_trade", False)
         )
-        
+
         # Add to active trades
         if user_id not in self.active_trades:
             self.active_trades[user_id] = []
         self.active_trades[user_id].append(trade)
-        
+
         # Update daily stats
         today = datetime.now().strftime("%Y-%m-%d")
         if user_id not in self.daily_stats:
             self.daily_stats[user_id] = DailyTradingStats(date=today)
         self.daily_stats[user_id].total_trades += 1
         self.daily_stats[user_id].trades.append(trade)
-        
+
         return {
             "success": True,
             "trade_id": trade_id,
-            "message": f"Trade executed successfully",
+            "message": "Trade executed successfully",
             "trade_details": {
                 "pair": trade.pair,
                 "action": trade.action,
@@ -1001,21 +1000,21 @@ class RiskManagementService:
         """Close an open trade and update P&L"""
         active_trades = self.active_trades.get(user_id, [])
         trade = next((t for t in active_trades if t.trade_id == trade_id), None)
-        
+
         if not trade:
             return {"success": False, "error": "Trade not found"}
-        
+
         # Calculate P&L
         if trade.action == "BUY":
             profit_loss = (exit_price - trade.entry_price) * trade.position_size
         else:  # SELL
             profit_loss = (trade.entry_price - exit_price) * trade.position_size
-        
+
         # Update trade
         trade.exit_price = exit_price
         trade.profit_loss = profit_loss
         trade.status = "closed"
-        
+
         # Update daily stats
         daily_stat = self.daily_stats.get(user_id)
         if daily_stat:
@@ -1034,7 +1033,7 @@ class RiskManagementService:
             + ((profit_loss / trade.position_size) if trade.position_size else 0.0)
         )
         self._apply_budget_and_autonomy(user_id)
-        
+
         return {
             "success": True,
             "trade_id": trade_id,
@@ -1048,7 +1047,7 @@ class RiskManagementService:
         Emergency: Immediately stop all trading for this user
         """
         self.kill_switch_active[user_id] = True
-        
+
         # Close all open trades at market price (simulated)
         active_trades = self.active_trades.get(user_id, [])
         closed_count = 0
@@ -1056,11 +1055,11 @@ class RiskManagementService:
             if trade.status == "open":
                 trade.status = "closed_emergency"
                 closed_count += 1
-        
+
         # Update daily stats
         if user_id in self.daily_stats:
             self.daily_stats[user_id].kill_switch_triggered = True
-        
+
         return {
             "success": True,
             "message": "KILL SWITCH ACTIVATED - All trading disabled",
@@ -1075,7 +1074,7 @@ class RiskManagementService:
         active_trades = self.active_trades.get(user_id, [])
         state = self._get_or_create_autonomy_state(user_id)
         budget = self._get_or_create_risk_budget(user_id)
-        
+
         # Provide default limits if not configured
         if not limits:
             limits = RiskLimits(
@@ -1089,12 +1088,12 @@ class RiskManagementService:
             )
             # Initialize user with default limits
             await self.initialize_user_limits(user_id, limits)
-        
+
         # Calculate risk level
         risk_level = await self._calculate_risk_level(user_id, limits, daily_stat, active_trades)
         self._apply_budget_and_autonomy(user_id)
         week_key = self._get_week_key()
-        
+
         return {
             "user_id": user_id,
             "risk_level": risk_level,
@@ -1129,24 +1128,24 @@ class RiskManagementService:
             "timestamp": datetime.now().isoformat()
         }
 
-    async def _calculate_risk_level(self, user_id: str, limits: RiskLimits, 
-                                   daily_stat: Optional[DailyTradingStats], 
+    async def _calculate_risk_level(self, user_id: str, limits: RiskLimits,
+                                   daily_stat: Optional[DailyTradingStats],
                                    active_trades: List[TradeExecution]) -> str:
         """Calculate current risk level"""
         danger_score = 0
-        
+
         # Check daily loss
         if daily_stat and daily_stat.total_profit_loss < -limits.daily_loss_limit * 0.5:
             danger_score += 2
-        
+
         # Check open positions
         if len(active_trades) > limits.max_open_positions * 0.7:
             danger_score += 1
-        
+
         # Check recent losing streak
         if daily_stat and daily_stat.losing_trades > 3:
             danger_score += 1
-        
+
         if danger_score >= 3:
             return RiskLevel.EXTREME.value
         elif danger_score >= 2:
@@ -1159,14 +1158,14 @@ class RiskManagementService:
     async def get_trading_analytics(self, user_id: str, days: int = 30) -> Dict:
         """Get comprehensive trading analytics for user"""
         daily_stat = self.daily_stats.get(user_id)
-        
+
         if not daily_stat:
             return {"error": "No trading history"}
-        
+
         total_trades = daily_stat.total_trades
         winning = daily_stat.winning_trades
         losing = daily_stat.losing_trades
-        
+
         return {
             "summary": {
                 "total_trades": total_trades,
