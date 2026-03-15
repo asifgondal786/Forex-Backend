@@ -23,6 +23,9 @@ class ApiException implements Exception {
 class ApiService {
   // Backend URL - matches your backend port
   // Use --dart-define=API_BASE_URL=http://your.server:port for production.
+  /// API version prefix — all versioned endpoints use this path segment.
+  static const String apiV1 = '/api/v1';
+
   static const String _baseUrlFromDefine = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',

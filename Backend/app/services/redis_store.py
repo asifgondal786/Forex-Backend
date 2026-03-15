@@ -106,6 +106,30 @@ class RedisStore:
                 print(f"[Redis] Connection failed: {exc}")
                 return False
 
+
+    async def sliding_window_check(self, key: str, limit: int, window_seconds: float):
+        if not await self.ensure_connected():
+            return True, 0
+        assert self._client is not None
+        now = time.time()
+        window_start = now - window_seconds
+        redis_key = f"rl:{key}"
+        try:
+            pipe = self._client.pipeline()
+            pipe.zremrangebyscore(redis_key, "-inf", window_start)
+            pipe.zadd(redis_key, {str(now): now})
+            pipe.zcard(redis_key)
+            pipe.expire(redis_key, int(window_seconds) + 10)
+            results = await pipe.execute()
+            count = int(results[2])
+            allowed = count <= limit
+            if not allowed:
+                await self._client.zrem(redis_key, str(now))
+            return allowed, count
+        except Exception as exc:
+            print(f"[Redis] sliding_window_check failed: {exc}")
+            return True, 0
+
     async def close(self) -> None:
         client = self._client
         self._client = None
