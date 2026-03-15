@@ -307,6 +307,7 @@ from .forex_data_service import forex_service
 from .services.task_queue_service import task_queue_service
 from .services.redis_store import redis_store
 from .services.rate_limiter import RateLimiter
+from fastapi.routing import APIRouter as _APIRouter
 from .services.observability import health_checker
 from .utils.firestore_client import (
     check_firebase_authorized_domain,
@@ -1171,32 +1172,42 @@ try:
 except Exception as exc:
     logger.warning(f"[WARN] Could not load audit middleware: {exc}")
 
-# Include routers
-app.include_router(users_router)
-app.include_router(websocket_router)
-app.include_router(engagement_router)
-app.include_router(auth_status_router)
-app.include_router(header_router)
-app.include_router(notifications_router)
-app.include_router(settings_router)
+# ── API v1 versioned router ──────────────────────────────────────────────────
+# All /api/* routes are mounted under /api/v1 via this wrapper.
+# Unversioned routes (/health, /healthz, /api/health, /auth) are registered
+# directly on `app` below and remain unaffected.
+_v1 = _APIRouter(prefix="/v1")
+
+_v1.include_router(users_router)
+_v1.include_router(websocket_router)
+_v1.include_router(engagement_router)
+_v1.include_router(auth_status_router)
+_v1.include_router(header_router)
+_v1.include_router(notifications_router)
+_v1.include_router(settings_router)
 if AI_ROUTES_AVAILABLE:
-    app.include_router(ai_task_router)
+    _v1.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
-    app.include_router(advanced_router)
+    _v1.include_router(advanced_router)
 if ACCOUNTS_ROUTES_AVAILABLE:
-    app.include_router(accounts_router)
+    _v1.include_router(accounts_router)
 if SUBSCRIPTION_ROUTES_AVAILABLE:
-    app.include_router(subscription_router)
+    _v1.include_router(subscription_router)
 if CREDENTIAL_VAULT_ROUTES_AVAILABLE:
-    app.include_router(credential_vault_router)
+    _v1.include_router(credential_vault_router)
+if OPS_ROUTES_AVAILABLE:
+    _v1.include_router(ops_router)
+if MONITORING_ROUTES_AVAILABLE:
+    _v1.include_router(monitoring_router)
+if AI_PROXY_AVAILABLE:
+    _v1.include_router(ai_proxy_router)
+
+# Mount v1 router — all /api/* routes become /api/v1/*
+app.include_router(_v1)
+
+# Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
     app.include_router(public_auth_router)
-if OPS_ROUTES_AVAILABLE:
-    app.include_router(ops_router)
-if MONITORING_ROUTES_AVAILABLE:
-    app.include_router(monitoring_router)
-if AI_PROXY_AVAILABLE:
-    app.include_router(ai_proxy_router)
 
 
 @app.get("/")
