@@ -267,9 +267,9 @@ class _WebVoiceAssistantService implements VoiceAssistantService {
     _onErrorJs = onError.toJS;
     _onEndJs = onEnd.toJS;
 
-    recognition.addEventListener('result', _onResultJs!);
-    recognition.addEventListener('error', _onErrorJs!);
-    recognition.addEventListener('end', _onEndJs!);
+    recognition.addEventListener('result', _onResultJs);
+    recognition.addEventListener('error', _onErrorJs);
+    recognition.addEventListener('end', _onEndJs);
 
     _recognitionTimeoutTimer = Timer(timeout, () {
       completeAndCleanup(null);
