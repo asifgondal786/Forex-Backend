@@ -1,3 +1,7 @@
+from app.market_routes import router as market_router
+    "/api/v1/market/prices",
+    "/api/v1/market/health",
+    "/api/v1/market/supported",
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -847,6 +851,9 @@ _rate_limit_max = _runtime_config.security.rate_limit_max
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
+    "/api/v1/market/prices",
+    "/api/v1/market/health",
+    "/api/v1/market/supported",
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
 
@@ -877,6 +884,9 @@ _public_unauthenticated_auth_paths = {
     "/auth/email-provider-status",
     "/api/ai/health",
     "/api/health",        # ← add this line
+    "/api/v1/market/prices",
+    "/api/v1/market/health",
+    "/api/v1/market/supported",
 }
 
 @app.middleware("http")
@@ -1184,6 +1194,7 @@ _v1.include_router(auth_status_router)
 _v1.include_router(header_router)
 _v1.include_router(notifications_router)
 _v1.include_router(settings_router)
+_v1.include_router(market_router)
 if AI_ROUTES_AVAILABLE:
     _v1.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
@@ -1203,6 +1214,7 @@ if AI_PROXY_AVAILABLE:
 
 # Mount v1 router — all /api/* routes become /api/v1/*
 app.include_router(_v1)
+app.include_router(router, prefix="/api/v1")
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
