@@ -1,18 +1,19 @@
 // lib/providers/market_watch_provider.dart
 import 'dart:async';
-import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Model
+// Model — identical to your existing PairQuote so all UI widgets still compile
 // ─────────────────────────────────────────────────────────────────────────────
 class PairQuote {
-  final String symbol;
+  final String symbol;          // EUR/USD  (slash format — matches your UI)
   final String base;
   final String quote;
   final double bid;
   final double ask;
-  final double changePercent;   // 24-h % change
+  final double changePercent;
   final double high24h;
   final double low24h;
   final double spread;
@@ -36,6 +37,34 @@ class PairQuote {
   double get mid => (bid + ask) / 2;
   bool get isBullish => changePercent >= 0;
 
+  // Build from backend response (uses EUR_USD format — we convert to EUR/USD)
+  factory PairQuote.fromBackend(
+    Map<String, dynamic> json, {
+    bool isFavourite = false,
+    double changePercent = 0.0,
+    double high24h = 0.0,
+    double low24h = 0.0,
+  }) {
+    final instrument = json['instrument'] as String; // EUR_USD
+    final parts      = instrument.split('_');
+    final slashSymbol = instrument.replaceAll('_', '/'); // EUR/USD
+
+    return PairQuote(
+      symbol:        slashSymbol,
+      base:          parts.isNotEmpty ? parts[0] : '',
+      quote:         parts.length > 1 ? parts[1] : '',
+      bid:           (json['bid']    as num).toDouble(),
+      ask:           (json['ask']    as num).toDouble(),
+      changePercent: changePercent,
+      high24h:       high24h,
+      low24h:        low24h,
+      spread:        (json['spread'] as num).toDouble(),
+      isFavourite:   isFavourite,
+      updatedAt:     DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+                     DateTime.now(),
+    );
+  }
+
   PairQuote copyWith({
     double? bid,
     double? ask,
@@ -46,125 +75,206 @@ class PairQuote {
     DateTime? updatedAt,
   }) =>
       PairQuote(
-        symbol: symbol,
-        base: base,
-        quote: quote,
-        bid: bid ?? this.bid,
-        ask: ask ?? this.ask,
+        symbol:        symbol,
+        base:          base,
+        quote:         quote,
+        bid:           bid ?? this.bid,
+        ask:           ask ?? this.ask,
         changePercent: changePercent ?? this.changePercent,
-        high24h: high24h ?? this.high24h,
-        low24h: low24h ?? this.low24h,
-        spread: (ask ?? this.ask) - (bid ?? this.bid),
-        isFavourite: isFavourite ?? this.isFavourite,
-        updatedAt: updatedAt ?? this.updatedAt,
+        high24h:       high24h ?? this.high24h,
+        low24h:        low24h ?? this.low24h,
+        spread:        (ask ?? this.ask) - (bid ?? this.bid),
+        isFavourite:   isFavourite ?? this.isFavourite,
+        updatedAt:     updatedAt ?? this.updatedAt,
       );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seed data — swap _fetchLive() for real OANDA v20 call later
+// Favourites & change% are not returned by Twelve Data free tier.
+// We persist them locally per session so they survive polling refreshes.
 // ─────────────────────────────────────────────────────────────────────────────
-final _kSeedQuotes = <PairQuote>[
-  PairQuote(symbol: 'EUR/USD', base: 'EUR', quote: 'USD', bid: 1.08452, ask: 1.08468, changePercent: 0.23, high24h: 1.08720, low24h: 1.08110, spread: 0.00016, isFavourite: true,  updatedAt: DateTime.now()),
-  PairQuote(symbol: 'GBP/USD', base: 'GBP', quote: 'USD', bid: 1.27310, ask: 1.27334, changePercent: -0.41, high24h: 1.27890, low24h: 1.27150, spread: 0.00024, isFavourite: true,  updatedAt: DateTime.now()),
-  PairQuote(symbol: 'USD/JPY', base: 'USD', quote: 'JPY', bid: 149.862, ask: 149.884, changePercent: 0.08, high24h: 150.120, low24h: 149.530, spread: 0.022,   isFavourite: true,  updatedAt: DateTime.now()),
-  PairQuote(symbol: 'AUD/USD', base: 'AUD', quote: 'USD', bid: 0.65234, ask: 0.65252, changePercent: -0.17, high24h: 0.65520, low24h: 0.65100, spread: 0.00018, isFavourite: false, updatedAt: DateTime.now()),
-  PairQuote(symbol: 'USD/CAD', base: 'USD', quote: 'CAD', bid: 1.36480, ask: 1.36502, changePercent: 0.31, high24h: 1.36750, low24h: 1.36200, spread: 0.00022, isFavourite: false, updatedAt: DateTime.now()),
-  PairQuote(symbol: 'USD/CHF', base: 'USD', quote: 'CHF', bid: 0.90124, ask: 0.90140, changePercent: -0.09, high24h: 0.90380, low24h: 0.89980, spread: 0.00016, isFavourite: false, updatedAt: DateTime.now()),
-  PairQuote(symbol: 'NZD/USD', base: 'NZD', quote: 'USD', bid: 0.60342, ask: 0.60360, changePercent: 0.54, high24h: 0.60680, low24h: 0.60100, spread: 0.00018, isFavourite: false, updatedAt: DateTime.now()),
-  PairQuote(symbol: 'EUR/GBP', base: 'EUR', quote: 'GBP', bid: 0.85220, ask: 0.85238, changePercent: -0.12, high24h: 0.85450, low24h: 0.85080, spread: 0.00018, isFavourite: false, updatedAt: DateTime.now()),
-  PairQuote(symbol: 'EUR/JPY', base: 'EUR', quote: 'JPY', bid: 162.480, ask: 162.510, changePercent: 0.29, high24h: 162.950, low24h: 162.100, spread: 0.030,   isFavourite: false, updatedAt: DateTime.now()),
-  PairQuote(symbol: 'GBP/JPY', base: 'GBP', quote: 'JPY', bid: 190.110, ask: 190.148, changePercent: -0.33, high24h: 190.780, low24h: 189.820, spread: 0.038,   isFavourite: false, updatedAt: DateTime.now()),
-];
+const _defaultFavourites = {'EUR/USD', 'GBP/USD', 'USD/JPY'};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider
 // ─────────────────────────────────────────────────────────────────────────────
 class MarketWatchProvider extends ChangeNotifier {
   List<PairQuote> _quotes = [];
-  bool _isLoading = false;
+  bool _isLoading          = false;
   String? _error;
-  String _filter = 'All';           // All | Favourites | Bullish | Bearish
-  String _searchQuery = '';
+  String _filter           = 'All';
+  String _searchQuery      = '';
   Timer? _ticker;
-  final _rng = Random();
+  bool _disposed           = false;
 
-  List<PairQuote> get quotes => _filtered;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-  String get filter => _filter;
+  // Session state — survives between polls
+  final Map<String, bool>   _favourites     = {};
+  final Map<String, double> _changePercents = {};
+  final Map<String, double> _high24h        = {};
+  final Map<String, double> _low24h         = {};
+
+  // ── Public getters ────────────────────────────────────────────────────────
+  List<PairQuote> get quotes   => _filtered;
+  bool   get isLoading         => _isLoading;
+  String? get error            => _error;
+  String get filter            => _filter;
   int get bullishCount => _quotes.where((q) => q.isBullish).length;
   int get bearishCount => _quotes.where((q) => !q.isBullish).length;
+  bool get hasLiveData => _quotes.isNotEmpty && _error == null;
 
   List<PairQuote> get _filtered {
     var list = [..._quotes];
     if (_searchQuery.isNotEmpty) {
-      list = list.where((q) =>
-          q.symbol.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+      list = list
+          .where((q) =>
+              q.symbol.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
     }
     switch (_filter) {
-      case 'Favourites': list = list.where((q) => q.isFavourite).toList(); break;
-      case 'Bullish':    list = list.where((q) => q.isBullish).toList();   break;
-      case 'Bearish':    list = list.where((q) => !q.isBullish).toList();  break;
+      case 'Favourites':
+        list = list.where((q) => q.isFavourite).toList();
+        break;
+      case 'Bullish':
+        list = list.where((q) => q.isBullish).toList();
+        break;
+      case 'Bearish':
+        list = list.where((q) => !q.isBullish).toList();
+        break;
     }
     return list;
   }
 
-  void setFilter(String f)      { _filter = f;       notifyListeners(); }
-  void setSearch(String q)      { _searchQuery = q;  notifyListeners(); }
+  void setFilter(String f) { _filter = f;      notifyListeners(); }
+  void setSearch(String q) { _searchQuery = q;  notifyListeners(); }
 
   void toggleFavourite(String symbol) {
-    _quotes = _quotes.map((q) => q.symbol == symbol
-        ? q.copyWith(isFavourite: !q.isFavourite) : q).toList();
+    _favourites[symbol] = !(_favourites[symbol] ?? false);
+    _quotes = _quotes
+        .map((q) => q.symbol == symbol
+            ? q.copyWith(isFavourite: _favourites[symbol])
+            : q)
+        .toList();
     notifyListeners();
   }
 
-  // ── Init & dispose ───────────────────────────────────────────────────────
+  // ── Backend URL ───────────────────────────────────────────────────────────
+  static String get _baseUrl => kDebugMode
+      ? 'http://localhost:8000'
+      : 'https://forex-backend-production-bc44.up.railway.app';
+
+  // ── Init ──────────────────────────────────────────────────────────────────
   Future<void> init() async {
     _isLoading = true;
+    _error     = null;
     notifyListeners();
-    await Future.delayed(const Duration(milliseconds: 800)); // simulate fetch
-    _quotes = List.from(_kSeedQuotes);
-    _isLoading = false;
-    notifyListeners();
-    _startTicker();
+
+    // Seed favourites for first run
+    for (final sym in _defaultFavourites) {
+      _favourites.putIfAbsent(sym, () => true);
+    }
+
+    await _fetchFromBackend();
+    _startPolling();
   }
 
-  void _startTicker() {
+  // ── Polling ───────────────────────────────────────────────────────────────
+  void _startPolling() {
     _ticker?.cancel();
-    // Simulate price ticks every 2 s
-    _ticker = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+    _ticker = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!_disposed) _fetchFromBackend();
+    });
   }
 
-  void _tick() {
-    _quotes = _quotes.map((q) {
-      final noise = (_rng.nextDouble() - 0.5) * 0.00030;
-      final newBid = q.bid + noise;
-      final newAsk = newBid + q.spread;
-      final newChange = q.changePercent + (_rng.nextDouble() - 0.5) * 0.05;
-      return q.copyWith(
-        bid: newBid,
-        ask: newAsk,
-        changePercent: newChange,
-        updatedAt: DateTime.now(),
+  // ── Fetch from /api/v1/market/prices ─────────────────────────────────────
+  Future<void> _fetchFromBackend() async {
+    if (_disposed) return;
+
+    try {
+      final uri = Uri.parse(
+        '$_baseUrl/api/v1/market/prices'
+        '?pairs=EUR_USD,GBP_USD,USD_JPY,AUD_USD,USD_CAD,USD_CHF,NZD_USD,EUR_GBP,EUR_JPY,GBP_JPY',
       );
-    }).toList();
-    notifyListeners();
+
+      final response = await http
+          .get(uri, headers: {'Content-Type': 'application/json'})
+          .timeout(const Duration(seconds: 6));
+
+      if (_disposed) return;
+
+      if (response.statusCode == 200) {
+        final json  = jsonDecode(response.body) as Map<String, dynamic>;
+        final raw   = json['prices'] as List<dynamic>? ?? [];
+
+        // Update 24h high/low from live mid prices
+        for (final item in raw) {
+          final data   = item as Map<String, dynamic>;
+          final instr  = data['instrument'] as String;  // EUR_USD
+          final symbol = instr.replaceAll('_', '/');    // EUR/USD
+          final mid    = (data['mid'] as num).toDouble();
+
+          // Track intraday high/low
+          _high24h[symbol] = _high24h.containsKey(symbol)
+              ? (_high24h[symbol]! > mid ? _high24h[symbol]! : mid)
+              : mid * 1.003;
+          _low24h[symbol] = _low24h.containsKey(symbol)
+              ? (_low24h[symbol]! < mid ? _low24h[symbol]! : mid)
+              : mid * 0.997;
+
+          // Derive changePercent from high/low range (approximation until
+          // you integrate a /quote endpoint for real 24h change data)
+          final range = _high24h[symbol]! - _low24h[symbol]!;
+          final fromOpen = mid - _low24h[symbol]!;
+          _changePercents[symbol] =
+              range > 0 ? ((fromOpen / range) * 2 - 1) * 0.5 : 0.0;
+        }
+
+        _quotes = raw.map((item) {
+          final data   = item as Map<String, dynamic>;
+          final instr  = data['instrument'] as String;
+          final symbol = instr.replaceAll('_', '/');
+          return PairQuote.fromBackend(
+            data,
+            isFavourite:   _favourites[symbol] ?? false,
+            changePercent: _changePercents[symbol] ?? 0.0,
+            high24h:       _high24h[symbol] ?? 0.0,
+            low24h:        _low24h[symbol]  ?? 0.0,
+          );
+        }).toList();
+
+        _error = null;
+      } else if (response.statusCode == 503) {
+        _error = 'Market data temporarily unavailable';
+      } else {
+        _error = 'Server error: ${response.statusCode}';
+      }
+    } on TimeoutException {
+      _error = 'Request timed out — retrying...';
+    } catch (e) {
+      _error = 'Connection error: $e';
+    } finally {
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
   }
 
+  Future<void> refresh() => _fetchFromBackend();
+
+  // ── Lookup ────────────────────────────────────────────────────────────────
+  PairQuote? quoteFor(String symbol) {
+    try {
+      return _quotes.firstWhere((q) => q.symbol == symbol);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Dispose ───────────────────────────────────────────────────────────────
   @override
   void dispose() {
+    _disposed = true;
     _ticker?.cancel();
     super.dispose();
   }
-
-  // ── TODO: swap this for real OANDA v20 call ──────────────────────────────
-  // Future<void> _fetchLive() async {
-  //   final resp = await http.get(
-  //     Uri.parse('https://api-fxtrade.oanda.com/v3/accounts/$accountId/pricing'
-  //               '?instruments=${pairs.join('%2C')}'),
-  //     headers: {'Authorization': 'Bearer $oandaKey'},
-  //   );
-  //   final data = json.decode(resp.body);
-  //   _quotes = (data['prices'] as List).map(PairQuote.fromOanda).toList();
-  // }
 }
