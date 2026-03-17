@@ -125,3 +125,4 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         return response if response is not None else JSONResponse(status_code=500, content={"status": "error"})
 
+

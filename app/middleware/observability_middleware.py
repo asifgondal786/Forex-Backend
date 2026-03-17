@@ -81,7 +81,7 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
                 trace_ctx.add_log(anomaly, level="warning")
 
             error_anomaly = anomaly_detector.record_error(
-                1 if response.status_code >= 400 else 0
+                1 if getattr(response, "status_code", 500) >= 400 else 0
             )
             if error_anomaly:
                 trace_ctx.add_log(error_anomaly, level="warning")
@@ -103,18 +103,18 @@ class ErrorTrackingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Track 4xx and 5xx errors
-        if response.status_code >= 400:
+        if getattr(response, "status_code", 500) >= 400:
             trace_ctx = get_trace_context()
 
             error_info = {
-                "status": response.status_code,
+                "status": getattr(response, "status_code", 500),
                 "method": request.method,
                 "path": request.url.path,
                 "timestamp": time.time(),
             }
 
             trace_ctx.add_log(
-                f"Error {response.status_code}: {request.method} {request.url.path}",
+                f"Error {getattr(response, "status_code", 500)}: {request.method} {request.url.path}",
                 level="error",
                 **error_info
             )
@@ -172,5 +172,6 @@ def inject_trace_context_headers(
     }
 
     return response_data
+
 
 
