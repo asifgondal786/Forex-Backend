@@ -773,6 +773,7 @@ async def api_response_envelope_middleware(request: Request, call_next):
     if (
         not path.startswith("/api")
         or path.startswith("/api/ws")
+        or path.startswith("/api/v1/market")
         or request.method == "OPTIONS"
         or response.status_code >= 400
     ):

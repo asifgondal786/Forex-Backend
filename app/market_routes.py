@@ -16,6 +16,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 from app.services.market_data_service import (
     MarketPricesResponse,
@@ -102,3 +103,4 @@ async def market_debug() -> dict:
     except Exception as e:
         result["error"] = str(e)
     return result
+
