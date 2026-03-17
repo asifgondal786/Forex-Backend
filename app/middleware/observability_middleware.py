@@ -63,7 +63,7 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
         finally:
             # Calculate latency
             duration_ms = (time.monotonic() - start_time) * 1000
-            trace_ctx.add_tag("http.status_code", response.status_code)
+            trace_ctx.add_tag("http.status_code", response.status_code if "response" in dir() else 500)
             trace_ctx.add_tag("http.duration_ms", duration_ms)
 
             # Record metrics
@@ -71,7 +71,7 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
             metrics_collector.record_request(
                 endpoint=endpoint,
                 latency_ms=duration_ms,
-                status=response.status_code
+                status=response.status_code if "response" in dir() else 500
             )
 
             # Check for anomalies
