@@ -50,6 +50,7 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
 
         # Process request
         start_time = time.monotonic()
+        response = None
         try:
             response = await call_next(request)
         except Exception as exc:
@@ -63,7 +64,7 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
         finally:
             # Calculate latency
             duration_ms = (time.monotonic() - start_time) * 1000
-            trace_ctx.add_tag("http.status_code", response.status_code if "response" in dir() else 500)
+            trace_ctx.add_tag("http.status_code", getattr(response, "status_code", 500))
             trace_ctx.add_tag("http.duration_ms", duration_ms)
 
             # Record metrics
@@ -71,7 +72,7 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
             metrics_collector.record_request(
                 endpoint=endpoint,
                 latency_ms=duration_ms,
-                status=response.status_code if "response" in dir() else 500
+                status=getattr(response, "status_code", 500)
             )
 
             # Check for anomalies
@@ -171,3 +172,5 @@ def inject_trace_context_headers(
     }
 
     return response_data
+
+
