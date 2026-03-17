@@ -7,6 +7,7 @@ import time
 from typing import Callable
 
 from fastapi import Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -85,6 +86,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     entry["body_size_bytes"] = len(body)
             _AUDIT_LOGGER.info(json.dumps(entry, ensure_ascii=True))
 
+        response = None
         try:
             response = await call_next(request)
         except Exception as exc:
@@ -104,8 +106,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 )
             )
             raise
-
-        status_code = response.status_code
+        status_code = getattr(response, "status_code", 500)
         if status_code >= 400:
             duration_ms = round((time.monotonic() - started) * 1000.0, 2)
             error_entry = {
@@ -122,4 +123,5 @@ class AuditMiddleware(BaseHTTPMiddleware):
             else:
                 _AUDIT_LOGGER.warning(json.dumps(error_entry, ensure_ascii=True))
 
-        return response
+        return response if response is not None else JSONResponse(status_code=500, content={"status": "error"})
+
