@@ -78,29 +78,22 @@ async def get_supported_instruments() -> dict:
 
 
 @router.get("/health", summary="Market data health check")
+@router.get("/health", summary="Market data health check")
 async def market_health(redis=Depends(get_redis)) -> dict:
-    result = await get_market_prices(pairs=["EUR_USD"], redis_client=redis)
-    ok = bool(result.prices) and result.source != "error_fallback"
-    return {
-        "status": "ok" if ok else "degraded",
-        "source": result.source,
-        "cached": result.cached,
-        "price_count": len(result.prices),
-    }
-@router.get("/debug")
-async def market_debug() -> dict:
-    import os, httpx
-    key = os.getenv("TWELVE_DATA_API_KEY", "")
-    result = {"key_set": bool(key), "key_prefix": key[:6] if key else "none"}
+    import os, traceback
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(
-                "https://api.twelvedata.com/price",
-                params={"symbol": "EUR/USD", "apikey": key, "dp": 5},
-            )
-        result["status_code"] = resp.status_code
-        result["response"] = resp.json()
+        result = await get_market_prices(pairs=["EUR_USD"], redis_client=redis)
+        ok = bool(result.prices) and result.source != "error_fallback"
+        return {
+            "status": "ok" if ok else "degraded",
+            "source": result.source,
+            "cached": result.cached,
+            "price_count": len(result.prices),
+            "key_set": bool(os.getenv("TWELVE_DATA_API_KEY")),
+        }
     except Exception as e:
-        result["error"] = str(e)
-    return result
-
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
