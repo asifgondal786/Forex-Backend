@@ -1,7 +1,4 @@
 from app.market_routes import router as market_router
-    "/api/v1/market/prices",
-    "/api/v1/market/health",
-    "/api/v1/market/supported",
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -851,9 +848,6 @@ _rate_limit_max = _runtime_config.security.rate_limit_max
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
-    "/api/v1/market/prices",
-    "/api/v1/market/health",
-    "/api/v1/market/supported",
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
 
