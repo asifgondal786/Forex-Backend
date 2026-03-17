@@ -86,3 +86,19 @@ async def market_health(redis=Depends(get_redis)) -> dict:
         "cached": result.cached,
         "price_count": len(result.prices),
     }
+@router.get("/debug")
+async def market_debug() -> dict:
+    import os, httpx
+    key = os.getenv("TWELVE_DATA_API_KEY", "")
+    result = {"key_set": bool(key), "key_prefix": key[:6] if key else "none"}
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                "https://api.twelvedata.com/price",
+                params={"symbol": "EUR/USD", "apikey": key, "dp": 5},
+            )
+        result["status_code"] = resp.status_code
+        result["response"] = resp.json()
+    except Exception as e:
+        result["error"] = str(e)
+    return result

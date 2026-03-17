@@ -881,6 +881,7 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/market/prices",
     "/api/v1/market/health",
     "/api/v1/market/supported",
+    "/api/v1/market/debug",
 }
 
 @app.middleware("http")
