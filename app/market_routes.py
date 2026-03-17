@@ -27,7 +27,7 @@ from app.services.market_data_service import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/market", tags=["Market Data"])
+router = APIRouter(prefix="/api/v1/market", tags=["Market Data"])
 
 
 async def get_redis(request: Request):
