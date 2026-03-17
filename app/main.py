@@ -1208,7 +1208,6 @@ if AI_PROXY_AVAILABLE:
 
 # Mount v1 router — all /api/* routes become /api/v1/*
 app.include_router(_v1)
-app.include_router(router, prefix="/api/v1")
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
