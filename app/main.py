@@ -1,3 +1,4 @@
+from app.market_routes import router as market_router
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -877,6 +878,9 @@ _public_unauthenticated_auth_paths = {
     "/auth/email-provider-status",
     "/api/ai/health",
     "/api/health",        # ← add this line
+    "/api/v1/market/prices",
+    "/api/v1/market/health",
+    "/api/v1/market/supported",
 }
 
 @app.middleware("http")
@@ -1184,6 +1188,7 @@ _v1.include_router(auth_status_router)
 _v1.include_router(header_router)
 _v1.include_router(notifications_router)
 _v1.include_router(settings_router)
+_v1.include_router(market_router)
 if AI_ROUTES_AVAILABLE:
     _v1.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
@@ -1203,6 +1208,7 @@ if AI_PROXY_AVAILABLE:
 
 # Mount v1 router — all /api/* routes become /api/v1/*
 app.include_router(_v1)
+app.include_router(router, prefix="/api/v1")
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
