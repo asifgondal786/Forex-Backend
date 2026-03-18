@@ -78,7 +78,6 @@ async def get_supported_instruments() -> dict:
 
 
 @router.get("/health", summary="Market data health check")
-@router.get("/health", summary="Market data health check")
 async def market_health(redis=Depends(get_redis)) -> dict:
     import os, traceback
     try:
@@ -97,3 +96,4 @@ async def market_health(redis=Depends(get_redis)) -> dict:
             "error": str(e),
             "traceback": traceback.format_exc(),
         }
+
