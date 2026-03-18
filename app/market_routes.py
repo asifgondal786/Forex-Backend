@@ -25,6 +25,7 @@ from app.services.market_data_service import (
     get_market_prices,
 )
 
+import traceback as _tb
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/market", tags=["Market Data"])
@@ -78,7 +79,7 @@ async def get_supported_instruments() -> dict:
 
 
 @router.get("/health", summary="Market data health check")
-async def market_health(redis=Depends(get_redis)) -> dict:
+async def market_health(request: Request, redis=Depends(get_redis)) -> dict:
     import os, traceback
     try:
         result = await get_market_prices(pairs=["EUR_USD"], redis_client=redis)
@@ -91,9 +92,12 @@ async def market_health(redis=Depends(get_redis)) -> dict:
             "key_set": bool(os.getenv("TWELVE_DATA_API_KEY")),
         }
     except Exception as e:
+        logger.error("MARKET_HEALTH_ERROR: %s\n%s", str(e), _tb.format_exc())
         return {
             "status": "error",
             "error": str(e),
             "traceback": traceback.format_exc(),
         }
+
+
 
