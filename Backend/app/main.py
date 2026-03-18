@@ -1163,9 +1163,10 @@ try:
         ErrorTrackingMiddleware,
         MetricsMiddleware,
     )
-    app.add_middleware(MetricsMiddleware)
-    app.add_middleware(ErrorTrackingMiddleware)
-    app.add_middleware(DistributedTracingMiddleware)
+    # Observability middleware disabled pending fix
+    # app.add_middleware(MetricsMiddleware)
+    # app.add_middleware(ErrorTrackingMiddleware)
+    # app.add_middleware(DistributedTracingMiddleware)
 except Exception as exc:
     logger.warning(f"[WARN] Could not load observability middleware: {exc}")
 
@@ -1272,5 +1273,6 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+
 
 
