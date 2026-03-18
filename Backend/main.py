@@ -6,6 +6,7 @@ Use Backend/app/main.py as the single source of truth.
 import os
 from fastapi import FastAPI
 from app.main import app as _app
+from app.market_routes import router as market_router
 
 init_sentry()
 app: FastAPI = _app

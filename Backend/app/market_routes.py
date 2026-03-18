@@ -16,6 +16,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 from app.services.market_data_service import (
     MarketPricesResponse,
@@ -26,7 +27,7 @@ from app.services.market_data_service import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/market", tags=["Market Data"])
+router = APIRouter(prefix="/api/v1/market", tags=["Market Data"])
 
 
 async def get_redis(request: Request):
@@ -78,11 +79,21 @@ async def get_supported_instruments() -> dict:
 
 @router.get("/health", summary="Market data health check")
 async def market_health(redis=Depends(get_redis)) -> dict:
-    result = await get_market_prices(pairs=["EUR_USD"], redis_client=redis)
-    ok = bool(result.prices) and result.source != "error_fallback"
-    return {
-        "status": "ok" if ok else "degraded",
-        "source": result.source,
-        "cached": result.cached,
-        "price_count": len(result.prices),
-    }
+    import os, traceback
+    try:
+        result = await get_market_prices(pairs=["EUR_USD"], redis_client=redis)
+        ok = bool(result.prices) and result.source != "error_fallback"
+        return {
+            "status": "ok" if ok else "degraded",
+            "source": result.source,
+            "cached": result.cached,
+            "price_count": len(result.prices),
+            "key_set": bool(os.getenv("TWELVE_DATA_API_KEY")),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
+

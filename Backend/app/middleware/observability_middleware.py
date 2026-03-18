@@ -9,7 +9,7 @@ import time
 from typing import Callable, Optional
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 
 from app.services.observability import (
     TraceContext,
@@ -26,7 +26,6 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable
     ) -> Response:
-        # Extract trace context from headers or create new
         trace_id = request.headers.get(
             "x-trace-id",
             request.headers.get("X-Trace-ID")
@@ -40,57 +39,55 @@ class DistributedTracingMiddleware(BaseHTTPMiddleware):
         if parent_span_id:
             trace_ctx.parent_span_id = parent_span_id
 
-        # Add request tags
         trace_ctx.add_tag("http.method", request.method)
         trace_ctx.add_tag("http.path", request.url.path)
         trace_ctx.add_tag("http.host", request.url.hostname)
 
-        # Set in context
         set_trace_context(trace_ctx)
 
-        # Process request
         start_time = time.monotonic()
+        response: Optional[Response] = None
+
         try:
             response = await call_next(request)
+            return response
         except Exception as exc:
-            # Log exception
             trace_ctx.add_log(
                 f"Request failed: {exc}",
                 level="error",
                 exception_type=type(exc).__name__
             )
-            raise
+            response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+            return response
         finally:
-            # Calculate latency
             duration_ms = (time.monotonic() - start_time) * 1000
-            trace_ctx.add_tag("http.status_code", response.status_code)
+            status = getattr(response, "status_code", 500)
+
+            trace_ctx.add_tag("http.status_code", status)
             trace_ctx.add_tag("http.duration_ms", duration_ms)
 
-            # Record metrics
             endpoint = f"{request.method} {request.url.path}"
             metrics_collector.record_request(
                 endpoint=endpoint,
                 latency_ms=duration_ms,
-                status=response.status_code
+                status=status,
             )
 
-            # Check for anomalies
             anomaly = anomaly_detector.record_latency(duration_ms)
             if anomaly:
                 trace_ctx.add_log(anomaly, level="warning")
 
-            error_anomaly = anomaly_detector.record_error(
-                1 if response.status_code >= 400 else 0
-            )
+            error_anomaly = anomaly_detector.record_error(1 if status >= 400 else 0)
             if error_anomaly:
                 trace_ctx.add_log(error_anomaly, level="warning")
 
-        # Add trace headers to response
-        headers = trace_ctx.to_headers()
-        for key, value in headers.items():
-            response.headers[key] = value
-
-        return response
+            if response is not None:
+                headers = trace_ctx.to_headers()
+                for key, value in headers.items():
+                    try:
+                        response.headers[key] = value
+                    except Exception:
+                        pass
 
 
 class ErrorTrackingMiddleware(BaseHTTPMiddleware):
@@ -99,21 +96,22 @@ class ErrorTrackingMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable
     ) -> Response:
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
-        # Track 4xx and 5xx errors
-        if response.status_code >= 400:
+        if getattr(response, "status_code", 500) >= 400:
             trace_ctx = get_trace_context()
-
+            status = getattr(response, "status_code", 500)
             error_info = {
-                "status": response.status_code,
+                "status": status,
                 "method": request.method,
                 "path": request.url.path,
                 "timestamp": time.time(),
             }
-
             trace_ctx.add_log(
-                f"Error {response.status_code}: {request.method} {request.url.path}",
+                f"Error {status}: {request.method} {request.url.path}",
                 level="error",
                 **error_info
             )
@@ -127,13 +125,15 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable
     ) -> Response:
-        # Record cache metrics if headers present
         if request.headers.get("x-cache") == "HIT":
             metrics_collector.record_cache_hit()
         else:
             metrics_collector.record_cache_miss()
 
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
         return response
 
@@ -144,13 +144,15 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable
     ) -> Response:
-        # Extract user info if authenticated
         auth_header = request.headers.get("authorization")
         if auth_header:
             trace_ctx = get_trace_context()
             trace_ctx.add_tag("auth.present", True)
 
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
         return response
 
@@ -159,11 +161,9 @@ def inject_trace_context_headers(
     response_data: dict,
     trace_ctx: Optional[TraceContext] = None
 ) -> dict:
-    """Inject trace context into response body for debugging."""
     if trace_ctx is None:
         trace_ctx = get_trace_context()
 
-    # Add trace info to response in debug mode
     response_data["_trace"] = {
         "trace_id": trace_ctx.trace_id,
         "span_id": trace_ctx.span_id,

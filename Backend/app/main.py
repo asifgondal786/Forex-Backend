@@ -773,6 +773,7 @@ async def api_response_envelope_middleware(request: Request, call_next):
     if (
         not path.startswith("/api")
         or path.startswith("/api/ws")
+        or path.startswith("/api/v1/market")
         or request.method == "OPTIONS"
         or response.status_code >= 400
     ):
@@ -881,6 +882,7 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/market/prices",
     "/api/v1/market/health",
     "/api/v1/market/supported",
+    "/api/v1/market/debug",
 }
 
 @app.middleware("http")
@@ -1188,7 +1190,6 @@ _v1.include_router(auth_status_router)
 _v1.include_router(header_router)
 _v1.include_router(notifications_router)
 _v1.include_router(settings_router)
-_v1.include_router(market_router)
 if AI_ROUTES_AVAILABLE:
     _v1.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
@@ -1208,7 +1209,7 @@ if AI_PROXY_AVAILABLE:
 
 # Mount v1 router — all /api/* routes become /api/v1/*
 app.include_router(_v1)
-app.include_router(router, prefix="/api/v1")
+app.include_router(market_router)
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
