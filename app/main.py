@@ -846,6 +846,7 @@ async def security_headers_middleware(request: Request, call_next):
 _runtime_config = get_config()
 _rate_limit_enabled = _runtime_config.security.rate_limit_enabled
 _rate_limit_max = _runtime_config.security.rate_limit_max
+_rate_limit_store: dict = {}
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json", "/redoc"}
@@ -863,6 +864,7 @@ def _normalize_middleware_path(path: str) -> str:
 
 _auth_rate_limit_enabled = _runtime_config.security.auth_rate_limit_enabled
 _auth_rate_limit_max = _runtime_config.security.auth_rate_limit_max
+_auth_rate_limit_store: dict = {}
 _auth_rate_limit_window = _runtime_config.security.auth_rate_limit_window_seconds
 _auth_global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _auth_rate_limited_paths = {
@@ -1273,6 +1275,9 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+
+
+
 
 
 
