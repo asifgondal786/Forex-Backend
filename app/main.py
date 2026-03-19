@@ -1163,7 +1163,7 @@ try:
         ErrorTrackingMiddleware,
         MetricsMiddleware,
     )
-    # Observability middleware disabled pending fix
+    # Observability middleware temporarily disabled
     # app.add_middleware(MetricsMiddleware)
     # app.add_middleware(ErrorTrackingMiddleware)
     # app.add_middleware(DistributedTracingMiddleware)
