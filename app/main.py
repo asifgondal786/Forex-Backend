@@ -1,4 +1,5 @@
 from app.market_routes import router as market_router
+from app.signal_routes import router as signal_router
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -1213,6 +1214,7 @@ if AI_PROXY_AVAILABLE:
 # Mount v1 router — all /api/* routes become /api/v1/*
 app.include_router(_v1)
 app.include_router(market_router)
+app.include_router(signal_router)
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
@@ -1275,6 +1277,8 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+
+
 
 
 
