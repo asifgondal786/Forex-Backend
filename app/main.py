@@ -983,6 +983,8 @@ async def rate_limit_middleware(request: Request, call_next):
     client_host = request.client.host if request.client else "unknown"
     now = time.time()
     window_start = now - _rate_limit_window
+    if client_host not in _rate_limit_store:
+        _rate_limit_store[client_host] = collections.deque()
     bucket = _rate_limit_store[client_host]
     while bucket and bucket[0] <= window_start:
         bucket.popleft()
