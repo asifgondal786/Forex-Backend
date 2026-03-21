@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
@@ -16,6 +17,8 @@ class _ChartScreenState extends State<ChartScreen> {
   final List<String> _pairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
   static bool _viewRegistered = false;
   web.HTMLIFrameElement? _iframe;
+  bool _iframeReady = false;
+  List<dynamic>? _pendingCandles;
 
   @override
   void initState() {
@@ -37,6 +40,17 @@ class _ChartScreenState extends State<ChartScreen> {
       ..style.border = 'none'
       ..style.backgroundColor = '#0D1117';
 
+    // Listen for ready signal from iframe
+    web.window.addEventListener('message', ((web.MessageEvent e) {
+      if (e.data.toString() == 'CHART_READY') {
+        _iframeReady = true;
+        if (_pendingCandles != null) {
+          _postCandles(_pendingCandles!);
+          _pendingCandles = null;
+        }
+      }
+    }).toJS);
+
     ui_web.platformViewRegistry.registerViewFactory(
       'tajir-chart',
       (int viewId) => _iframe!,
@@ -48,7 +62,7 @@ class _ChartScreenState extends State<ChartScreen> {
 <html>
 <head>
 <style>
-  body { margin:0; background:#0D1117; }
+  body { margin:0; background:#0D1117; overflow:hidden; }
   #chart { width:100vw; height:100vh; }
 </style>
 <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
@@ -76,16 +90,31 @@ class _ChartScreenState extends State<ChartScreen> {
       series.setData(e.data.candles);
     }
   });
+  // Signal parent that chart is ready
+  window.parent.postMessage("CHART_READY", "*");
 </script>
 </body>
 </html>''';
   }
 
+  void _postCandles(List<dynamic> candles) {
+    final msg = '{"type":"RENDER_CHART","candles":${jsonEncode(candles)}}';
+    _iframe?.contentWindow?.postMessage(msg.toJS, '*'.toJS);
+  }
+
   void _renderChart(List<dynamic> candles) {
-    _iframe?.contentWindow?.postMessage(
-      '{"type":"RENDER_CHART","candles":${jsonEncode(candles)}}'.toJS,
-      '*'.toJS,
-    );
+    if (_iframeReady) {
+      _postCandles(candles);
+    } else {
+      _pendingCandles = candles;
+      // Fallback: force send after 2s if CHART_READY never fires
+      Timer(const Duration(seconds: 2), () {
+        if (_pendingCandles != null) {
+          _postCandles(_pendingCandles!);
+          _pendingCandles = null;
+        }
+      });
+    }
   }
 
   @override
