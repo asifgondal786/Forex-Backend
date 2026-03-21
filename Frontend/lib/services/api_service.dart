@@ -936,6 +936,23 @@ class ApiService {
 
   // ========== FOREX DATA ENDPOINTS ==========
 
+  // ========== CHART ENDPOINTS ==========
+  Future<Map<String, dynamic>> fetchOHLCData({
+    String pair = 'EUR/USD',
+    String interval = '1h',
+    int outputsize = 100,
+  }) async {
+    try {
+      final uri = Uri.parse(
+          '$baseUrl$apiV1/market/ohlc?pair=${Uri.encodeComponent(pair)}&interval=$interval&outputsize=$outputsize');
+      final response = await _client.get(uri).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error fetching OHLC data: $e');
+      return {'values': []};
+    }
+  }
+
   // ========== SIGNALS & NEWS ENDPOINTS ==========
   Future<List<Map<String, dynamic>>> fetchLiveSignals({
     List<String> pairs = const ['EUR_USD', 'GBP_USD', 'USD_JPY'],

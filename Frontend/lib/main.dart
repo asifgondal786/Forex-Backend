@@ -20,6 +20,7 @@ import 'providers/account_connection_provider.dart';
 import 'providers/agent_orchestrator_provider.dart';
 import 'providers/market_watch_provider.dart';
 import 'providers/trade_signals_provider.dart';
+import 'providers/chart_provider.dart';
 import 'providers/news_events_provider.dart';
 import 'core/utils/runtime_url_resolver.dart';
 import 'helpers/mock_data_helper.dart';
@@ -121,6 +122,7 @@ class ForexCompanionApp extends StatelessWidget {
 
         // ── Mode-specific live data providers ─────────────────────────
         ChangeNotifierProvider(create: (_) => MarketWatchProvider()..init()),
+        ChangeNotifierProvider(create: (ctx) => ChartProvider(ctx.read<ApiService>())),
         ChangeNotifierProvider(create: (ctx) => TradeSignalsProvider(ctx.read<ApiService>())),
         ChangeNotifierProvider(create: (ctx) => NewsEventsProvider(ctx.read<ApiService>())),
 
