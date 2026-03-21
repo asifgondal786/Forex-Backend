@@ -1,102 +1,103 @@
-﻿"""
-Backend/app/news_routes.py
-
-Task 10 - Real News Feed + Economic Calendar + Macro Shield
-Exposes existing market_intelligence_service and macro_event_service via API.
-
-Endpoints:
-  GET /api/v1/news/feed          - live articles with sentiment from 20+ sources
-  GET /api/v1/news/events        - economic calendar events (FOMC/CPI/NFP)
-  GET /api/v1/news/macro-shield  - current macro shield status
-  GET /api/v1/news/health        - service health check
 """
-
+app/news_routes.py
+News feed, economic calendar, and macro shield endpoints.
+Phase 3: /news/events and /news/macro-shield now use live ForexFactory data.
+"""
 import logging
 from typing import Optional
-from fastapi import APIRouter, Query, Request
-from app.services.market_intelligence_service import MarketIntelligenceService
+from fastapi import APIRouter, Query
+from app.services.market_intelligence_service import market_intelligence_service
 from app.services.macro_event_service import macro_event_service
+from app.services.forex_factory_service import forex_factory_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/news", tags=["News & Events"])
 
-_intelligence = MarketIntelligenceService()
-
 
 @router.get("/feed", summary="Live forex news feed with sentiment")
 async def get_news_feed(
-    pair: Optional[str] = Query(default="EUR/USD", description="Currency pair e.g. EUR/USD"),
-    limit: Optional[int] = Query(default=3, description="Max headlines per source"),
+    pair: Optional[str] = Query(default="EUR/USD"),
 ) -> dict:
     try:
-        report = await _intelligence.build_deep_study(
-            pair=pair or "EUR/USD",
-            max_headlines_per_source=min(limit or 3, 5),
+        result = await market_intelligence_service.get_market_intelligence(
+            pair=pair or "EUR/USD"
         )
-        return {
-            "status": "ok",
-            "pair": report.get("pair"),
-            "sentiment_score": report.get("sentiment_score"),
-            "consensus_score": report.get("consensus_score"),
-            "confidence_band": report.get("confidence_band"),
-            "recommendation": report.get("recommendation"),
-            "top_headlines": report.get("top_headlines", []),
-            "source_coverage": report.get("source_coverage"),
-            "generated_at": report.get("generated_at"),
-            "cached": report.get("cached", False),
-        }
+        return result
     except Exception as e:
-        logger.exception("Error fetching news feed")
-        return {"status": "error", "error": str(e), "top_headlines": []}
+        logger.exception("News feed error")
+        return {"error": str(e), "top_headlines": [], "status": "error"}
 
 
-@router.get("/events", summary="Economic calendar events")
+@router.get("/events", summary="Live economic calendar from ForexFactory")
 async def get_economic_events(
-    hours: Optional[int] = Query(default=24, description="Look-ahead window in hours"),
-    high_impact_only: Optional[bool] = Query(default=True, description="Filter to high impact only"),
+    hours: int = Query(default=48, ge=1, le=168),
+    high_impact_only: bool = Query(default=False),
 ) -> dict:
     try:
-        events = macro_event_service.get_upcoming_events(
-            window_hours=hours or 24,
-            only_high_impact=high_impact_only if high_impact_only is not None else True,
+        # Phase 3: live ForexFactory feed with static fallback
+        events = await forex_factory_service.get_events(
+            hours=hours,
+            high_impact_only=high_impact_only,
         )
         return {
-            "status": "ok",
             "events": events,
             "count": len(events),
-            "window_hours": hours,
-            "high_impact_only": high_impact_only,
+            "hours_window": hours,
+            "source": "forexfactory_live",
         }
     except Exception as e:
-        logger.exception("Error fetching economic events")
-        return {"status": "error", "error": str(e), "events": []}
+        logger.exception("Economic events error")
+        # Hard fallback to static service
+        events = macro_event_service.get_upcoming_events(
+            window_hours=hours,
+            only_high_impact=high_impact_only,
+        )
+        return {
+            "events": events,
+            "count": len(events),
+            "hours_window": hours,
+            "source": "static_fallback",
+        }
 
 
 @router.get("/macro-shield", summary="Macro Event Shield status")
 async def get_macro_shield(
-    user_id: Optional[str] = Query(default="anonymous"),
+    pre_minutes: int = Query(default=30, ge=5, le=120),
 ) -> dict:
     try:
-        shield = macro_event_service.compute_shield_for_user(user_id or "anonymous")
+        # Phase 3: live shield using ForexFactory
+        shield = await forex_factory_service.is_shield_active(
+            pre_minutes=pre_minutes
+        )
+        # Enrich with next 3 high-impact events for Flutter countdown
+        upcoming = await forex_factory_service.get_events(
+            hours=72, high_impact_only=True
+        )
+        shield["upcoming_high_impact"] = upcoming[:3]
+        shield["pre_minutes"] = pre_minutes
+        return shield
+    except Exception as e:
+        logger.exception("Macro shield error")
+        return {
+            "shield_active": False,
+            "reason": f"Shield check error: {e}",
+            "next_event": None,
+            "minutes_until": None,
+            "upcoming_high_impact": [],
+        }
+
+
+@router.get("/health", summary="News service health")
+async def news_health() -> dict:
+    try:
+        next_event = await forex_factory_service.get_next_high_impact()
+        cached_count = len(forex_factory_service._cache)
         return {
             "status": "ok",
-            "shield_active": shield.get("shield_active", False),
-            "reason": shield.get("reason"),
-            "next_event": shield.get("next_event"),
-            "pre_event_minutes": macro_event_service.pre_event_minutes,
-            "post_event_minutes": macro_event_service.post_event_minutes,
+            "source": "forexfactory_live",
+            "cached_events": cached_count,
+            "next_high_impact": next_event.get("title") if next_event else None,
+            "macro_events_loaded": cached_count,
         }
     except Exception as e:
-        logger.exception("Error computing macro shield")
-        return {"status": "error", "error": str(e), "shield_active": False}
-
-
-@router.get("/health", summary="News service health check")
-async def news_health() -> dict:
-    import os
-    return {
-        "status": "ok",
-        "news_api_key_set": bool(os.getenv("NEWS_API_KEY")),
-        "macro_events_loaded": len(macro_event_service._events),
-        "intelligence_service": "active",
-    }
+        return {"status": "error", "error": str(e)}
