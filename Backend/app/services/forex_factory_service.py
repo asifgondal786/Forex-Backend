@@ -1,6 +1,6 @@
 """
 app/services/forex_factory_service.py
-Live economic calendar scraper — replaces static MacroEventService template.
+Live economic calendar scraper ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â replaces static MacroEventService template.
 Scrapes forexfactory.com/calendar.json (public JSON endpoint).
 Falls back to static schedule if network is unavailable.
 """
@@ -32,15 +32,17 @@ _HIGH_IMPACT_KEYWORDS = {
 class ForexFactoryEvent:
     def __init__(self, raw: Dict) -> None:
         self.title: str = str(raw.get("title") or "")
-        self.country: str = str(raw.get("country") or "")
-        self.currency: str = _country_to_currency(self.country)
+        # Real FF format: "country" field IS the currency code (e.g. "USD", "GBP")
+        country_raw = str(raw.get("country") or "")
+        self.country: str = country_raw
+        self.currency: str = country_raw if len(country_raw) == 3 else _country_to_currency(country_raw)
         self.impact: str = _normalize_impact(str(raw.get("impact") or ""))
         self.forecast: Optional[str] = raw.get("forecast") or None
         self.previous: Optional[str] = raw.get("previous") or None
         self.actual: Optional[str] = raw.get("actual") or None
         self.category: str = _categorize(self.title)
 
-        # Parse scheduled time
+        # Real FF format: "date" is full ISO datetime e.g. "2026-03-18T14:00:00-04:00"
         raw_date = str(raw.get("date") or "")
         raw_time = str(raw.get("time") or "")
         self.scheduled_at: datetime = _parse_ff_datetime(raw_date, raw_time)
@@ -132,7 +134,7 @@ class ForexFactoryService:
         return {
             "shield_active": shield_active,
             "reason": (
-                f"Shield active — {next_event['title']} in {minutes_until}m"
+                f"Shield active ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {next_event['title']} in {minutes_until}m"
                 if shield_active
                 else f"Next: {next_event['title']} in {max(minutes_until, 0)}m"
             ),
@@ -152,20 +154,28 @@ class ForexFactoryService:
 
     async def _fetch_and_cache(self) -> None:
         events: List[ForexFactoryEvent] = []
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://www.forexfactory.com/",
+        }
         for url in [_FF_URL, _FF_NEXT_URL]:
-            try:
-                async with httpx.AsyncClient(timeout=10) as client:
-                    resp = await client.get(url)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if isinstance(data, list):
-                            events.extend(
-                                ForexFactoryEvent(item)
-                                for item in data
-                                if isinstance(item, dict)
-                            )
-            except Exception as exc:
-                logger.warning("ForexFactory fetch failed for %s: %s", url, exc)
+                try:
+                    async with httpx.AsyncClient(timeout=15, headers=headers, follow_redirects=True) as client:
+                        resp = await client.get(url)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            # Handle both {"value": [...]} and [...] formats
+                            if isinstance(data, dict) and "value" in data:
+                                data = data["value"]
+                            if isinstance(data, list):
+                                events.extend(
+                                    ForexFactoryEvent(item)
+                                    for item in data
+                                    if isinstance(item, dict)
+                                )
+                except Exception as exc:
+                    logger.warning("ForexFactory fetch failed for %s: %s", url, exc)
 
         if events:
             self._cache = events
@@ -180,7 +190,7 @@ class ForexFactoryService:
                 self._cache_time = datetime.now(timezone.utc)
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Helpers ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
 def _normalize_impact(raw: str) -> str:
     r = raw.lower().strip()
