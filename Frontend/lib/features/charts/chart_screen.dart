@@ -1,15 +1,10 @@
 import 'dart:convert';
+import 'dart:js_interop';
+import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:js_interop';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:ui_web' as ui_web;
-// ignore: avoid_web_libraries_in_flutter
 import 'package:web/web.dart' as web;
 import '../../providers/chart_provider.dart';
-
-@JS('renderTajirChart')
-external void renderTajirChart(String json);
 
 class ChartScreen extends StatefulWidget {
   const ChartScreen({super.key});
@@ -19,35 +14,78 @@ class ChartScreen extends StatefulWidget {
 
 class _ChartScreenState extends State<ChartScreen> {
   final List<String> _pairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
-  bool _viewRegistered = false;
+  static bool _viewRegistered = false;
+  web.HTMLIFrameElement? _iframe;
 
   @override
   void initState() {
     super.initState();
-    _registerView();
+    _registerIframe();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChartProvider>().fetchCandles();
     });
   }
 
-  void _registerView() {
+  void _registerIframe() {
     if (_viewRegistered) return;
     _viewRegistered = true;
+    _iframe = web.HTMLIFrameElement()
+      ..id = 'tajir-chart-iframe'
+      ..srcdoc = _chartHtml().toJS
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.border = 'none'
+      ..style.backgroundColor = '#0D1117';
+
     ui_web.platformViewRegistry.registerViewFactory(
       'tajir-chart',
-      (int viewId) {
-        final div = web.HTMLDivElement();
-        div.id = 'tajir-chart-container';
-        div.style.width = '100%';
-        div.style.height = '100%';
-        div.style.backgroundColor = '#0D1117';
-        return div;
-      },
+      (int viewId) => _iframe!,
     );
   }
 
+  String _chartHtml() {
+    return '''<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin:0; background:#0D1117; }
+  #chart { width:100vw; height:100vh; }
+</style>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+<div id="chart"></div>
+<script>
+  var chart = LightweightCharts.createChart(document.getElementById("chart"), {
+    width: window.innerWidth, height: window.innerHeight,
+    layout: { background: { color: "#0D1117" }, textColor: "#C9D1D9" },
+    grid: { vertLines: { color: "#21262D" }, horzLines: { color: "#21262D" } },
+    rightPriceScale: { borderColor: "#30363D" },
+    timeScale: { borderColor: "#30363D", timeVisible: true },
+  });
+  var series = chart.addCandlestickSeries({
+    upColor: "#00D4AA", downColor: "#FF4B4B",
+    borderUpColor: "#00D4AA", borderDownColor: "#FF4B4B",
+    wickUpColor: "#00D4AA", wickDownColor: "#FF4B4B",
+  });
+  window.addEventListener("resize", function() {
+    chart.applyOptions({ width: window.innerWidth, height: window.innerHeight });
+  });
+  window.addEventListener("message", function(e) {
+    if (e.data && e.data.type === "RENDER_CHART") {
+      series.setData(e.data.candles);
+    }
+  });
+</script>
+</body>
+</html>''';
+  }
+
   void _renderChart(List<dynamic> candles) {
-    renderTajirChart(jsonEncode(candles));
+    _iframe?.contentWindow?.postMessage(
+      '{"type":"RENDER_CHART","candles":${jsonEncode(candles)}}'.toJS,
+      '*'.toJS,
+    );
   }
 
   @override
@@ -56,11 +94,8 @@ class _ChartScreenState extends State<ChartScreen> {
 
     if (!provider.isLoading && provider.candles.isNotEmpty) {
       final raw = provider.candles.map((c) => {
-        'time': c.time,
-        'open': c.open,
-        'high': c.high,
-        'low': c.low,
-        'close': c.close,
+        'time': c.time, 'open': c.open,
+        'high': c.high, 'low': c.low, 'close': c.close,
       }).toList();
       WidgetsBinding.instance.addPostFrameCallback((_) => _renderChart(raw));
     }
@@ -93,14 +128,8 @@ class _ChartScreenState extends State<ChartScreen> {
               padding: const EdgeInsets.all(8),
               child: Text(provider.error!, style: const TextStyle(color: Colors.red)),
             ),
-          Expanded(
-            child: Stack(
-              children: [
-                const HtmlElementView(viewType: 'tajir-chart'),
-                if (provider.isLoading)
-                  const Center(child: CircularProgressIndicator(color: Color(0xFF00D4AA))),
-              ],
-            ),
+          const Expanded(
+            child: HtmlElementView(viewType: 'tajir-chart'),
           ),
         ],
       ),

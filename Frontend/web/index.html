@@ -83,6 +83,14 @@
       });
     }
     registerTajirChartView();
+
+    // Chart communication via postMessage
+    window.addEventListener("message", function(e) {
+      if (e.data && e.data.type === "RENDER_CHART") {
+        renderTajirChart(JSON.stringify(e.data.candles));
+      }
+    });
   </script>
 </body>
 </html>
+
