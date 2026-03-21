@@ -1,4 +1,4 @@
-﻿"""Shared Gemini client wrapper used across backend AI modules."""
+﻿"""Shared Gemini client wrapper - uses google-genai (new SDK)."""
 
 from __future__ import annotations
 
@@ -8,10 +8,12 @@ import os
 from typing import Any, Optional
 
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
     GENAI_AVAILABLE = True
 except ImportError:
     genai = None
+    genai_types = None
     GENAI_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -34,33 +36,42 @@ def _extract_json_block(raw_text: str) -> str:
 
 
 class GeminiClient:
-    """Gemini client using google-generativeai SDK."""
+    """Gemini client using google-genai (new SDK >= 1.0.0)."""
 
     def __init__(self, api_key: Optional[str] = None):
         key = (api_key or os.getenv("GEMINI_API_KEY") or "").strip()
         self.api_key = key
-        self._available = bool(key) and GENAI_AVAILABLE
-        if self._available:
-            genai.configure(api_key=key)
+        self._client = None
+        self._available = False
+        if key and GENAI_AVAILABLE:
+            try:
+                self._client = genai.Client(api_key=key)
+                self._available = True
+            except Exception as e:
+                logger.error("GeminiClient init failed: %s", e)
 
     @property
     def available(self) -> bool:
-        # Lazy re-check in case key was missing at import time
         if not self._available:
             key = os.getenv("GEMINI_API_KEY", "").strip()
-            if key and GENAI_AVAILABLE:
-                self.api_key = key
-                self._available = True
-                genai.configure(api_key=key)
+            if key and GENAI_AVAILABLE and not self._client:
+                try:
+                    self._client = genai.Client(api_key=key)
+                    self.api_key = key
+                    self._available = True
+                except Exception as e:
+                    logger.error("GeminiClient lazy init failed: %s", e)
         return self._available
 
     def generate_text(self, *, model_name: str, prompt: str) -> str:
         if not self.available:
-            logger.warning("GeminiClient: not available (key missing or package not installed)")
+            logger.warning("GeminiClient: not available")
             return ""
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
+            response = self._client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
             return (getattr(response, "text", "") or "").strip()
         except Exception as e:
             logger.error("GeminiClient.generate_text failed: %s", e, exc_info=True)
