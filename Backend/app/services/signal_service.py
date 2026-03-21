@@ -1,4 +1,4 @@
-﻿"""
+"""
 Backend/app/services/signal_service.py
 
 Task 9 - Real Trade Signals
@@ -12,7 +12,7 @@ import httpx
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from app.services.market_data_service import get_market_prices
-from app.ai.gemini_client import gemini_client
+from app.ai.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,8 @@ async def generate_signals(
 
         # Step 3: Generate signal via Gemini
         prompt = _build_gemini_prompt(pair, price, headlines)
-        raw = gemini_client.generate_json(
+        _client = GeminiClient()
+        raw = _client.generate_json(
             model_name=GEMINI_MODEL,
             prompt=prompt,
             fallback={
@@ -199,3 +200,6 @@ async def generate_signals(
         logger.info("Signal generated: %s %s (confidence=%.2f)", signal.action, pair, signal.confidence)
 
     return SignalResponse(signals=signals, generated_at=now_iso, pairs=pairs)
+
+
+

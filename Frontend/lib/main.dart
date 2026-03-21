@@ -121,8 +121,8 @@ class ForexCompanionApp extends StatelessWidget {
 
         // ── Mode-specific live data providers ─────────────────────────
         ChangeNotifierProvider(create: (_) => MarketWatchProvider()..init()),
-        ChangeNotifierProvider(create: (_) => TradeSignalsProvider()),
-        ChangeNotifierProvider(create: (_) => NewsEventsProvider()),
+        ChangeNotifierProvider(create: (ctx) => TradeSignalsProvider(ctx.read<ApiService>())),
+        ChangeNotifierProvider(create: (ctx) => NewsEventsProvider(ctx.read<ApiService>())),
 
         // ── Feature providers ─────────────────────────────────────────
         ChangeNotifierProvider(

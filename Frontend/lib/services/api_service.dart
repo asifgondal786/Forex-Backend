@@ -936,6 +936,52 @@ class ApiService {
 
   // ========== FOREX DATA ENDPOINTS ==========
 
+  // ========== SIGNALS & NEWS ENDPOINTS ==========
+  Future<List<Map<String, dynamic>>> fetchLiveSignals({
+    List<String> pairs = const ['EUR_USD', 'GBP_USD', 'USD_JPY'],
+  }) async {
+    try {
+      final pairsParam = pairs.join(',');
+      final uri = Uri.parse('$baseUrl$apiV1/signals/generate?pairs=$pairsParam');
+      final response = await _client.post(uri).timeout(_timeout);
+      final data = _handleResponse(response);
+      final signals = data['signals'] as List? ?? [];
+      return signals.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Error fetching live signals: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchNewsFeed({
+    String pair = 'EUR/USD',
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl$apiV1/news/feed?pair=${Uri.encodeComponent(pair)}');
+      final response = await _client.get(uri).timeout(_timeout);
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error fetching news feed: $e');
+      return {'top_headlines': [], 'status': 'error'};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchEconomicEvents({
+    int hours = 48,
+    bool highImpactOnly = false,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl$apiV1/news/events?hours=$hours&high_impact_only=$highImpactOnly');
+      final response = await _client.get(uri).timeout(_timeout);
+      final data = _handleResponse(response);
+      final events = data['events'] as List? ?? [];
+      return events.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Error fetching economic events: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> getForexRates({List<String>? pairs}) async {
     final normalizedPairs = _normalizePairs(pairs);
     try {
