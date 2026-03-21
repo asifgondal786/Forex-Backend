@@ -1,4 +1,4 @@
-﻿"""
+"""
 Backend/app/signal_routes.py
 
 Task 9 - Trade Signal Endpoints
@@ -49,6 +49,20 @@ async def generate_trade_signals(
     return result
 
 
+@router.get("/debug-gemini")
+async def debug_gemini() -> dict:
+    import subprocess, sys, os
+    result = subprocess.run([sys.executable, "-c", "from google import genai; print(genai.__version__)"], capture_output=True, text=True)
+    from app.ai.gemini_client import gemini_client
+    return {
+        "genai_version": result.stdout.strip(),
+        "genai_error": result.stderr.strip(),
+        "key_length": len(os.getenv("GEMINI_API_KEY", "")),
+        "key_preview": os.getenv("GEMINI_API_KEY", "")[:12] + "...",
+        "client_available": gemini_client.available,
+        "genai_available": result.returncode == 0,
+    }
+
 @router.get("/health", summary="Signal service health check")
 async def signals_health() -> dict:
     import os
@@ -59,3 +73,4 @@ async def signals_health() -> dict:
         "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
         "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
     }
+
