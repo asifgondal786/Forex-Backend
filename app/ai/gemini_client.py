@@ -48,7 +48,14 @@ class GeminiClient:
         return self._available
 
     def generate_text(self, *, model_name: str, prompt: str) -> str:
-        if not self.available:
+        # Re-read key lazily in case it was not set at import time
+        if not self._available:
+            key = os.getenv("GEMINI_API_KEY", "").strip()
+            if key and genai is not None:
+                self.api_key = key
+                self._client = genai.Client(api_key=key)
+                self._available = True
+        if not self._available:
             return ""
         response = self._client.models.generate_content(
             model=model_name,
@@ -79,4 +86,9 @@ class GeminiClient:
             return default_value
 
 
+def get_gemini_client() -> GeminiClient:
+    return GeminiClient()
+
 gemini_client = GeminiClient()
+
+
