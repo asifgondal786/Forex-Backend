@@ -52,16 +52,23 @@ async def generate_trade_signals(
 @router.get("/debug-gemini")
 async def debug_gemini() -> dict:
     import os
-    from app.ai.gemini_client import GeminiClient
-    client = GeminiClient()
-    result = client.generate_text(
-        model_name="gemini-2.0-flash",
-        prompt="Return only this exact JSON: {\"status\": \"ok\"}"
-    )
+    from google import genai
+    key = os.getenv("GEMINI_API_KEY", "")
+    error = ""
+    result = ""
+    try:
+        client = genai.Client(api_key=key)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents="Say hello",
+        )
+        result = str(response.text)
+    except Exception as e:
+        error = str(e)
     return {
-        "client_available": client.available,
-        "key_length": len(os.getenv("GEMINI_API_KEY", "")),
-        "raw_result": result,
+        "key_length": len(key),
+        "result": result,
+        "error": error,
         "success": bool(result),
     }
 
@@ -75,5 +82,6 @@ async def signals_health() -> dict:
         "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
         "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
     }
+
 
 
