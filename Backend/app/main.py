@@ -892,6 +892,7 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/market/health",
     "/api/v1/market/supported",
     "/api/v1/market/debug",
+    "/api/v1/market/ohlc",
     "/api/v1/signals/health",
     "/api/v1/signals/generate",
     "/api/v1/signals/debug-gemini",
