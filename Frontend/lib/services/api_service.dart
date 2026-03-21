@@ -367,7 +367,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/users/me'),
+            Uri.parse('$baseUrl$apiV1/users/me'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -388,7 +388,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .put(
-            Uri.parse('$baseUrl/api/users/me'),
+            Uri.parse('$baseUrl$apiV1/users/me'),
             headers: headers,
             body: json.encode(body),
           )
@@ -407,7 +407,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/header'),
+            Uri.parse('$baseUrl$apiV1/header'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -430,7 +430,7 @@ class ApiService {
   }) async {
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/notifications').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/notifications').replace(
         queryParameters: {
           'unread_only': unreadOnly.toString(),
           'limit': '$limit',
@@ -461,7 +461,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/notifications/$notificationId/read'),
+            Uri.parse('$baseUrl$apiV1/notifications/$notificationId/read'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -477,7 +477,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/notifications/preferences'),
+            Uri.parse('$baseUrl$apiV1/notifications/preferences'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -531,7 +531,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/notifications/preferences'),
+            Uri.parse('$baseUrl$apiV1/notifications/preferences'),
             headers: headers,
             body: json.encode(body),
           )
@@ -560,7 +560,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/notifications/send'),
+            Uri.parse('$baseUrl$apiV1/notifications/send'),
             headers: headers,
             body: json.encode(body),
           )
@@ -591,7 +591,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/notifications/autonomous-study'),
+            Uri.parse('$baseUrl$apiV1/notifications/autonomous-study'),
             headers: headers,
             body: json.encode(body),
           )
@@ -630,7 +630,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/notifications/autonomous-awareness'),
+            Uri.parse('$baseUrl$apiV1/notifications/autonomous-awareness'),
             headers: headers,
             body: json.encode(body),
           )
@@ -648,7 +648,7 @@ class ApiService {
   }) async {
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/notifications/deep-study').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/notifications/deep-study').replace(
         queryParameters: {
           'pair': pair.trim().toUpperCase(),
           'max_headlines_per_source': '$maxHeadlinesPerSource',
@@ -677,7 +677,7 @@ class ApiService {
   }) async {
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/notifications/digest').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/notifications/digest').replace(
         queryParameters: {'period': period},
       );
       final response =
@@ -696,7 +696,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/tasks/'),
+            Uri.parse('$baseUrl$apiV1/tasks/'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -723,7 +723,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/tasks/$taskId'),
+            Uri.parse('$baseUrl$apiV1/tasks/$taskId'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -756,7 +756,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/tasks/create'),
+            Uri.parse('$baseUrl$apiV1/tasks/create'),
             headers: headers,
             body: json.encode(body),
           )
@@ -779,7 +779,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/tasks/$taskId/stop'),
+            Uri.parse('$baseUrl$apiV1/tasks/$taskId/stop'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -795,7 +795,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/tasks/$taskId/pause'),
+            Uri.parse('$baseUrl$apiV1/tasks/$taskId/pause'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -810,7 +810,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/tasks/$taskId/resume'),
+            Uri.parse('$baseUrl$apiV1/tasks/$taskId/resume'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -825,7 +825,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .delete(
-            Uri.parse('$baseUrl/api/tasks/$taskId'),
+            Uri.parse('$baseUrl$apiV1/tasks/$taskId'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -842,7 +842,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/accounts/connections'),
+            Uri.parse('$baseUrl$apiV1/accounts/connections'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -873,7 +873,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/accounts/connect/forex'),
+            Uri.parse('$baseUrl$apiV1/accounts/connect/forex'),
             headers: headers,
             body: json.encode(body),
           )
@@ -898,7 +898,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/accounts/disconnect'),
+            Uri.parse('$baseUrl$apiV1/accounts/disconnect'),
             headers: headers,
             body: json.encode(body),
           )
@@ -916,7 +916,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/accounts/$accountId/balance'),
+            Uri.parse('$baseUrl$apiV1/accounts/$accountId/balance'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -1003,7 +1003,7 @@ class ApiService {
     final normalizedPairs = _normalizePairs(pairs);
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/forex/rates').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/forex/rates').replace(
         queryParameters: normalizedPairs.isEmpty
             ? null
             : {
@@ -1034,7 +1034,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/forex/news'),
+            Uri.parse('$baseUrl$apiV1/forex/news'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -1075,7 +1075,7 @@ class ApiService {
       final headers = await _buildHeaders();
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/forex/sentiment'),
+            Uri.parse('$baseUrl$apiV1/forex/sentiment'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -1103,7 +1103,7 @@ class ApiService {
         : normalizedPairs;
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/forex/signals').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/forex/signals').replace(
         queryParameters: targetPairs.isEmpty
             ? null
             : {
@@ -1254,7 +1254,7 @@ class ApiService {
     final normalizedHorizon = horizon.trim().toLowerCase();
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/forex/forecast').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/forex/forecast').replace(
         queryParameters: <String, String>{
           'pair': normalizedPair,
           'horizon': normalizedHorizon,
@@ -1303,7 +1303,7 @@ class ApiService {
       String command) async {
     try {
       final headers = await _buildHeaders();
-      final uri = Uri.parse('$baseUrl/api/advanced/nlp/parse-command').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/advanced/nlp/parse-command').replace(
         queryParameters: {'text': command},
       );
       final response = await _client
@@ -1330,7 +1330,7 @@ class ApiService {
       final userId = await _resolveUserId(headers: headers);
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/advanced/features/status?user_id=$userId'),
+            Uri.parse('$baseUrl$apiV1/advanced/features/status?user_id=$userId'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -1395,7 +1395,7 @@ class ApiService {
       final userId = await _resolveUserId(headers: headers);
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/advanced/security/dashboard/$userId'),
+            Uri.parse('$baseUrl$apiV1/advanced/security/dashboard/$userId'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -1412,7 +1412,7 @@ class ApiService {
       final userId = await _resolveUserId(headers: headers);
       final response = await _client
           .get(
-            Uri.parse('$baseUrl/api/advanced/autonomy/guardrails/$userId'),
+            Uri.parse('$baseUrl$apiV1/advanced/autonomy/guardrails/$userId'),
             headers: headers,
           )
           .timeout(_timeout);
@@ -1446,7 +1446,7 @@ class ApiService {
 
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/advanced/autonomy/guardrails/configure'),
+            Uri.parse('$baseUrl$apiV1/advanced/autonomy/guardrails/configure'),
             headers: headers,
             body: json.encode(body),
           )
@@ -1466,7 +1466,7 @@ class ApiService {
       final userId = await _resolveUserId(headers: headers);
       final response = await _client
           .post(
-            Uri.parse('$baseUrl/api/advanced/autonomy/explain-before-execute'),
+            Uri.parse('$baseUrl$apiV1/advanced/autonomy/explain-before-execute'),
             headers: headers,
             body: json.encode({
               'user_id': userId,
@@ -1488,7 +1488,7 @@ class ApiService {
     try {
       final headers = await _buildHeaders();
       final userId = await _resolveUserId(headers: headers);
-      final uri = Uri.parse('$baseUrl/api/advanced/risk/execute-trade').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/advanced/risk/execute-trade').replace(
         queryParameters: {
           'user_id': userId,
         },
@@ -1516,7 +1516,7 @@ class ApiService {
     try {
       final headers = await _buildHeaders();
       final userId = await _resolveUserId(headers: headers);
-      final uri = Uri.parse('$baseUrl/api/advanced/risk/kill-switch').replace(
+      final uri = Uri.parse('$baseUrl$apiV1/advanced/risk/kill-switch').replace(
         queryParameters: {
           'user_id': userId,
         },
@@ -1538,3 +1538,4 @@ class ApiService {
     _client.close();
   }
 }
+
