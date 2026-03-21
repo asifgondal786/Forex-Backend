@@ -33,6 +33,30 @@
   <title>Forex Companion</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    // Phase 7 - Web Speech API for Voice Copilot
+    window.isSpeechSupported = function() {
+      return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    };
+
+    window.startSpeechRecognition = function() {
+      return new Promise(function(resolve, reject) {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { reject('Speech not supported'); return; }
+        var recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = function(event) {
+          resolve(event.results[0][0].transcript);
+        };
+        recognition.onerror = function(event) {
+          reject(event.error);
+        };
+        recognition.start();
+      });
+    };
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

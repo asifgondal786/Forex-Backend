@@ -23,7 +23,7 @@ class ApiException implements Exception {
 class ApiService {
   // Backend URL - matches your backend port
   // Use --dart-define=API_BASE_URL=http://your.server:port for production.
-  /// API version prefix ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â all versioned endpoints use this path segment.
+  /// API version prefix ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â all versioned endpoints use this path segment.
   static const String apiV1 = '/api/v1';
 
   static const String _baseUrlFromDefine = String.fromEnvironment(
@@ -124,12 +124,12 @@ class ApiService {
     final filtered = <String, T>{};
     for (final pair in pairs) {
       if (rates.containsKey(pair)) {
-        filtered[pair] = rates[pair]!;        // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â added !
+        filtered[pair] = rates[pair]!;        // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â added !
         continue;
       }
       final compact = pair.replaceAll('/', '');
       if (rates.containsKey(compact)) {
-        filtered[compact] = rates[compact]!;  // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â added !
+        filtered[compact] = rates[compact]!;  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â added !
       }
     }
     return filtered.isNotEmpty ? filtered : rates;
@@ -1632,6 +1632,24 @@ class ApiService {
     }
   }
 
+
+  // ========== NLP VOICE COPILOT (Phase 7) ==========
+  Future<Map<String, dynamic>> parseNLPCommand({
+    required String text,
+    double accountBalance = 10000.0,
+  }) async {
+    try {
+      final body = {'text': text, 'account_balance': accountBalance};
+      final uri = Uri.parse('$baseUrl$apiV1/signals/nlp/parse');
+      final response = await _client
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: json.encode(body))
+          .timeout(const Duration(seconds: 10));
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('NLP parse error: $e');
+      return {'intent': 'CHAT', 'confidence': 0.0, 'response': null};
+    }
+  }
   // ========== PAPER TRADING ENDPOINTS ==========
   Future<Map<String, dynamic>> openPaperTrade({
     required String userId,
