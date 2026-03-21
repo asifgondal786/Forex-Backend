@@ -23,7 +23,7 @@ class ApiException implements Exception {
 class ApiService {
   // Backend URL - matches your backend port
   // Use --dart-define=API_BASE_URL=http://your.server:port for production.
-  /// API version prefix — all versioned endpoints use this path segment.
+  /// API version prefix â€” all versioned endpoints use this path segment.
   static const String apiV1 = '/api/v1';
 
   static const String _baseUrlFromDefine = String.fromEnvironment(
@@ -124,12 +124,12 @@ class ApiService {
     final filtered = <String, T>{};
     for (final pair in pairs) {
       if (rates.containsKey(pair)) {
-        filtered[pair] = rates[pair]!;        // ← added !
+        filtered[pair] = rates[pair]!;        // â† added !
         continue;
       }
       final compact = pair.replaceAll('/', '');
       if (rates.containsKey(compact)) {
-        filtered[compact] = rates[compact]!;  // ← added !
+        filtered[compact] = rates[compact]!;  // â† added !
       }
     }
     return filtered.isNotEmpty ? filtered : rates;
@@ -1534,6 +1534,37 @@ class ApiService {
     }
   }
 
+
+  // ========== RISK SIMULATOR ENDPOINTS ==========
+  Future<Map<String, dynamic>> fetchRiskSimulation({
+    double winRate = 0.55,
+    double avgWin = 50.0,
+    double avgLoss = 30.0,
+    int numTrades = 100,
+    double startingBalance = 10000.0,
+    int simulations = 1000,
+  }) async {
+    try {
+      final body = {
+        'win_rate': winRate,
+        'avg_win': avgWin,
+        'avg_loss': avgLoss,
+        'num_trades': numTrades,
+        'starting_balance': startingBalance,
+        'simulations': simulations,
+      };
+      final uri = Uri.parse('$baseUrl$apiV1/risk/simulate');
+      final response = await _client
+          .post(uri,
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode(body))
+          .timeout(const Duration(seconds: 30));
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('Error running risk simulation: $e');
+      throw ApiException('Error running risk simulation: $e');
+    }
+  }
   void dispose() {
     _client.close();
   }

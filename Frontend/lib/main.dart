@@ -22,6 +22,7 @@ import 'providers/market_watch_provider.dart';
 import 'providers/trade_signals_provider.dart';
 import 'providers/chart_provider.dart';
 import 'providers/news_events_provider.dart';
+import 'providers/risk_provider.dart';
 import 'core/utils/runtime_url_resolver.dart';
 import 'helpers/mock_data_helper.dart';
 
@@ -99,7 +100,7 @@ class ForexCompanionApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
-        // ── Services ─────────────────────────────────────────────────
+        // â”€â”€ Services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Provider<ApiService>.value(value: apiService),
         if (firebaseService != null)
           Provider<FirebaseService>.value(value: firebaseService),
@@ -108,25 +109,26 @@ class ForexCompanionApp extends StatelessWidget {
           dispose: (_, service) => service.dispose(),
         ),
 
-        // ── Core providers ────────────────────────────────────────────
+        // â”€â”€ Core providers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ChangeNotifierProvider(create: (_) => ModeProvider()..load()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
 
-        // ── Quick actions (loads persisted dismiss state on boot) ──────
+        // â”€â”€ Quick actions (loads persisted dismiss state on boot) â”€â”€â”€â”€â”€â”€
         ChangeNotifierProvider(
           create: (_) => QuickActionsProvider()..load(),
         ),
 
-        // ── Custom setup preferences ──────────────────────────────────
+        // â”€â”€ Custom setup preferences â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ChangeNotifierProvider(create: (_) => CustomSetupProvider()),
 
-        // ── Mode-specific live data providers ─────────────────────────
+        // â”€â”€ Mode-specific live data providers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ChangeNotifierProvider(create: (_) => MarketWatchProvider()..init()),
         ChangeNotifierProvider(create: (ctx) => ChartProvider(ctx.read<ApiService>())),
         ChangeNotifierProvider(create: (ctx) => TradeSignalsProvider(ctx.read<ApiService>())),
         ChangeNotifierProvider(create: (ctx) => NewsEventsProvider(ctx.read<ApiService>())),
+        ChangeNotifierProvider(create: (ctx) => RiskProvider(ctx.read<ApiService>())),
 
-        // ── Feature providers ─────────────────────────────────────────
+        // â”€â”€ Feature providers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ChangeNotifierProvider(
           create: (_) {
             final provider = TaskProvider(

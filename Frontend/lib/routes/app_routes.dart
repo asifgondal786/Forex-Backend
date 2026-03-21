@@ -17,6 +17,7 @@ import '../features/settings/custom_setup_screen.dart';
 import '../features/settings/security_center_screen.dart';
 import '../features/charts/chart_screen.dart';
 import '../features/admin/user_admin_dashboard_screen.dart';
+import '../features/risk/risk_simulator_screen.dart';
 
 class AppRoutes {
   static const String root = '/';
@@ -34,6 +35,7 @@ class AppRoutes {
   static const String security = '/security';
   static const String help = '/help';
   static const String charts = '/charts';
+  static const String risk = '/risk';
 
   static Map<String, WidgetBuilder> routes = {
     root: (_) => const AuthEntryScreen(),
@@ -51,6 +53,7 @@ class AppRoutes {
     '/onboarding': (_) => const OnboardingScreen(),
     security: (_) => const _ProtectedRoute(child: SecurityCenterScreen()),
     charts: (_) => const _ProtectedRoute(child: ChartScreen()),
+    risk: (_) => const _ProtectedRoute(child: RiskSimulatorScreen()),
     help: (_) => const _ProtectedRoute(
         child: PlaceholderScreen(title: 'Help & Support')),
   };
