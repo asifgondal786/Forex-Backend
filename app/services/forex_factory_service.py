@@ -1,6 +1,6 @@
 """
 app/services/forex_factory_service.py
-Live economic calendar scraper â€” replaces static MacroEventService template.
+Live economic calendar scraper Ã¢â‚¬â€ replaces static MacroEventService template.
 Scrapes forexfactory.com/calendar.json (public JSON endpoint).
 Falls back to static schedule if network is unavailable.
 """
@@ -134,7 +134,7 @@ class ForexFactoryService:
         return {
             "shield_active": shield_active,
             "reason": (
-                f"Shield active â€” {next_event['title']} in {minutes_until}m"
+                f"Shield active Ã¢â‚¬â€ {next_event['title']} in {minutes_until}m"
                 if shield_active
                 else f"Next: {next_event['title']} in {max(minutes_until, 0)}m"
             ),
@@ -155,11 +155,11 @@ class ForexFactoryService:
     async def _fetch_and_cache(self) -> None:
         events: List[ForexFactoryEvent] = []
         headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "application/json",
-                "Referer": "https://www.forexfactory.com/",
-            }
-            for url in [_FF_URL, _FF_NEXT_URL]:
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://www.forexfactory.com/",
+        }
+        for url in [_FF_URL, _FF_NEXT_URL]:
                 try:
                     async with httpx.AsyncClient(timeout=15, headers=headers, follow_redirects=True) as client:
                         resp = await client.get(url)
@@ -190,7 +190,7 @@ class ForexFactoryService:
                 self._cache_time = datetime.now(timezone.utc)
 
 
-# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 def _normalize_impact(raw: str) -> str:
     r = raw.lower().strip()
