@@ -1,4 +1,5 @@
 from app.market_routes import router as market_router
+from app.risk_routes import router as risk_router
 from app.signal_routes import router as signal_router
 from app.news_routes import router as news_router
 """
@@ -894,6 +895,8 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/market/supported",
     "/api/v1/market/debug",
     "/api/v1/market/ohlc",
+    "/api/v1/risk/simulate",
+    "/api/v1/risk/health",
     "/api/v1/signals/health",
     "/api/v1/signals/generate",
     "/api/v1/signals/debug-gemini",
@@ -1233,6 +1236,7 @@ if AI_PROXY_AVAILABLE:
 # Mount v1 router — all /api/* routes become /api/v1/*
 app.include_router(_v1)
 app.include_router(market_router)
+app.include_router(risk_router)
 app.include_router(signal_router)
 app.include_router(news_router)
 
