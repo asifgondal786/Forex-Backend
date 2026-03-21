@@ -82,7 +82,9 @@ class GeminiClient:
             if isinstance(parsed, dict):
                 return parsed
             return default_value
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("GeminiClient.generate_json failed: %s", e, exc_info=True)
             return default_value
 
 
@@ -90,5 +92,6 @@ def get_gemini_client() -> GeminiClient:
     return GeminiClient()
 
 gemini_client = GeminiClient()
+
 
 
