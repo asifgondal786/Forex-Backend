@@ -51,16 +51,18 @@ async def generate_trade_signals(
 
 @router.get("/debug-gemini")
 async def debug_gemini() -> dict:
-    import subprocess, sys, os
-    result = subprocess.run([sys.executable, "-c", "from google import genai; print(genai.__version__)"], capture_output=True, text=True)
-    from app.ai.gemini_client import gemini_client
+    import os
+    from app.ai.gemini_client import GeminiClient
+    client = GeminiClient()
+    result = client.generate_text(
+        model_name="gemini-2.0-flash",
+        prompt="Return only this exact JSON: {\"status\": \"ok\"}"
+    )
     return {
-        "genai_version": result.stdout.strip(),
-        "genai_error": result.stderr.strip(),
+        "client_available": client.available,
         "key_length": len(os.getenv("GEMINI_API_KEY", "")),
-        "key_preview": os.getenv("GEMINI_API_KEY", "")[:12] + "...",
-        "client_available": gemini_client.available,
-        "genai_available": result.returncode == 0,
+        "raw_result": result,
+        "success": bool(result),
     }
 
 @router.get("/health", summary="Signal service health check")
@@ -73,4 +75,5 @@ async def signals_health() -> dict:
         "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
         "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
     }
+
 
