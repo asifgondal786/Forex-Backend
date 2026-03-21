@@ -943,6 +943,8 @@ async def auth_rate_limit_middleware(request: Request, call_next):
     key = f"{client_host}:{path}"
     now = time.time()
     window_start = now - _auth_rate_limit_window
+    if key not in _auth_rate_limit_store:
+        _auth_rate_limit_store[key] = collections.deque()
     bucket = _auth_rate_limit_store[key]
     while bucket and bucket[0] <= window_start:
         bucket.popleft()
