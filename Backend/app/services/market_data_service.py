@@ -214,3 +214,26 @@ async def get_market_prices(
             logger.warning("Redis cache write failed: %s", e)
 
     return result
+async def get_ohlc_data(pair: str = "EUR/USD", interval: str = "1h", outputsize: int = 100) -> dict:
+    """Fetch OHLC candlestick data from Twelve Data."""
+    import httpx, os
+    from datetime import timezone
+    api_key = os.getenv("TWELVE_DATA_API_KEY", "")
+    symbol = _to_twelve(pair)
+    url = (
+        f"https://api.twelvedata.com/time_series"
+        f"?symbol={symbol}&interval={interval}&outputsize={outputsize}"
+        f"&apikey={api_key}&format=JSON"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url)
+            data = resp.json()
+        if data.get("status") == "error":
+            return {"values": [], "error": data.get("message", "Twelve Data error")}
+        values = data.get("values", [])
+        # Twelve Data returns newest first — reverse for chart chronological order
+        values = list(reversed(values))
+        return {"values": values, "pair": pair, "interval": interval}
+    except Exception as e:
+        return {"values": [], "error": str(e)}

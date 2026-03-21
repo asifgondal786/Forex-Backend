@@ -101,3 +101,12 @@ async def market_health(request: Request, redis=Depends(get_redis)) -> dict:
 
 
 
+
+@router.get("/ohlc", summary="OHLC candlestick data for charting")
+async def get_ohlc(
+    pair: str = "EUR/USD",
+    interval: str = "1h",
+    outputsize: int = 100,
+) -> dict:
+    from app.services.market_data_service import get_ohlc_data
+    return await get_ohlc_data(pair=pair, interval=interval, outputsize=outputsize)
