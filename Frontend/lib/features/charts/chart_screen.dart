@@ -2,6 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:js_interop';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:ui_web' as ui_web;
+// ignore: avoid_web_libraries_in_flutter
+import 'package:web/web.dart' as web;
 import '../../providers/chart_provider.dart';
 
 @JS('renderTajirChart')
@@ -15,13 +19,31 @@ class ChartScreen extends StatefulWidget {
 
 class _ChartScreenState extends State<ChartScreen> {
   final List<String> _pairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
+  bool _viewRegistered = false;
 
   @override
   void initState() {
     super.initState();
+    _registerView();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChartProvider>().fetchCandles();
     });
+  }
+
+  void _registerView() {
+    if (_viewRegistered) return;
+    _viewRegistered = true;
+    ui_web.platformViewRegistry.registerViewFactory(
+      'tajir-chart',
+      (int viewId) {
+        final div = web.HTMLDivElement();
+        div.id = 'tajir-chart-container';
+        div.style.width = '100%';
+        div.style.height = '100%';
+        div.style.backgroundColor = '#0D1117';
+        return div;
+      },
+    );
   }
 
   void _renderChart(List<dynamic> candles) {
