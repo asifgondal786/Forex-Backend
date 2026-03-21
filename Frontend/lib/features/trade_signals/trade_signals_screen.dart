@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/trade_signals_provider.dart';
 
-// ── colours ──────────────────────────────────────────────────────────────────
+// â”€â”€ colours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const _kBg       = Color(0xFF0A0E1A);
 const _kSurface  = Color(0xFF111827);
 const _kCard     = Color(0xFF161D2E);
@@ -153,9 +153,9 @@ class _TradeSignalsScreenState extends State<TradeSignalsScreen>
       );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Summary bar
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _SignalSummaryBar extends StatelessWidget {
   const _SignalSummaryBar({required this.provider});
   final TradeSignalsProvider provider;
@@ -205,9 +205,9 @@ class _StatCell extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Filter row
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _FilterRow extends StatelessWidget {
   const _FilterRow({required this.provider});
   final TradeSignalsProvider provider;
@@ -248,9 +248,9 @@ class _FilterRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Signal Card — all 4 fields + expandable explanation
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Signal Card â€” all 4 fields + expandable explanation
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _SignalCard extends StatelessWidget {
   const _SignalCard({
     required this.signal,
@@ -319,7 +319,7 @@ class _SignalCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Row 1: header ─────────────────────────────────────────
+            // â”€â”€ Row 1: header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
               child: Row(children: [
@@ -385,20 +385,20 @@ class _SignalCard extends StatelessWidget {
               ]),
             ),
 
-            // ── Row 2: Confidence meter ───────────────────────────────
+            // â”€â”€ Row 2: Confidence meter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
               child: _ConfidenceBar(
                   confidence: signal.confidence, color: _typeColor),
             ),
 
-            // ── Row 3: Entry / SL / TP ────────────────────────────────
+            // â”€â”€ Row 3: Entry / SL / TP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
               child: _PriceRow(signal: signal, typeColor: _typeColor),
             ),
 
-            // ── Row 4: Reason tags + time ────────────────────────────
+            // â”€â”€ Row 4: Reason tags + time â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: Row(children: [
@@ -429,7 +429,7 @@ class _SignalCard extends StatelessWidget {
               ]),
             ),
 
-            // ── Expand toggle ─────────────────────────────────────────
+            // â”€â”€ Expand toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: Row(children: [
@@ -451,7 +451,7 @@ class _SignalCard extends StatelessWidget {
               ]),
             ),
 
-            // ── Expandable explanation ────────────────────────────────
+            // â”€â”€ Expandable explanation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 250),
               crossFadeState: expanded
@@ -485,9 +485,9 @@ class _SignalCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Confidence bar
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _ConfidenceBar extends StatelessWidget {
   const _ConfidenceBar({required this.confidence, required this.color});
   final int confidence;
@@ -521,9 +521,9 @@ class _ConfidenceBar extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Price row: Entry / SL / TP + R:R
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _PriceRow extends StatelessWidget {
   const _PriceRow({required this.signal, required this.typeColor});
   final TradeSignal signal;
@@ -591,4 +591,96 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(color: _kSubtext, fontSize: 14)),
         ]),
       );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4: Plain English Explainer with 3 literacy levels
+// ─────────────────────────────────────────────────────────────────────────────
+class _ExplainerPanel extends StatefulWidget {
+  const _ExplainerPanel({required this.signal});
+  final TradeSignal signal;
+
+  @override
+  State<_ExplainerPanel> createState() => _ExplainerPanelState();
+}
+
+class _ExplainerPanelState extends State<_ExplainerPanel> {
+  int _level = 1; // 0=simple, 1=standard, 2=advanced
+
+  String get _text {
+    if (_level == 0) return widget.signal.explainSimple ?? widget.signal.explanation;
+    if (_level == 2) return widget.signal.explainAdvanced ?? widget.signal.explanation;
+    return widget.signal.explainStandard ?? widget.signal.explanation;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+      decoration: BoxDecoration(
+        color: _kGold.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kGold.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Level selector
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            child: Row(children: [
+              const Icon(Icons.school_rounded, color: _kGold, size: 12),
+              const SizedBox(width: 6),
+              const Text('Explanation Level',
+                  style: TextStyle(color: _kGold, fontSize: 10, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              _LevelChip(label: 'Simple',   active: _level == 0, onTap: () => setState(() => _level = 0)),
+              const SizedBox(width: 4),
+              _LevelChip(label: 'Standard', active: _level == 1, onTap: () => setState(() => _level = 1)),
+              const SizedBox(width: 4),
+              _LevelChip(label: 'Expert',   active: _level == 2, onTap: () => setState(() => _level = 2)),
+            ]),
+          ),
+          Container(height: 1, color: _kGold.withValues(alpha: 0.1)),
+          // Explanation text
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              _text,
+              style: TextStyle(
+                  color: _kText.withValues(alpha: 0.85),
+                  fontSize: 12,
+                  height: 1.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: active ? _kGold.withValues(alpha: 0.2) : _kCard,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: active ? _kGold.withValues(alpha: 0.5) : _kBorder),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: active ? _kGold : _kSubtext,
+              fontSize: 9,
+              fontWeight: FontWeight.w700)),
+    ),
+  );
 }

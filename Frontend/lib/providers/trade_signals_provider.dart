@@ -19,6 +19,14 @@ class TradeSignal {
   final SignalStatus status;
   final DateTime generatedAt;
   final List<String> reasonTags;
+  // Phase 4 fields
+  final List<String> indicatorTags;
+  final String? technicalBias;
+  final double? rsi;
+  final String? macdBias;
+  final String? explainSimple;
+  final String? explainStandard;
+  final String? explainAdvanced;
 
   const TradeSignal({
     required this.id,
@@ -33,6 +41,13 @@ class TradeSignal {
     required this.status,
     required this.generatedAt,
     required this.reasonTags,
+    this.indicatorTags = const [],
+    this.technicalBias,
+    this.rsi,
+    this.macdBias,
+    this.explainSimple,
+    this.explainStandard,
+    this.explainAdvanced,
   });
 
   double get riskReward =>
@@ -76,6 +91,13 @@ class TradeSignal {
           DateTime.tryParse(json['generated_at'] as String? ?? '') ??
               DateTime.now(),
       reasonTags: [sentimentLabel, 'Live Signal', 'Twelve Data'],
+      indicatorTags: (json['indicator_tags'] as List? ?? []).cast<String>(),
+      technicalBias: json['technical_bias'] as String?,
+      rsi: (json['rsi'] as num?)?.toDouble(),
+      macdBias: json['macd_bias'] as String?,
+      explainSimple: json['explain_simple'] as String?,
+      explainStandard: json['explain_standard'] as String?,
+      explainAdvanced: json['explain_advanced'] as String?,
     );
   }
 }
