@@ -1,5 +1,6 @@
 from app.market_routes import router as market_router
 from app.signal_routes import router as signal_router
+from app.news_routes import router as news_router
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -851,7 +852,11 @@ _rate_limit_store: dict = {}
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/api/v1/signals/health", "/api/v1/signals/generate",
-    "/api/v1/signals/debug-gemini", "/docs", "/openapi.json", "/redoc"}
+    "/api/v1/signals/debug-gemini",
+    "/api/v1/news/feed",
+    "/api/v1/news/events",
+    "/api/v1/news/macro-shield",
+    "/api/v1/news/health", "/docs", "/openapi.json", "/redoc"}
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
 
@@ -890,6 +895,10 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/signals/health",
     "/api/v1/signals/generate",
     "/api/v1/signals/debug-gemini",
+    "/api/v1/news/feed",
+    "/api/v1/news/events",
+    "/api/v1/news/macro-shield",
+    "/api/v1/news/health",
 }
 
 @app.middleware("http")
@@ -1219,6 +1228,7 @@ if AI_PROXY_AVAILABLE:
 app.include_router(_v1)
 app.include_router(market_router)
 app.include_router(signal_router)
+app.include_router(news_router)
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
@@ -1281,6 +1291,9 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+
+
+
 
 
 
