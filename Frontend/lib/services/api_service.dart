@@ -23,7 +23,7 @@ class ApiException implements Exception {
 class ApiService {
   // Backend URL - matches your backend port
   // Use --dart-define=API_BASE_URL=http://your.server:port for production.
-  /// API version prefix â€” all versioned endpoints use this path segment.
+  /// API version prefix ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â all versioned endpoints use this path segment.
   static const String apiV1 = '/api/v1';
 
   static const String _baseUrlFromDefine = String.fromEnvironment(
@@ -124,12 +124,12 @@ class ApiService {
     final filtered = <String, T>{};
     for (final pair in pairs) {
       if (rates.containsKey(pair)) {
-        filtered[pair] = rates[pair]!;        // â† added !
+        filtered[pair] = rates[pair]!;        // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â added !
         continue;
       }
       final compact = pair.replaceAll('/', '');
       if (rates.containsKey(compact)) {
-        filtered[compact] = rates[compact]!;  // â† added !
+        filtered[compact] = rates[compact]!;  // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â added !
       }
     }
     return filtered.isNotEmpty ? filtered : rates;
@@ -1535,6 +1535,72 @@ class ApiService {
   }
 
 
+
+  // ========== RISK GUARDIAN ENDPOINTS (Phase 6) ==========
+  Future<Map<String, dynamic>> fetchKellyCriterion({
+    required double winRate,
+    required double avgWin,
+    required double avgLoss,
+    required double accountBalance,
+    double kellyFraction = 0.25,
+  }) async {
+    try {
+      final body = {'win_rate': winRate, 'avg_win': avgWin, 'avg_loss': avgLoss,
+          'account_balance': accountBalance, 'kelly_fraction': kellyFraction};
+      final uri = Uri.parse('$baseUrl$apiV1/risk/kelly');
+      final response = await _client
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: json.encode(body))
+          .timeout(const Duration(seconds: 15));
+      return _handleResponse(response);
+    } catch (e) {
+      throw ApiException('Kelly error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchDrawdownControls({
+    required double accountBalance,
+    double dailyLossLimitPct = 0.03,
+    double weeklyLossLimitPct = 0.06,
+    int maxOpenTrades = 3,
+    double riskPerTradePct = 0.01,
+  }) async {
+    try {
+      final body = {'account_balance': accountBalance,
+          'daily_loss_limit_pct': dailyLossLimitPct,
+          'weekly_loss_limit_pct': weeklyLossLimitPct,
+          'max_open_trades': maxOpenTrades,
+          'risk_per_trade_pct': riskPerTradePct};
+      final uri = Uri.parse('$baseUrl$apiV1/risk/drawdown');
+      final response = await _client
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: json.encode(body))
+          .timeout(const Duration(seconds: 15));
+      return _handleResponse(response);
+    } catch (e) {
+      throw ApiException('Drawdown error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchStressTest({
+    required double winRate,
+    required double avgWin,
+    required double avgLoss,
+    required double startingBalance,
+    int numTrades = 100,
+    int simulations = 300,
+  }) async {
+    try {
+      final body = {'win_rate': winRate, 'avg_win': avgWin, 'avg_loss': avgLoss,
+          'starting_balance': startingBalance, 'num_trades': numTrades,
+          'simulations': simulations};
+      final uri = Uri.parse('$baseUrl$apiV1/risk/stress-test');
+      final response = await _client
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: json.encode(body))
+          .timeout(const Duration(seconds: 30));
+      return _handleResponse(response);
+    } catch (e) {
+      throw ApiException('Stress test error: $e');
+    }
+  }
   // ========== RISK SIMULATOR ENDPOINTS ==========
   Future<Map<String, dynamic>> fetchRiskSimulation({
     double winRate = 0.55,
@@ -1563,6 +1629,86 @@ class ApiService {
     } catch (e) {
       debugPrint('Error running risk simulation: $e');
       throw ApiException('Error running risk simulation: $e');
+    }
+  }
+
+  // ========== PAPER TRADING ENDPOINTS ==========
+  Future<Map<String, dynamic>> openPaperTrade({
+    required String userId,
+    required String pair,
+    required String direction,
+    required double entryPrice,
+    required double stopLoss,
+    required double takeProfit,
+    double lotSize = 1000.0,
+    String? reasoning,
+    String? signalId,
+  }) async {
+    try {
+      final body = {
+        'user_id': userId, 'pair': pair, 'direction': direction,
+        'entry_price': entryPrice, 'stop_loss': stopLoss,
+        'take_profit': takeProfit, 'lot_size': lotSize,
+        if (reasoning != null) 'reasoning': reasoning,
+        if (signalId != null) 'signal_id': signalId,
+      };
+      final uri = Uri.parse('$baseUrl$apiV1/paper/open');
+      final response = await _client
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: json.encode(body))
+          .timeout(const Duration(seconds: 15));
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('openPaperTrade error: $e');
+      throw ApiException('Error opening paper trade: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> closePaperTrade({
+    required String tradeId,
+    required double closePrice,
+    String closeReason = 'manual',
+  }) async {
+    try {
+      final body = {'trade_id': tradeId, 'close_price': closePrice, 'close_reason': closeReason};
+      final uri = Uri.parse('$baseUrl$apiV1/paper/close');
+      final response = await _client
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: json.encode(body))
+          .timeout(const Duration(seconds: 15));
+      return _handleResponse(response);
+    } catch (e) {
+      throw ApiException('Error closing paper trade: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchOpenPaperTrades({required String userId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl$apiV1/paper/trades/open?user_id=$userId');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      return _handleResponse(response);
+    } catch (e) {
+      return {'trades': [], 'count': 0};
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchPaperTradeHistory({
+    required String userId, int limit = 50,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl$apiV1/paper/trades/history?user_id=$userId&limit=$limit');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      return _handleResponse(response);
+    } catch (e) {
+      return {'trades': [], 'count': 0};
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchPaperPerformance({required String userId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl$apiV1/paper/performance?user_id=$userId');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      return _handleResponse(response);
+    } catch (e) {
+      return {'total_trades': 0, 'win_rate': 0.0, 'total_pnl': 0.0};
     }
   }
   void dispose() {

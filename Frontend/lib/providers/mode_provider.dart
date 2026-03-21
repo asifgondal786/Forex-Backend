@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ─── Enum ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Enum â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 enum AppMode {
   marketWatch,
@@ -10,6 +10,7 @@ enum AppMode {
   tradeSignals,
   newsEvents,
   customSetup,
+  paperTrading,
 }
 
 extension AppModeX on AppMode {
@@ -22,6 +23,7 @@ extension AppModeX on AppMode {
         AppMode.tradeSignals => 'Trade Signals',
         AppMode.newsEvents   => 'News & Events',
         AppMode.customSetup  => 'Custom Setup',
+        AppMode.paperTrading => 'Paper Trading',
       };
 
   IconData get icon => switch (this) {
@@ -31,10 +33,11 @@ extension AppModeX on AppMode {
         AppMode.tradeSignals => Icons.trending_up_rounded,
         AppMode.newsEvents   => Icons.newspaper_rounded,
         AppMode.customSetup  => Icons.tune_rounded,
+        AppMode.paperTrading => Icons.receipt_long_rounded,
       };
 }
 
-// ─── Provider ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Provider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ModeProvider extends ChangeNotifier {
   static const _prefKey = 'tajir_app_mode';
@@ -48,7 +51,7 @@ class ModeProvider extends ChangeNotifier {
   /// True once user has picked a mode at onboarding
   bool get hasChosen => _mode != null;
 
-  /// Load persisted mode on app boot — call once in main()
+  /// Load persisted mode on app boot â€” call once in main()
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString(_prefKey);
@@ -62,7 +65,7 @@ class ModeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Persist and notify — called from onboarding + settings
+  /// Persist and notify â€” called from onboarding + settings
   Future<void> setMode(AppMode mode) async {
     _mode = mode;
     notifyListeners();
@@ -70,7 +73,7 @@ class ModeProvider extends ChangeNotifier {
     await prefs.setString(_prefKey, mode.key);
   }
 
-  /// Reset — useful for testing or "start over" in settings
+  /// Reset â€” useful for testing or "start over" in settings
   Future<void> clearMode() async {
     _mode = null;
     notifyListeners();

@@ -3,6 +3,7 @@ app/signal_routes.py
 Phase 4 - Signal Fusion Endpoints
 """
 import logging
+from pydantic import BaseModel
 import os
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -10,6 +11,11 @@ from app.services.signal_service import SignalResponse, generate_signals
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/signals", tags=["Trade Signals"])
+
+
+class NLPCommandRequest(BaseModel):
+    text: str
+    account_balance: float = 10000.0
 
 
 @router.post("/generate", response_model=SignalResponse, summary="Generate fused AI trade signals")
@@ -56,3 +62,13 @@ async def signals_health() -> dict:
         "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
         "twelve_data_set":  bool(os.getenv("TWELVE_DATA_API_KEY")),
     }
+
+@router.post("/nlp/parse", summary="Parse natural language trading command")
+async def parse_nlp_command(req: NLPCommandRequest) -> dict:
+    from app.services.nlp_command_service import parse_command
+    try:
+        result = parse_command(text=req.text, account_balance=req.account_balance)
+        return result
+    except Exception as e:
+        logger.exception("NLP parse error")
+        raise HTTPException(status_code=500, detail=str(e))
