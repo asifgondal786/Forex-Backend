@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app.services.market_data_service import (
+    get_ohlc_data,
     MarketPricesResponse,
     SUPPORTED_PAIRS,
     DEFAULT_PAIRS,
