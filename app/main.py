@@ -850,7 +850,8 @@ _rate_limit_max = _runtime_config.security.rate_limit_max
 _rate_limit_store: dict = {}
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
-_rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/api/v1/signals/health", "/api/v1/signals/generate", "/docs", "/openapi.json", "/redoc"}
+_rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/api/v1/signals/health", "/api/v1/signals/generate",
+    "/api/v1/signals/debug-gemini", "/docs", "/openapi.json", "/redoc"}
 _max_request_body_bytes = _env_int("MAX_REQUEST_BODY_BYTES", 1_048_576)
 
 
@@ -888,6 +889,7 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/market/debug",
     "/api/v1/signals/health",
     "/api/v1/signals/generate",
+    "/api/v1/signals/debug-gemini",
 }
 
 @app.middleware("http")
@@ -1279,6 +1281,7 @@ async def api_health():
         "connections": ws_manager.get_connection_count(),
         "firebase": firebase_status,
     }
+
 
 
 
