@@ -6,7 +6,8 @@ Phase 3: /news/events and /news/macro-shield now use live ForexFactory data.
 import logging
 from typing import Optional
 from fastapi import APIRouter, Query
-from app.services.market_intelligence_service import market_intelligence_service
+from app.services.market_intelligence_service import MarketIntelligenceService
+market_intelligence_service = MarketIntelligenceService()
 from app.services.macro_event_service import macro_event_service
 from app.services.forex_factory_service import forex_factory_service
 
