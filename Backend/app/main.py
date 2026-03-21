@@ -854,7 +854,6 @@ _rate_limit_store: dict = {}
 _rate_limit_window = _runtime_config.security.rate_limit_window_seconds
 _global_limiter = RateLimiter(limit=_rate_limit_max, window=_rate_limit_window)
 _rate_limit_exempt = {"/", "/health", "/healthz", "/api/health", "/api/v1/signals/health", "/api/v1/signals/generate",
-    "/api/v1/signals/debug-gemini",
     "/api/v1/news/feed",
     "/api/v1/news/events",
     "/api/v1/news/macro-shield",
@@ -881,25 +880,23 @@ _auth_rate_limited_paths = {
     "/auth/email-verification",
     "/auth/login",
     "/auth/signup",
-    "/auth/email-provider-status",   # ← add this
+    "/auth/email-provider-status",   # â† add this
 }
-# app/main.py — find this set:
+# app/main.py â€” find this set:
 _public_unauthenticated_auth_paths = {
     "/auth/password-reset",
     "/auth/email-verification",
     "/auth/email-provider-status",
     "/api/ai/health",
-    "/api/health",        # ← add this line
+    "/api/health",        # â† add this line
     "/api/v1/market/prices",
     "/api/v1/market/health",
     "/api/v1/market/supported",
-    "/api/v1/market/debug",
     "/api/v1/market/ohlc",
     "/api/v1/risk/simulate",
     "/api/v1/risk/health",
     "/api/v1/signals/health",
     "/api/v1/signals/generate",
-    "/api/v1/signals/debug-gemini",
     "/api/v1/news/feed",
     "/api/v1/news/events",
     "/api/v1/news/macro-shield",
@@ -1013,7 +1010,7 @@ async def rate_limit_middleware(request: Request, call_next):
                 message="Rate limit exceeded",
                 request_id=_request_id_from_request(request),
             ),
-            headers={"Retry-After": str(_rate_limit_window)},   # ← add this
+            headers={"Retry-After": str(_rate_limit_window)},   # â† add this
         )
     bucket.append(now)
     return await call_next(request)
@@ -1203,7 +1200,7 @@ try:
 except Exception as exc:
     logger.warning(f"[WARN] Could not load audit middleware: {exc}")
 
-# ── API v1 versioned router ──────────────────────────────────────────────────
+# â”€â”€ API v1 versioned router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # All /api/* routes are mounted under /api/v1 via this wrapper.
 # Unversioned routes (/health, /healthz, /api/health, /auth) are registered
 # directly on `app` below and remain unaffected.
@@ -1233,7 +1230,7 @@ if MONITORING_ROUTES_AVAILABLE:
 if AI_PROXY_AVAILABLE:
     _v1.include_router(ai_proxy_router)
 
-# Mount v1 router — all /api/* routes become /api/v1/*
+# Mount v1 router â€” all /api/* routes become /api/v1/*
 app.include_router(_v1)
 app.include_router(market_router)
 app.include_router(risk_router)

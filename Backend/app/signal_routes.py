@@ -49,29 +49,6 @@ async def generate_trade_signals(
     return result
 
 
-@router.get("/debug-gemini")
-async def debug_gemini() -> dict:
-    import os
-    from google import genai
-    key = os.getenv("GEMINI_API_KEY", "")
-    error = ""
-    result = ""
-    try:
-        client = genai.Client(api_key=key)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents="Say hello",
-        )
-        result = str(response.text)
-    except Exception as e:
-        error = str(e)
-    return {
-        "key_length": len(key),
-        "result": result,
-        "error": error,
-        "success": bool(result),
-    }
-
 @router.get("/health", summary="Signal service health check")
 async def signals_health() -> dict:
     import os
