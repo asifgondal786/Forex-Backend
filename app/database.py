@@ -15,3 +15,11 @@ SessionLocal = sessionmaker(
     autoflush=False,
     bind=engine,
 )
+
+# Supabase client
+import os as _os
+from supabase import create_client as _create_client
+supabase = _create_client(
+    _os.environ["SUPABASE_URL"],
+    _os.environ["SUPABASE_KEY"]
+)
