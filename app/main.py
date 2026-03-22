@@ -1347,3 +1347,7 @@ async def api_health():
 
 
 
+
+# Phase 9 — Social and Autonomy
+from app.social_routes import router as social_router
+app.include_router(social_router)
