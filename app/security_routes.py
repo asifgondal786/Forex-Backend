@@ -5,7 +5,7 @@ from app.services.key_vault_service import store_broker_key, get_broker_key, del
 from app.services.withdraw_service import request_withdrawal, confirm_withdrawal, cancel_withdrawal
 from app.services.device_service import get_device_fingerprint, is_known_device, send_device_otp, verify_device_otp
 from app.auth import get_current_user
-from app.main import limiter
+from app.limiter import limiter
 
 router = APIRouter(prefix="/api/v1/security", tags=["security"])
 
