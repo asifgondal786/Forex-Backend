@@ -1,4 +1,4 @@
-from __future__ import annotations
+ï»¿from __future__ import annotations
 import asyncio
 from datetime import datetime, date
 from app.database import supabase
@@ -80,9 +80,9 @@ async def evaluate_and_execute(user_id: str, signal: dict) -> dict:
     if _daily_drawdown_breached(user_id, max_dd):
         return _log_and_return(user_id, pair, direction, confidence,
             "blocked_drawdown",
-            f"Daily drawdown of {max_dd}% breached — autonomous mode paused for today")
+            f"Daily drawdown of {max_dd}% breached â€” autonomous mode paused for today")
 
-    # All guardrails passed — execute
+    # All guardrails passed â€” execute
     trade_mode = config.get("trade_mode", "paper")
     risk_pct   = float(config.get("max_risk_per_trade") or 1.0)
 

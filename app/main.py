@@ -13,9 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from slowapi import _rate_limit_exceeded_handler
 
-from slowapi.errors import RateLimitExceeded
 
 from contextlib import asynccontextmanager
 import os
@@ -579,10 +577,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-
+# Rate limiter (slowapi)
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Rate limiter (slowapi)
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.limiter import limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
 def _request_id_from_request(request: Request) -> str | None:
     from_state = getattr(request.state, "request_id", None)
     if isinstance(from_state, str) and from_state.strip():
@@ -1351,4 +1360,5 @@ async def api_health():
 # Phase 9 — Social and Autonomy
 from app.social_routes import router as social_router
 app.include_router(social_router)
+
 
