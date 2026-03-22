@@ -52,10 +52,8 @@ asyncpg
 
 pyotp==2.9.0
 qrcode[pil]==7.4.2
-cryptography==42.0.8
 slowapi==0.1.9
 
 pyotp==2.9.0
 qrcode[pil]==7.4.2
-cryptography==42.0.8
 slowapi==0.1.9
