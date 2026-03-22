@@ -13,6 +13,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 from contextlib import asynccontextmanager
 import os
 import time
@@ -1257,6 +1264,10 @@ app.include_router(risk_router)
 app.include_router(paper_router)
 app.include_router(signal_router)
 app.include_router(news_router)
+
+# security router added
+from app.security_routes import router as security_router
+app.include_router(security_router)
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
