@@ -1,15 +1,12 @@
-from sqlalchemy import create_engine
+﻿from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 
-
 DATABASE_URL = os.getenv("DATABASE_URL")
-
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
 
 engine = create_engine(DATABASE_URL)
-
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -17,9 +14,13 @@ SessionLocal = sessionmaker(
 )
 
 # Supabase client
-import os as _os
 from supabase import create_client as _create_client
-supabase = _create_client(
-    _os.environ["SUPABASE_URL"],
-    _os.environ["SUPABASE_KEY"]
-)
+
+_supabase_url = os.getenv("SUPABASE_URL")
+_supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+
+if _supabase_url and _supabase_key:
+    supabase = _create_client(_supabase_url, _supabase_key)
+else:
+    supabase = None
+    print(f"WARNING: Supabase not initialized. URL={'set' if _supabase_url else 'MISSING'}, KEY={'set' if _supabase_key else 'MISSING'}")
