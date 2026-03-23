@@ -2,7 +2,9 @@
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
-import os, base64, json
+import os
+import base64
+import json
 
 # Initialize Firebase app once
 if not firebase_admin._apps:
@@ -12,7 +14,7 @@ if not firebase_admin._apps:
         cred = credentials.Certificate(svc)
         firebase_admin.initialize_app(cred)
     else:
-        firebase_admin.initialize_app()  # will use ADC if available
+        firebase_admin.initialize_app()
 
 _bearer = HTTPBearer(auto_error=True)
 
@@ -22,7 +24,7 @@ async def get_current_user(
     token = creds.credentials
     try:
         decoded = firebase_auth.verify_id_token(token)
-        return decoded          # dict with uid, email, etc.
+        return decoded
     except firebase_auth.ExpiredIdTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Token expired")
