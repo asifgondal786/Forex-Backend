@@ -8,54 +8,35 @@ websockets==14.1
 aiohttp==3.11.11
 httpx==0.28.1
 redis==5.2.1
-
 # Data Processing - FIXED VERSIONS
 numpy>=2.2.0
 pandas==2.2.3
 scipy==1.15.1
 scikit-learn==1.6.1
-
 # Date/Time
 python-dateutil==2.9.0.post0
-
 # Environment Variables
 python-dotenv==1.0.1
-
 # Validation
 pydantic==2.10.6
 pydantic-settings==2.1.0
 cryptography==44.0.2
-
 # Authentication
 email-validator==2.1.0
-
 # Firebase
 firebase-admin==6.5.0
-
 # Google Generative AI (Gemini)
 google-genai>=1.0.0
-
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.25.2
-
 # Monitoring (optional but recommended in production)
 sentry-sdk>=2.0.0
 sentry-sdk[fastapi]==2.22.0
-
 psycopg2-binary
 sqlalchemy
 asyncpg
-
-
-
-
 pyotp==2.9.0
 qrcode[pil]==7.4.2
 slowapi==0.1.9
-
-pyotp==2.9.0
-qrcode[pil]==7.4.2
-slowapi==0.1.9
-
 supabase
