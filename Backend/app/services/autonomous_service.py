@@ -112,7 +112,7 @@ async def evaluate_and_execute(user_id: str, signal: dict) -> dict:
                 "take_profit": signal.get("take_profit"),
             })
         _log_execution(user_id, pair, direction, confidence,
-                       str(trade.get("id") or trade.get("trade_id") or ""))
+               str(trade.get("trade", {}).get("id") or trade.get("id") or ""))
         return {"action": "executed", "trade": trade,
                 "mode": trade_mode, "confidence": confidence}
     except Exception as e:

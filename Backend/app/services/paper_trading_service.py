@@ -54,7 +54,7 @@ async def open_paper_trade(
     trade = {
         "user_id":     user_id,
         "pair":        pair,
-        "direction":   direction.upper(),
+        "direction":   direction.lower(),
         "entry_price": entry_price,
         "stop_loss":   stop_loss,
         "take_profit": take_profit,
