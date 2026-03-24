@@ -19,14 +19,15 @@ def store_broker_key(user_id: str, broker: str, api_key: str, api_secret: str) -
     }).execute()
 
 def get_broker_key(user_id: str, broker: str) -> dict | None:
-    f   = _f()
-    row = supabase.table("broker_keys").select("encrypted_api_key,encrypted_api_secret")\
-        .eq("user_id", user_id).eq("broker", broker).single().execute()
-    if not row.data:
+    f = _f()
+    rows = supabase.table("broker_keys").select("encrypted_api_key,encrypted_api_secret")\
+        .eq("user_id", user_id).eq("broker", broker).limit(1).execute()
+    if not rows.data:
         return None
+    row_data = rows.data[0]
     return {
-        "api_key":    f.decrypt(row.data["encrypted_api_key"].encode()).decode(),
-        "api_secret": f.decrypt(row.data["encrypted_api_secret"].encode()).decode(),
+        "api_key":    f.decrypt(row_data["encrypted_api_key"].encode()).decode(),
+        "api_secret": f.decrypt(row_data["encrypted_api_secret"].encode()).decode(),
     }
 
 def delete_broker_key(user_id: str, broker: str) -> None:
