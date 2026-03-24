@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import datetime
 from app.database import supabase
 
@@ -67,9 +67,7 @@ def _update_follower_count(user_id: str) -> None:
         .select("id", count="exact") \
         .eq("following_id", user_id).execute()
     count = count_result.count or 0
-    supabase.table("strategy_profiles") \
-        .update({"followers": count}) \
-        .eq("user_id", user_id).execute()
+    supabase.table("strategy_profiles").upsert({"user_id": user_id, "followers": count}).execute()
 
 def refresh_profile_stats(user_id: str) -> dict:
     """Recalculate win_rate/total_trades/pnl from paper_trades table."""
@@ -88,3 +86,5 @@ def refresh_profile_stats(user_id: str) -> dict:
     supabase.table("strategy_profiles") \
         .update(update).eq("user_id", user_id).execute()
     return update
+
+
