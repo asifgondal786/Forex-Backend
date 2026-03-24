@@ -94,7 +94,7 @@ async def check_device(request: Request, current_user=Depends(get_current_user))
     fp    = get_device_fingerprint(request)
     known = is_known_device(str(current_user["uid"]), fp)
     if not known:
-        send_device_otp(str(current_user["uid"]), fp, request.headers.get("user-agent", "Unknown")[:60])
+        send_device_otp(str(current_user["uid"]), fp, request.headers.get("user-agent", "Unknown")[:60], str(current_user.get("email", "")))
     return {"known_device": known, "fingerprint": fp,
             "message": None if known else "OTP sent to your email"}
 
@@ -105,3 +105,4 @@ async def verify_device(request: Request, body: dict = Body(...), current_user=D
     if not verify_device_otp(str(current_user["uid"]), fp, body.get("otp", "")):
         raise HTTPException(400, "Invalid or expired OTP")
     return {"message": "Device verified and trusted"}
+
