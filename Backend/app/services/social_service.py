@@ -25,16 +25,19 @@ def follow_trader(follower_id: str, following_id: str,
                   copy_enabled: bool = False,
                   copy_risk_pct: float = 1.0,
                   max_drawdown_pct: float = 10.0) -> dict:
-    result = supabase.table("follows").upsert({
-        "follower_id": follower_id,
-        "following_id": following_id,
-        "copy_enabled": copy_enabled,
-        "copy_risk_pct": copy_risk_pct,
-        "max_drawdown_pct": max_drawdown_pct,
-    }).execute()
-    # Update follower count on profile
-    _update_follower_count(following_id)
-    return result.data[0]
+    try:
+        result = supabase.table("follows").upsert({
+            "follower_id": follower_id,
+            "following_id": following_id,
+            "copy_enabled": copy_enabled,
+            "copy_risk_pct": copy_risk_pct,
+            "max_drawdown_pct": max_drawdown_pct,
+        }).execute()
+        _update_follower_count(following_id)
+        return result.data[0] if result.data else {"follower_id": follower_id, "following_id": following_id}
+    except Exception as e:
+        import traceback
+        raise RuntimeError(f"follow_trader failed: {e} | {traceback.format_exc()}")
 
 def unfollow_trader(follower_id: str, following_id: str) -> dict:
     supabase.table("follows").delete() \
