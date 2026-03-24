@@ -17,7 +17,7 @@ def consume_trade_token(user_id: str, token: str) -> dict | None:
     now        = datetime.utcnow().isoformat()
     row = supabase.table("trade_tokens")\
         .select("*").eq("user_id", user_id).eq("token_hash", token_hash)\
-        .eq("used", False).gt("expires_at", now).single().execute()
+        .eq("used", False).gt("expires_at", now).limit(1).execute()
     if not row.data:
         return None
     supabase.table("trade_tokens").update({"used": True, "used_at": now})\
