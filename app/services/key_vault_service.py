@@ -1,9 +1,9 @@
-import os
+﻿import os
 from cryptography.fernet import Fernet
 from app.database import supabase
 
 VAULT_KEY = os.environ.get("VAULT_ENCRYPTION_KEY", "")
-fernet    = Fernet(VAULT_KEY.encode()) if VAULT_KEY else None
+fernet    = Fernet(VAULT_KEY.strip().encode()) if VAULT_KEY else None
 
 def _f():
     if not fernet:
@@ -13,10 +13,11 @@ def _f():
 def store_broker_key(user_id: str, broker: str, api_key: str, api_secret: str) -> None:
     f = _f()
     supabase.table("broker_keys").upsert({
-        "user_id": user_id, "broker": broker,
+        "user_id": user_id,
+        "broker": broker,
         "encrypted_api_key":    f.encrypt(api_key.encode()).decode(),
         "encrypted_api_secret": f.encrypt(api_secret.encode()).decode(),
-    }).execute()
+    }, on_conflict="user_id,broker").execute()
 
 def get_broker_key(user_id: str, broker: str) -> dict | None:
     f = _f()
