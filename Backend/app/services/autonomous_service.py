@@ -88,16 +88,16 @@ async def evaluate_and_execute(user_id: str, signal: dict) -> dict:
 
     try:
         if trade_mode == "paper":
-            from app.services.paper_trading_service import PaperTradingService
-            pts = PaperTradingService()
-            trade = await pts.open_trade(user_id, {
-                "pair": pair, "direction": direction,
-                "lot_size": 0.1, "risk_pct": risk_pct,
-                "entry_price": signal.get("entry_price"),
-                "stop_loss":   signal.get("stop_loss"),
-                "take_profit": signal.get("take_profit"),
-                "source": "autonomous",
-            })
+            from app.services import paper_trading_service as pts
+            trade = await pts.open_paper_trade(
+                user_id=user_id,
+                pair=pair,
+                direction=direction,
+                entry_price=float(signal.get("entry_price") or 0),
+                stop_loss=float(signal.get("stop_loss") or 0),
+                take_profit=float(signal.get("take_profit") or 0),
+                lot_size=0.1,
+            )
         else:
             from app.services.trading_bot_service import TradingBotService
             from app.services.forex_data_service import ForexDataService
@@ -151,3 +151,8 @@ def _log_execution(user_id, pair, direction, confidence,
         "confidence": confidence, "action_taken": action,
         "reason": reason, "trade_id": trade_id,
     }).execute()
+
+
+
+
+
