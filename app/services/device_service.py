@@ -31,12 +31,12 @@ def verify_device_otp(user_id: str, fingerprint: str, otp: str) -> bool:
     row = supabase.table("device_otps").select("*")\
         .eq("user_id", user_id).eq("fingerprint", fingerprint)\
         .eq("otp_hash", otp_hash).eq("verified", False)\
-        .gt("expires_at", now).single().execute()
-    if not row.data:
-        return False
-    supabase.table("device_otps").update({"verified": True}).eq("id", row.data["id"]).execute()
+        .gt("expires_at", now).limit(1).execute()
+    if not row.data:`n        return False`n    row_data = row.data[0]
+    supabase.table("device_otps").update({"verified": True}).eq("id", row_data["id"]).execute()
     supabase.table("trusted_devices").insert({
         "user_id": user_id, "fingerprint": fingerprint,
-        "device_name": row.data["device_name"], "revoked": False,
+        "device_name": row_data["device_name"], "revoked": False,
     }).execute()
     return True
+
