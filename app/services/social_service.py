@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 from datetime import datetime
 from app.database import supabase
 
@@ -32,7 +32,7 @@ def follow_trader(follower_id: str, following_id: str,
             "copy_enabled": copy_enabled,
             "copy_risk_pct": copy_risk_pct,
             "max_drawdown_pct": max_drawdown_pct,
-        }).execute()
+        }, on_conflict="follower_id,following_id").execute()
         _update_follower_count(following_id)
         return result.data[0] if result.data else {"follower_id": follower_id, "following_id": following_id}
     except Exception as e:
@@ -73,7 +73,6 @@ def _update_follower_count(user_id: str) -> None:
     supabase.table("strategy_profiles").upsert({"user_id": user_id, "followers": count}).execute()
 
 def refresh_profile_stats(user_id: str) -> dict:
-    """Recalculate win_rate/total_trades/pnl from paper_trades table."""
     trades = supabase.table("paper_trades") \
         .select("realized_pnl,status") \
         .eq("user_id", user_id) \
@@ -89,5 +88,3 @@ def refresh_profile_stats(user_id: str) -> dict:
     supabase.table("strategy_profiles") \
         .update(update).eq("user_id", user_id).execute()
     return update
-
-
