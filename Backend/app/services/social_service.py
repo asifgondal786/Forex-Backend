@@ -70,7 +70,7 @@ def _update_follower_count(user_id: str) -> None:
         .select("id", count="exact") \
         .eq("following_id", user_id).execute()
     count = count_result.count or 0
-    supabase.table("strategy_profiles").upsert({"user_id": user_id, "followers": count}).execute()
+    supabase.table("strategy_profiles").update({"followers": count}).eq("user_id", user_id).execute()
 
 def refresh_profile_stats(user_id: str) -> dict:
     trades = supabase.table("paper_trades") \
