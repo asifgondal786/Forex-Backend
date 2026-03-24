@@ -1,4 +1,4 @@
-import secrets, hashlib
+﻿import secrets, hashlib
 from datetime import datetime, timedelta
 from app.database import supabase
 
@@ -15,11 +15,12 @@ def generate_trade_token(user_id: str, trade_intent: dict) -> str:
 def consume_trade_token(user_id: str, token: str) -> dict | None:
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     now        = datetime.utcnow().isoformat()
-    row = supabase.table("trade_tokens")\
+    rows = supabase.table("trade_tokens")\
         .select("*").eq("user_id", user_id).eq("token_hash", token_hash)\
         .eq("used", False).gt("expires_at", now).limit(1).execute()
-    if not row.data:
+    if not rows.data:
         return None
+    row = rows.data[0]
     supabase.table("trade_tokens").update({"used": True, "used_at": now})\
-        .eq("id", row.data["id"]).execute()
-    return row.data["trade_intent"]
+        .eq("id", row["id"]).execute()
+    return row["trade_intent"]

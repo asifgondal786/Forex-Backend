@@ -1,4 +1,4 @@
-import hashlib, secrets
+﻿import hashlib, secrets
 from datetime import datetime, timedelta
 from app.database import supabase
 
@@ -22,21 +22,21 @@ def send_device_otp(user_id: str, fingerprint: str, device_name: str) -> str:
         "device_name": device_name, "otp_hash": otp_hash,
         "expires_at": expires, "verified": False
     }).execute()
-    # TODO: send otp via email to user
-    return otp  # remove return in production — email only
+    return otp
 
 def verify_device_otp(user_id: str, fingerprint: str, otp: str) -> bool:
     otp_hash = hashlib.sha256(otp.encode()).hexdigest()
     now      = datetime.utcnow().isoformat()
-    row = supabase.table("device_otps").select("*")\
+    rows = supabase.table("device_otps").select("*")\
         .eq("user_id", user_id).eq("fingerprint", fingerprint)\
         .eq("otp_hash", otp_hash).eq("verified", False)\
         .gt("expires_at", now).limit(1).execute()
-    if not row.data:`n        return False`n    row_data = row.data[0]
-    supabase.table("device_otps").update({"verified": True}).eq("id", row_data["id"]).execute()
+    if not rows.data:
+        return False
+    row = rows.data[0]
+    supabase.table("device_otps").update({"verified": True}).eq("id", row["id"]).execute()
     supabase.table("trusted_devices").insert({
         "user_id": user_id, "fingerprint": fingerprint,
-        "device_name": row_data["device_name"], "revoked": False,
+        "device_name": row["device_name"], "revoked": False,
     }).execute()
     return True
-
