@@ -77,3 +77,31 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+# Phase 13: Bridge to EnhancedNotificationService
+import logging as _logging
+_notif_logger = _logging.getLogger(__name__)
+
+async def notify_trade_executed(user_id: str, trade_data: dict) -> None:
+    try:
+        from app.services.enhanced_notification_service import EnhancedNotificationService
+        svc = EnhancedNotificationService()
+        await svc.send_trade_notification(user_id=user_id, trade_data=trade_data)
+    except Exception as _e:
+        _notif_logger.warning("notify_trade_executed failed: %s", _e)
+
+async def notify_risk_alert(user_id: str, risk_data: dict) -> None:
+    try:
+        from app.services.enhanced_notification_service import EnhancedNotificationService
+        svc = EnhancedNotificationService()
+        await svc.send_risk_alert(user_id=user_id, risk_data=risk_data)
+    except Exception as _e:
+        _notif_logger.warning("notify_risk_alert failed: %s", _e)
+
+async def notify_new_signal(user_id: str, signal_data: dict) -> None:
+    try:
+        from app.services.enhanced_notification_service import EnhancedNotificationService
+        svc = EnhancedNotificationService()
+        await svc.send_signal_notification(user_id=user_id, signal_data=signal_data)
+    except Exception as _e:
+        _notif_logger.warning("notify_new_signal failed: %s", _e)

@@ -40,3 +40,5 @@ qrcode[pil]==7.4.2
 supabase
 
 slowapi==0.1.9
+
+twilio>=8.0.0
