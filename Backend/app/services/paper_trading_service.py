@@ -233,3 +233,21 @@ async def get_trade_by_id(trade_id: str) -> Optional[Dict]:
     except Exception as e:
         logger.error("get_trade_by_id error: %s", e)
         return None
+
+# ── Phase 13: Notification wiring ────────────────────────────────────────
+from app.services.notification_dispatcher import NotificationDispatcher
+_dispatcher_pt = NotificationDispatcher()
+
+async def _notify_trade(user_id: str, pair: str, direction: str, price: float, size: float):
+    """Call this immediately after a trade is saved to fire multi-channel alerts."""
+    await _dispatcher_pt.dispatch(
+        user_id    = user_id,
+        event_type = "trade",
+        payload    = {
+            "pair":      pair,
+            "direction": direction.upper(),
+            "price":     str(round(price, 5)),
+            "size":      f"{size} lot",
+        }
+    )
+# ── End Phase 13 ─────────────────────────────────────────────────────────

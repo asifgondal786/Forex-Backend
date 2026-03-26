@@ -706,3 +706,35 @@ class ForexDataService:
 
 # Global instance
 forex_service = ForexDataService()
+
+
+# ── Phase 13: Notification wiring ────────────────────────────────────────
+from app.services.notification_dispatcher import NotificationDispatcher
+_dispatcher_fd = NotificationDispatcher()
+
+async def _notify_signal(user_id: str, pair: str, signal: str, confidence: float):
+    """Call this from generate_signal() when confidence > 80%."""
+    if confidence < 0.80:
+        return  # Only fire for high-confidence signals
+    await _dispatcher_fd.dispatch(
+        user_id    = user_id,
+        event_type = "signal",
+        payload    = {
+            "pair":       pair,
+            "signal":     signal.upper(),
+            "confidence": f"{int(confidence * 100)}%",
+        }
+    )
+
+async def _notify_market(user_id: str, pair: str, event: str, time_utc: str):
+    """Call this when an economic calendar event is detected for a watched pair."""
+    await _dispatcher_fd.dispatch(
+        user_id    = user_id,
+        event_type = "market",
+        payload    = {
+            "pair":  pair,
+            "event": event,
+            "time":  time_utc,
+        }
+    )
+# ── End Phase 13 ─────────────────────────────────────────────────────────
