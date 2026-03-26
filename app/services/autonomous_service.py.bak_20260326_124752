@@ -156,21 +156,3 @@ def _log_execution(user_id, pair, direction, confidence,
 
 
 
-
-
-# ── Phase 13: Notification wiring ────────────────────────────────────────
-from app.services.notification_dispatcher import NotificationDispatcher
-_dispatcher_as = NotificationDispatcher()
-
-async def _notify_risk(user_id: str, pair: str, drawdown_pct: float, threshold_pct: float):
-    """Call this when drawdown threshold is breached to fire high-priority alerts."""
-    await _dispatcher_as.dispatch(
-        user_id    = user_id,
-        event_type = "risk",
-        payload    = {
-            "pair":      pair,
-            "drawdown":  f"{drawdown_pct:.1f}%",
-            "threshold": f"{threshold_pct:.1f}%",
-        }
-    )
-# ── End Phase 13 ─────────────────────────────────────────────────────────
