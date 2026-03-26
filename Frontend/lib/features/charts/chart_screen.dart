@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
@@ -65,7 +65,7 @@ class _ChartScreenState extends State<ChartScreen> {
   body { margin:0; background:#0D1117; overflow:hidden; }
   #chart { width:100vw; height:100vh; }
 </style>
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lightweight-charts@3.3.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 <div id="chart"></div>
@@ -165,3 +165,4 @@ class _ChartScreenState extends State<ChartScreen> {
     );
   }
 }
+

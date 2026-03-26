@@ -242,7 +242,8 @@ from .users import router as users_router  # noqa: E402
 from .websocket_routes import router as websocket_router  # noqa: E402
 from .engagement_routes import router as engagement_router  # noqa: E402
 from .auth_status_routes import router as auth_status_router  # noqa: E402
-from .header_routes import router as header_router  # noqa: E402
+from .header_routes import router as header_router
+from .tasks_routes import router as tasks_router  # noqa: E402
 from .notifications_routes import router as notifications_router  # noqa: E402
 from .settings_routes import router as settings_router  # noqa: E402
 
@@ -1248,6 +1249,7 @@ _v1.include_router(websocket_router)
 _v1.include_router(engagement_router)
 _v1.include_router(auth_status_router)
 _v1.include_router(header_router)
+_v1.include_router(tasks_router)
 _v1.include_router(notifications_router)
 _v1.include_router(settings_router)
 if AI_ROUTES_AVAILABLE:
@@ -1360,5 +1362,8 @@ async def api_health():
 # Phase 9 — Social and Autonomy
 from app.social_routes import router as social_router
 app.include_router(social_router)
+
+
+
 
 

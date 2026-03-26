@@ -60,7 +60,7 @@ async def get_current_user(
     return user
 
 router = APIRouter(
-    prefix="/api/users",
+    prefix="/users",
     tags=["Users"],
 )
 
@@ -100,3 +100,4 @@ async def update_current_user(
 async def get_user_preferences(current_user: dict = Depends(get_current_user)):
     """Get user preferences"""
     return current_user.get("preferences", {})
+
