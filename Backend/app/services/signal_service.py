@@ -256,6 +256,13 @@ async def generate_signals(
 
         await _save_signal_to_supabase(signal)
         signals.append(signal)
+        # Phase 13 (_notify_signal_task_injected)
+        try:
+            import asyncio as _asyncio
+            from app.services.notification_service import notify_new_signal
+            _asyncio.create_task(notify_new_signal(user_id="broadcast", signal_data=signal.model_dump()))
+        except Exception as _ne:
+            logger.warning("Signal notification task failed: %s", _ne)
         logger.info(
             "Signal [Phase4] %s %s conf=%.2f→%.2f tech=%s",
             action, pair, gemini_conf, fused_conf,
