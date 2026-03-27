@@ -1,5 +1,5 @@
 # Phase13_Test_Notifications.ps1
-$BASE = "http://localhost:8000"
+$BASE = "https://forex-backend-production-bc44.up.railway.app"
 $TOKEN = $env:TEST_JWT_TOKEN
 $headers = @{ "Authorization" = "Bearer $TOKEN"; "Content-Type" = "application/json" }
 
