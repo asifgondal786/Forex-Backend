@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # ── Brevo template IDs (set in Railway Variables) ──────────────────────────
 TEMPLATE_IDS = {
-    "trade":  int(os.environ.get("BREVO_TRADE_TEMPLATE_ID",  "0")),
+    "trade":  int(os.environ.get("BREVO_TRADE_TEMPLATE_ID", "0") or "0") if str(os.environ.get("BREVO_TRADE_TEMPLATE_ID", "0")).isdigit() else 0,
     "risk":   int(os.environ.get("BREVO_RISK_TEMPLATE_ID",   "0")),
     "signal": int(os.environ.get("BREVO_SIGNAL_TEMPLATE_ID", "0")),
     "market": int(os.environ.get("BREVO_MARKET_TEMPLATE_ID", "0")),
