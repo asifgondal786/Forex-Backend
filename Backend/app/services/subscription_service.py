@@ -11,7 +11,7 @@ import os
 
 from fastapi import HTTPException
 
-from ..utils.firestore_client import get_firestore_client
+from ..database import supabase
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -32,7 +32,6 @@ class SubscriptionService:
         "enterprise": 2,
     }
 
-    # Feature-level minimum plans when paywall is enabled.
     _FEATURE_MIN_PLAN: Dict[str, str] = {
         "live_broker_execution": "premium",
         "full_autonomy": "premium",
@@ -41,8 +40,6 @@ class SubscriptionService:
 
     def __init__(self) -> None:
         self._subscriptions_by_user: Dict[str, Dict[str, Any]] = {}
-        self._firestore = None
-        self._firestore_disabled = False
 
         self.paywall_enabled = _env_bool("SUBSCRIPTION_PAYWALL_ENABLED", False)
         self.allow_dev_bypass = _env_bool("SUBSCRIPTION_ALLOW_DEV_BYPASS", True)
@@ -67,18 +64,6 @@ class SubscriptionService:
             return value
         return "active"
 
-    def _get_firestore(self):
-        if self._firestore_disabled:
-            return None
-        if self._firestore is not None:
-            return self._firestore
-        try:
-            self._firestore = get_firestore_client()
-            return self._firestore
-        except Exception:
-            self._firestore_disabled = True
-            return None
-
     def _default_subscription(self, user_id: str) -> Dict[str, Any]:
         now = _now_iso()
         return {
@@ -94,45 +79,49 @@ class SubscriptionService:
             "premium_price_usd": self.premium_price_usd,
         }
 
-    def _load_from_firestore(self, user_id: str) -> Optional[Dict[str, Any]]:
-        db = self._get_firestore()
-        if db is None:
+    def _load_from_supabase(self, user_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            result = (
+                supabase.table("user_subscriptions")
+                .select("*")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            if not result.data:
+                return None
+            data = result.data[0]
+            now = _now_iso()
+            return {
+                "user_id": user_id,
+                "plan": self._normalize_plan(data.get("plan")),
+                "status": self._normalize_status(data.get("status")),
+                "source": str(data.get("source") or "supabase"),
+                "subscribed_at": str(data.get("subscribed_at") or now),
+                "updated_at": str(data.get("updated_at") or now),
+                "renews_on": data.get("renews_on"),
+                "expires_on": data.get("expires_on"),
+                "paywall_enabled": self.paywall_enabled,
+                "premium_price_usd": self.premium_price_usd,
+            }
+        except Exception:
             return None
-        doc = db.collection("user_subscriptions").document(user_id).get()
-        if not doc.exists:
-            return None
-        data = doc.to_dict() or {}
-        now = _now_iso()
-        return {
-            "user_id": user_id,
-            "plan": self._normalize_plan(data.get("plan")),
-            "status": self._normalize_status(data.get("status")),
-            "source": str(data.get("source") or "firestore"),
-            "subscribed_at": str(data.get("subscribed_at") or now),
-            "updated_at": str(data.get("updated_at") or now),
-            "renews_on": data.get("renews_on"),
-            "expires_on": data.get("expires_on"),
-            "paywall_enabled": self.paywall_enabled,
-            "premium_price_usd": self.premium_price_usd,
-        }
 
     def _persist(self, subscription: Dict[str, Any]) -> None:
-        db = self._get_firestore()
-        if db is None:
-            return
-        db.collection("user_subscriptions").document(subscription["user_id"]).set(
-            {
-                "user_id": subscription["user_id"],
-                "plan": subscription["plan"],
-                "status": subscription["status"],
-                "source": subscription["source"],
-                "subscribed_at": subscription["subscribed_at"],
-                "updated_at": subscription["updated_at"],
-                "renews_on": subscription["renews_on"],
-                "expires_on": subscription["expires_on"],
-            },
-            merge=True,
-        )
+        try:
+            supabase.table("user_subscriptions").upsert(
+                {
+                    "user_id": subscription["user_id"],
+                    "plan": subscription["plan"],
+                    "status": subscription["status"],
+                    "source": subscription["source"],
+                    "subscribed_at": subscription["subscribed_at"],
+                    "updated_at": subscription["updated_at"],
+                    "renews_on": subscription["renews_on"],
+                    "expires_on": subscription["expires_on"],
+                }
+            ).execute()
+        except Exception:
+            pass
 
     def get_subscription(self, user_id: str) -> Dict[str, Any]:
         cached = self._subscriptions_by_user.get(user_id)
@@ -141,7 +130,7 @@ class SubscriptionService:
             cached["premium_price_usd"] = self.premium_price_usd
             return dict(cached)
 
-        loaded = self._load_from_firestore(user_id)
+        loaded = self._load_from_supabase(user_id)
         if loaded is None:
             loaded = self._default_subscription(user_id)
 
@@ -186,64 +175,29 @@ class SubscriptionService:
         required_plan = self._FEATURE_MIN_PLAN.get(feature_key)
 
         if not self.paywall_enabled:
-            return {
-                "allowed": True,
-                "reason": "paywall_disabled",
-                "feature": feature_key,
-                "required_plan": required_plan,
-                "plan": plan,
-                "status": status,
-                "paywall_enabled": self.paywall_enabled,
-                "premium_price_usd": self.premium_price_usd,
-            }
+            return {"allowed": True, "reason": "paywall_disabled", "feature": feature_key,
+                    "required_plan": required_plan, "plan": plan, "status": status,
+                    "paywall_enabled": self.paywall_enabled, "premium_price_usd": self.premium_price_usd}
 
         if self.allow_dev_bypass and user_id.startswith("dev_"):
-            return {
-                "allowed": True,
-                "reason": "dev_bypass",
-                "feature": feature_key,
-                "required_plan": required_plan,
-                "plan": plan,
-                "status": status,
-                "paywall_enabled": self.paywall_enabled,
-                "premium_price_usd": self.premium_price_usd,
-            }
+            return {"allowed": True, "reason": "dev_bypass", "feature": feature_key,
+                    "required_plan": required_plan, "plan": plan, "status": status,
+                    "paywall_enabled": self.paywall_enabled, "premium_price_usd": self.premium_price_usd}
 
         if required_plan is None:
-            return {
-                "allowed": True,
-                "reason": "unrestricted_feature",
-                "feature": feature_key,
-                "required_plan": None,
-                "plan": plan,
-                "status": status,
-                "paywall_enabled": self.paywall_enabled,
-                "premium_price_usd": self.premium_price_usd,
-            }
+            return {"allowed": True, "reason": "unrestricted_feature", "feature": feature_key,
+                    "required_plan": None, "plan": plan, "status": status,
+                    "paywall_enabled": self.paywall_enabled, "premium_price_usd": self.premium_price_usd}
 
         if status not in {"active", "trialing"}:
-            return {
-                "allowed": False,
-                "reason": "inactive_subscription",
-                "feature": feature_key,
-                "required_plan": required_plan,
-                "plan": plan,
-                "status": status,
-                "paywall_enabled": self.paywall_enabled,
-                "premium_price_usd": self.premium_price_usd,
-            }
+            return {"allowed": False, "reason": "inactive_subscription", "feature": feature_key,
+                    "required_plan": required_plan, "plan": plan, "status": status,
+                    "paywall_enabled": self.paywall_enabled, "premium_price_usd": self.premium_price_usd}
 
         allowed = self._compare_plan_rank(plan, required_plan)
-        return {
-            "allowed": allowed,
-            "reason": "plan_sufficient" if allowed else "plan_upgrade_required",
-            "feature": feature_key,
-            "required_plan": required_plan,
-            "plan": plan,
-            "status": status,
-            "paywall_enabled": self.paywall_enabled,
-            "premium_price_usd": self.premium_price_usd,
-        }
+        return {"allowed": allowed, "reason": "plan_sufficient" if allowed else "plan_upgrade_required",
+                "feature": feature_key, "required_plan": required_plan, "plan": plan, "status": status,
+                "paywall_enabled": self.paywall_enabled, "premium_price_usd": self.premium_price_usd}
 
     def ensure_feature_access(self, user_id: str, feature: str) -> Dict[str, Any]:
         decision = self.check_feature_access(user_id=user_id, feature=feature)
@@ -251,14 +205,9 @@ class SubscriptionService:
             return decision
         raise HTTPException(
             status_code=402,
-            detail={
-                "message": (
-                    f"Feature '{decision.get('feature')}' requires "
-                    f"{decision.get('required_plan', 'a paid')} plan."
-                ),
-                "code": "SUBSCRIPTION_REQUIRED",
-                **decision,
-            },
+            detail={"message": (f"Feature '{decision.get('feature')}' requires "
+                                f"{decision.get('required_plan', 'a paid')} plan."),
+                    "code": "SUBSCRIPTION_REQUIRED", **decision},
         )
 
     def get_feature_matrix(self, user_id: str) -> Dict[str, Any]:
@@ -266,11 +215,7 @@ class SubscriptionService:
         access_map: Dict[str, Dict[str, Any]] = {}
         for feature in features:
             access_map[feature] = self.check_feature_access(user_id=user_id, feature=feature)
-        return {
-            "user_id": user_id,
-            "subscription": self.get_subscription(user_id),
-            "features": access_map,
-        }
+        return {"user_id": user_id, "subscription": self.get_subscription(user_id), "features": access_map}
 
 
 subscription_service = SubscriptionService()
