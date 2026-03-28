@@ -13,8 +13,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
-from app.core.supabase_client import supabase
-from app.core.config import settings
+from app.database import supabase
+
 
 
 # ─────────────────────────────────────────────
@@ -33,7 +33,7 @@ def generate_totp_secret(user_id: str) -> dict:
     # Build otpauth URI for QR code
     provisioning_uri = totp.provisioning_uri(
         name=user_id,
-        issuer_name=settings.APP_NAME  # e.g. "Tajir"
+        issuer_name="Tajir"  # e.g. "Tajir"
     )
 
     # Generate QR code image as base64
