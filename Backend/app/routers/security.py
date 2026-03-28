@@ -16,7 +16,7 @@ All security-related API endpoints:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.firebase_auth import get_current_user   # your existing Firebase auth dependency
+from app.auth import get_current_user   # your existing Firebase auth dependency
 from app.models.security_models import (
     TwoFASetupResponse, TwoFAVerifyRequest, TwoFAVerifyResponse,
     TwoFAStatusResponse, TwoFADisableRequest,
