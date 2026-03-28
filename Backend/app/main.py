@@ -13,9 +13,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-
-
 from contextlib import asynccontextmanager
+
 import os
 import time
 import collections
@@ -246,6 +245,8 @@ from .header_routes import router as header_router
 from .tasks_routes import router as tasks_router  # noqa: E402
 from .notifications_routes import router as notifications_router  # noqa: E402
 from .settings_routes import router as settings_router  # noqa: E402
+
+
 
 try:
     from .ai_task_routes import router as ai_task_router
@@ -1277,6 +1278,11 @@ app.include_router(paper_router)
 app.include_router(signal_router)
 app.include_router(news_router)
 
+
+# Register the router â€” add this alongside your other app.include_router() calls
+from app.routers.security import router as security_router
+app.include_router(security_router)
+
 # security router added
 from app.security_routes import router as security_router
 app.include_router(security_router)
@@ -1359,7 +1365,7 @@ async def api_health():
 
 
 
-# Phase 9 — Social and Autonomy
+# Phase 9 ï¿½ Social and Autonomy
 from app.social_routes import router as social_router
 app.include_router(social_router)
 
