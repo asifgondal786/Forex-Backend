@@ -10,7 +10,7 @@ import asyncio
 import os
 import aiohttp
 
-from ..utils.firestore_client import get_firestore_client
+from ..database import supabase
 from .market_intelligence_service import MarketIntelligenceService
 from .mail_delivery_service import MailDeliveryService
 
@@ -164,12 +164,8 @@ class EnhancedNotificationService:
 
         self.default_webhook_url = os.getenv("NOTIFICATION_WEBHOOK_URL", "").strip()
 
-        self._firestore = None
 
-    def _get_firestore(self):
-        if self._firestore is None:
-            self._firestore = get_firestore_client()
-        return self._firestore
+
 
     def _normalize_channel_settings(self, raw: Optional[Dict]) -> Dict[str, str]:
         if not isinstance(raw, dict):
@@ -305,11 +301,10 @@ class EnhancedNotificationService:
 
     def _load_preferences_from_firestore(self, user_id: str) -> Optional[NotificationPreference]:
         try:
-            db = self._get_firestore()
-            doc = db.collection("notification_preferences").document(user_id).get()
-            if not doc.exists:
+            result = supabase.table("notification_preferences").select("*").eq("user_id", user_id).execute()
+            if not result.data:
                 return None
-            data = doc.to_dict() or {}
+            data = result.data[0]
             enabled_raw = data.get("enabled_channels") or [NotificationChannel.PUSH.value, NotificationChannel.IN_APP.value]
             disabled_raw = data.get("disabled_categories") or []
 
@@ -356,27 +351,23 @@ class EnhancedNotificationService:
 
     def _persist_preferences(self, preferences: NotificationPreference):
         try:
-            db = self._get_firestore()
-            db.collection("notification_preferences").document(preferences.user_id).set(
-                {
-                    "user_id": preferences.user_id,
-                    "enabled_channels": [ch.value for ch in preferences.enabled_channels],
-                    "disabled_categories": [cat.value for cat in preferences.disabled_categories],
-                    "quiet_hours_start": preferences.quiet_hours_start,
-                    "quiet_hours_end": preferences.quiet_hours_end,
-                    "max_notifications_per_hour": preferences.max_notifications_per_hour,
-                    "digest_mode": preferences.digest_mode,
-                    "digest_frequency": preferences.digest_frequency,
-                    "autonomous_mode": preferences.autonomous_mode,
-                    "autonomous_profile": preferences.autonomous_profile,
-                    "autonomous_min_confidence": preferences.autonomous_min_confidence,
-                    "autonomous_stage_alerts": preferences.autonomous_stage_alerts,
-                    "autonomous_stage_interval_seconds": preferences.autonomous_stage_interval_seconds,
-                    "channel_settings": preferences.channel_settings,
-                    "updated_at": datetime.utcnow(),
-                },
-                merge=True,
-            )
+            supabase.table("notification_preferences").upsert({
+                "user_id": preferences.user_id,
+                "enabled_channels": [ch.value for ch in preferences.enabled_channels],
+                "disabled_categories": [cat.value for cat in preferences.disabled_categories],
+                "quiet_hours_start": preferences.quiet_hours_start,
+                "quiet_hours_end": preferences.quiet_hours_end,
+                "max_notifications_per_hour": preferences.max_notifications_per_hour,
+                "digest_mode": preferences.digest_mode,
+                "digest_frequency": preferences.digest_frequency,
+                "autonomous_mode": preferences.autonomous_mode,
+                "autonomous_profile": preferences.autonomous_profile,
+                "autonomous_min_confidence": preferences.autonomous_min_confidence,
+                "autonomous_stage_alerts": preferences.autonomous_stage_alerts,
+                "autonomous_stage_interval_seconds": preferences.autonomous_stage_interval_seconds,
+                "channel_settings": preferences.channel_settings,
+                "updated_at": datetime.utcnow().isoformat(),
+            }).execute()
         except Exception as exc:
             print(f"[PREFS] Firestore unavailable: {exc}")
 
@@ -726,15 +717,9 @@ class EnhancedNotificationService:
 
     async def _persist_delivery_metadata(self, notification: Notification) -> None:
         try:
-            db = self._get_firestore()
-            db.collection("notifications").document(notification.notification_id).set(
-                {
-                    "channelsToSend": self._serialize_channels(notification.channels_to_send),
-                    "deliveryStatus": self._serialize_delivery_status(notification.delivery_status),
-                    "deliveryUpdatedAt": datetime.utcnow(),
-                },
-                merge=True,
-            )
+            supabase.table("notifications").update({
+                "delivery_status": self._serialize_delivery_status(notification.delivery_status),
+            }).eq("id", notification.notification_id).execute()
         except Exception:
             # Best-effort persistence only.
             pass
@@ -1197,26 +1182,19 @@ class EnhancedNotificationService:
         """Store in-app notification"""
         # Already stored in self.notifications
         try:
-            db = self._get_firestore()
-            db.collection("notifications").document(notification.notification_id).set(
-                {
-                    "notificationId": notification.notification_id,
-                    "userId": notification.user_id,
-                    "title": notification.title,
-                    "message": notification.message,
-                    "shortMessage": notification.short_message,
-                    "category": notification.category.value,
-                    "priority": notification.priority.value,
-                    "timestamp": notification.timestamp,
-                    "read": notification.read,
-                    "actionUrl": notification.action_url,
-                    "richData": notification.rich_data,
-                    "channelsToSend": self._serialize_channels(notification.channels_to_send),
-                    "deliveryStatus": self._serialize_delivery_status(notification.delivery_status),
-                    "createdAt": datetime.utcnow(),
-                },
-                merge=True,
-            )
+            supabase.table("notifications").upsert({
+                "id": notification.notification_id,
+                "user_id": notification.user_id,
+                "title": notification.title,
+                "message": notification.message,
+                "short_message": notification.short_message,
+                "category": notification.category.value,
+                "priority": notification.priority.value,
+                "timestamp": notification.timestamp.isoformat(),
+                "is_read": notification.read,
+                "action_url": notification.action_url,
+                "created_at": datetime.utcnow().isoformat(),
+            }).execute()
         except Exception as exc:
             print(f"[IN_APP] Firestore unavailable: {exc}")
 
@@ -1311,35 +1289,28 @@ class EnhancedNotificationService:
             return ""
 
         try:
-            db = self._get_firestore()
-            docs = list(db.collection("notifications").where("userId", "==", user_id).stream())
+            result = supabase.table("notifications").select("*").eq("user_id", user_id).execute()
             items: List[Dict] = []
-            for doc in docs:
-                data = doc.to_dict() or {}
-                read = data.get("read")
-                if read is None:
-                    read = data.get("is_read") or data.get("isRead") or False
+            for data in (result.data or []):
+                read = bool(data.get("is_read") or False)
                 if unread_only and read:
                     continue
-
-                timestamp = data.get("timestamp") or data.get("createdAt") or data.get("created_at")
+                timestamp = data.get("timestamp") or data.get("created_at")
                 sort_dt = _coerce_dt(timestamp)
-                items.append(
-                    {
-                        "notification_id": data.get("notificationId") or data.get("notification_id") or doc.id,
-                        "title": data.get("title") or "",
-                        "message": data.get("message") or "",
-                        "category": data.get("category") or "",
-                        "priority": data.get("priority") or "",
-                        "timestamp": _format_ts(timestamp),
-                        "read": bool(read),
-                        "clicked": bool(data.get("clicked") or False),
-                        "rich_data": data.get("richData") or data.get("rich_data") or {},
-                        "channels_to_send": data.get("channelsToSend") or data.get("channels_to_send") or [],
-                        "delivery_status": data.get("deliveryStatus") or data.get("delivery_status") or {},
-                        "_sort_ts": sort_dt,
-                    }
-                )
+                items.append({
+                    "notification_id": data.get("id") or "",
+                    "title": data.get("title") or "",
+                    "message": data.get("message") or "",
+                    "category": data.get("category") or "",
+                    "priority": data.get("priority") or "",
+                    "timestamp": _format_ts(timestamp),
+                    "read": read,
+                    "clicked": False,
+                    "rich_data": {},
+                    "channels_to_send": [],
+                    "delivery_status": data.get("delivery_status") or {},
+                    "_sort_ts": sort_dt,
+                })
 
             items.sort(key=lambda item: item.get("_sort_ts", datetime.min), reverse=True)
             for item in items:
@@ -1384,21 +1355,14 @@ class EnhancedNotificationService:
             updated = True
 
         try:
-            db = self._get_firestore()
-            doc_ref = db.collection("notifications").document(notification_id)
-            if user_id:
-                doc = doc_ref.get()
-                if doc.exists:
-                    data = doc.to_dict() or {}
-                    if data.get("userId") and data.get("userId") != user_id:
-                        return {"error": "Notification not found"}
-            doc_ref.set(
-                {
-                    "read": True,
-                    "readAt": datetime.utcnow(),
-                },
-                merge=True,
-            )
+            result = supabase.table("notifications").select("user_id").eq("id", notification_id).execute()
+            if user_id and result.data:
+                if result.data[0].get("user_id") != user_id:
+                    return {"error": "Notification not found"}
+            supabase.table("notifications").update({
+                "is_read": True,
+                "read_at": datetime.utcnow().isoformat(),
+            }).eq("id", notification_id).execute()
             updated = True
         except Exception:
             pass

@@ -1,14 +1,11 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+import uuid
 
-from firebase_admin import firestore
-
-from ..utils.firestore_client import get_firestore_client
+from ..database import supabase
 
 
 class EngagementActivityService:
-    def __init__(self):
-        self.db = get_firestore_client()
 
     def log_activity(
         self,
@@ -19,20 +16,23 @@ class EngagementActivityService:
         color: Optional[str] = None,
     ) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
+        activity_id = str(uuid.uuid4())
         payload = {
-            "userId": user_id,
+            "id": activity_id,
+            "user_id": user_id,
             "type": activity_type,
             "message": message,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": now.isoformat(),
             "emoji": emoji,
             "color": color,
         }
+        try:
+            supabase.table("ai_activity").insert(payload).execute()
+        except Exception:
+            pass
 
-        doc_ref = self.db.collection("ai_activity").document()
-        doc_ref.set(payload)
-
-        response = {
-            "id": doc_ref.id,
+        return {
+            "id": activity_id,
             "userId": user_id,
             "type": activity_type,
             "message": message,
@@ -40,7 +40,6 @@ class EngagementActivityService:
             "emoji": emoji,
             "color": color,
         }
-        return response
 
     def get_activity_feed(
         self,
@@ -48,40 +47,41 @@ class EngagementActivityService:
         limit: int = 10,
         cursor: Optional[str] = None,
     ) -> Dict[str, Any]:
-        query = (
-            self.db.collection("ai_activity")
-            .where("userId", "==", user_id)
-            .order_by("timestamp", direction=firestore.Query.DESCENDING)
-            .limit(limit)
-        )
+        try:
+            query = (
+                supabase.table("ai_activity")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("timestamp", desc=True)
+                .limit(limit)
+            )
+            if cursor:
+                query = query.lt("id", cursor)
 
-        if cursor:
-            cursor_doc = self.db.collection("ai_activity").document(cursor).get()
-            if cursor_doc.exists:
-                query = query.start_after(cursor_doc)
+            result = query.execute()
+            docs = result.data or []
+        except Exception:
+            docs = []
 
-        docs = list(query.stream())
-        activities: List[Dict[str, Any]] = []
-
-        for doc in docs:
-            data = doc.to_dict() or {}
-            activities.append(self._normalize_activity(doc.id, data, user_id))
-
-        next_cursor = docs[-1].id if len(docs) == limit else None
+        activities = [self._normalize_activity(row) for row in docs]
+        next_cursor = docs[-1]["id"] if len(docs) == limit else None
         return {"activities": activities, "next_cursor": next_cursor}
 
-    def _normalize_activity(self, doc_id: str, data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+    def _normalize_activity(self, data: Dict[str, Any]) -> Dict[str, Any]:
         timestamp = data.get("timestamp")
-        if hasattr(timestamp, "to_datetime"):
-            timestamp = timestamp.to_datetime()
+        if isinstance(timestamp, str):
+            try:
+                timestamp = datetime.fromisoformat(timestamp)
+            except ValueError:
+                timestamp = datetime.now(timezone.utc)
         if timestamp is None:
             timestamp = datetime.now(timezone.utc)
 
         return {
-            "id": doc_id,
-            "userId": data.get("userId", user_id),
-            "type": data.get("type", "monitor"),
-            "message": data.get("message", ""),
+            "id": data.get("id") or "",
+            "userId": data.get("user_id") or "",
+            "type": data.get("type") or "monitor",
+            "message": data.get("message") or "",
             "timestamp": timestamp,
             "emoji": data.get("emoji"),
             "color": data.get("color"),

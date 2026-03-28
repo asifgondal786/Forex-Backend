@@ -14,13 +14,13 @@ import json
 import os
 import uuid
 
-from ..utils.firestore_client import get_firestore_client
+from ..database import supabase
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
-except Exception:  # pragma: no cover - handled via runtime checks
-    Fernet = None  # type: ignore[assignment]
-    InvalidToken = Exception  # type: ignore[assignment]
+except Exception:
+    Fernet = None
+    InvalidToken = Exception
 
 
 def _now_iso() -> str:
@@ -37,8 +37,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
 class CredentialVaultService:
     def __init__(self) -> None:
         self._records_by_user: Dict[str, Dict[str, Dict[str, Any]]] = {}
-        self._firestore = None
-        self._firestore_disabled = False
         self._key_mode = "configured"
         self._cipher = self._build_cipher()
 
@@ -76,10 +74,8 @@ class CredentialVaultService:
     def _build_fernet_from_secret(self, secret: str, configured: bool):
         secret_bytes = secret.encode("utf-8")
         try:
-            # If already a valid Fernet key, use as-is.
             return Fernet(secret_bytes)
         except Exception:
-            # Otherwise derive deterministic 32-byte key from provided secret.
             digest = hashlib.sha256(secret_bytes).digest()
             derived = base64.urlsafe_b64encode(digest)
             if configured:
@@ -99,28 +95,16 @@ class CredentialVaultService:
             "CREDENTIAL_VAULT_MASTER_KEY."
         )
 
-    def _get_firestore(self):
-        if self._firestore_disabled:
-            return None
-        if self._firestore is not None:
-            return self._firestore
-        try:
-            self._firestore = get_firestore_client()
-            return self._firestore
-        except Exception:
-            self._firestore_disabled = True
-            return None
-
     def _encrypt_payload(self, payload: Dict[str, Any]) -> str:
         self._ensure_enabled()
         serialized = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
-        token = self._cipher.encrypt(serialized.encode("utf-8"))  # type: ignore[union-attr]
+        token = self._cipher.encrypt(serialized.encode("utf-8"))
         return token.decode("utf-8")
 
     def _decrypt_payload(self, token: str) -> Dict[str, Any]:
         self._ensure_enabled()
         try:
-            decrypted = self._cipher.decrypt(token.encode("utf-8"))  # type: ignore[union-attr]
+            decrypted = self._cipher.decrypt(token.encode("utf-8"))
         except InvalidToken as exc:
             raise ValueError("Stored credential payload is invalid or key has changed") from exc
         data = json.loads(decrypted.decode("utf-8"))
@@ -156,14 +140,17 @@ class CredentialVaultService:
             return cached
 
         records: Dict[str, Dict[str, Any]] = {}
-        db = self._get_firestore()
-        if db is not None:
-            query = db.collection("credential_vault").where("user_id", "==", user_id).stream()
-            for doc in query:
-                data = doc.to_dict() or {}
-                credential_id = str(data.get("credential_id") or doc.id)
-                provider = str(data.get("provider") or "").lower()
-                if provider != "forex_com":
+        try:
+            result = (
+                supabase.table("credential_vault")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("provider", "forex_com")
+                .execute()
+            )
+            for data in (result.data or []):
+                credential_id = str(data.get("credential_id") or "")
+                if not credential_id:
                     continue
                 records[credential_id] = {
                     "credential_id": credential_id,
@@ -179,16 +166,15 @@ class CredentialVaultService:
                     "metadata": data.get("metadata") or {},
                     "ciphertext": str(data.get("ciphertext") or ""),
                 }
+        except Exception:
+            pass
 
         self._records_by_user[user_id] = records
         return records
 
     def _persist_record(self, record: Dict[str, Any]) -> None:
-        db = self._get_firestore()
-        if db is None:
-            return
-        db.collection("credential_vault").document(record["credential_id"]).set(
-            {
+        try:
+            supabase.table("credential_vault").upsert({
                 "credential_id": record["credential_id"],
                 "user_id": record["user_id"],
                 "provider": record["provider"],
@@ -201,15 +187,15 @@ class CredentialVaultService:
                 "last_used_at": record.get("last_used_at"),
                 "metadata": record.get("metadata") or {},
                 "ciphertext": record["ciphertext"],
-            },
-            merge=True,
-        )
+            }).execute()
+        except Exception:
+            pass
 
     def _delete_record_from_store(self, credential_id: str) -> None:
-        db = self._get_firestore()
-        if db is None:
-            return
-        db.collection("credential_vault").document(credential_id).delete()
+        try:
+            supabase.table("credential_vault").delete().eq("credential_id", credential_id).execute()
+        except Exception:
+            pass
 
     def store_forex_credentials(
         self,
@@ -224,10 +210,7 @@ class CredentialVaultService:
         if not username or not password:
             raise ValueError("Username and password are required")
 
-        payload = {
-            "username": username,
-            "password": password,
-        }
+        payload = {"username": username, "password": password}
         ciphertext = self._encrypt_payload(payload)
         credential_id = f"cred_{uuid.uuid4().hex[:18]}"
         now = _now_iso()
