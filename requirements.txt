@@ -44,3 +44,8 @@ slowapi==0.1.9
 twilio>=8.0.0
 
 sib-api-v3-sdk>=7.6.0
+
+# security layer added for 2FA
+pyotp>=2.9.0
+qrcode[pil]>=7.4.2
+Pillow>=10.0.0
