@@ -1287,6 +1287,10 @@ app.include_router(security_router)
 from app.security_routes import router as security_router
 app.include_router(security_router)
 
+# charts router added
+from app.routers.charting import router as charting_router
+app.include_router(charting_router)
+
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
     app.include_router(public_auth_router)
