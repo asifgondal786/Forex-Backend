@@ -1,3 +1,4 @@
+﻿import 'package:forex_companion/services/api_service.dart';
 import 'providers/quick_actions_provider.dart';
 import 'providers/custom_setup_provider.dart';
 import 'providers/mode_provider.dart';
@@ -59,13 +60,6 @@ Future<void> main() async {
   _validateUrlConfigOnBoot();
 
   // Phase 13 - Notification service init
-  try {
-    final notifService = NotificationService();
-    await notifService.initialize();
-    debugPrint('NotificationService initialized');
-  } catch (e) {
-    debugPrint('NotificationService init failed (non-fatal): $e');
-  }
 
   bool firebaseReady = false;
   if (useFirebaseAuth) {
