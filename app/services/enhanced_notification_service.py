@@ -1,4 +1,4 @@
-"""
+﻿"""
 Enhanced Multi-Channel Notification System
 Sends smart, contextual notifications via multiple channels
 """
@@ -396,9 +396,9 @@ class EnhancedNotificationService:
                 template_id="risk_warning",
                 category=NotificationCategory.RISK_WARNING,
                 name="Risk Warning",
-                title_template="⚠️ Risk Warning",
+                title_template="âš ï¸ Risk Warning",
                 message_template="{warning_text}. Current account status: {account_status}",
-                short_message_template="⚠️ {warning_text}",
+                short_message_template="âš ï¸ {warning_text}",
                 priority=NotificationPriority.CRITICAL
             ),
             "prediction_ready": NotificationTemplate(

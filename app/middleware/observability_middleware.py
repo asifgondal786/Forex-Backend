@@ -1,4 +1,4 @@
-"""
+﻿"""
 Observability Middleware for FastAPI
 Integrates distributed tracing, metrics, and error tracking
 """

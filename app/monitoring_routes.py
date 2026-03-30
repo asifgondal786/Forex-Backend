@@ -1,4 +1,4 @@
-"""
+﻿"""
 Phase 6: Production Monitoring Endpoints
 Exposes metrics, health checks, and observability data
 """

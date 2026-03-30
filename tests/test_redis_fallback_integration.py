@@ -1,4 +1,4 @@
-"""
+﻿"""
 Step 3: Comprehensive Redis integration and fallback tests.
 Tests verify that:
 - Redis backend works when available

@@ -1,5 +1,5 @@
-"""
-Phase 13 — Twilio Service
+﻿"""
+Phase 13 â€” Twilio Service
 Sends WhatsApp messages and SMS for high-priority events.
 Requires: pip install twilio
 """
@@ -16,7 +16,7 @@ AUTH_TOKEN       = os.environ.get("TWILIO_AUTH_TOKEN")
 WHATSAPP_FROM    = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")  # Twilio sandbox default
 SMS_FROM         = os.environ.get("TWILIO_SMS_FROM")
 
-# Event → message templates
+# Event â†’ message templates
 TEMPLATES = {
     "trade": {
         "whatsapp": "Tajir Trade Alert\nPair: {pair}\nDirection: {direction}\nPrice: {price}\nSize: {size}",
@@ -36,7 +36,7 @@ class TwilioService:
             self.client = Client(ACCOUNT_SID, AUTH_TOKEN)
         else:
             self.client = None
-            logger.warning("[Twilio] Credentials not set — service disabled")
+            logger.warning("[Twilio] Credentials not set â€” service disabled")
 
     def _get_phone(self, user_id: str) -> str | None:
         """Fetch user phone number from Supabase users table."""

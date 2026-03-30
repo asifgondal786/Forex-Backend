@@ -1,4 +1,4 @@
-import os
+﻿import os
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
@@ -29,7 +29,7 @@ def test_root():
 
 
 def test_health():
-    # /api/health is exempt — no token required once main.py one-liner is applied.
+    # /api/health is exempt â€” no token required once main.py one-liner is applied.
     # Until then, we mock to confirm the endpoint itself works correctly.
     with patch("app.utils.firestore_client.verify_firebase_token", return_value=FAKE_CLAIMS):
         with _authed_client() as client:

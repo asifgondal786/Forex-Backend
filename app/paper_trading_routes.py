@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/paper_trading_routes.py
 Phase 5 - Paper Trading Endpoints
 """

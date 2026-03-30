@@ -1,4 +1,4 @@
-"""
+﻿"""
 Sentry error monitoring service for Tajir FastAPI backend.
 Initialise once at startup via init_sentry().
 """
@@ -15,7 +15,7 @@ def init_sentry() -> bool:
     """
     dsn = os.getenv("SENTRY_DSN", "").strip()
     if not dsn:
-        logger.warning("SENTRY_DSN not set — Sentry monitoring disabled.")
+        logger.warning("SENTRY_DSN not set â€” Sentry monitoring disabled.")
         return False
 
     import sentry_sdk
@@ -35,7 +35,7 @@ def init_sentry() -> bool:
     sentry_sdk.init(
         dsn=dsn,
         environment=environment,
-        # Performance tracing — 20% of requests
+        # Performance tracing â€” 20% of requests
         traces_sample_rate=0.2,
         # Profile 10% of sampled transactions
         profiles_sample_rate=0.1,
@@ -55,7 +55,7 @@ def init_sentry() -> bool:
         before_send=_before_send,
     )
 
-    logger.info(f"✅ Sentry initialised — environment={environment}")
+    logger.info(f"âœ… Sentry initialised â€” environment={environment}")
     return True
 
 

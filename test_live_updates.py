@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test script to verify WebSocket connections and live updates.
 Run this after starting the server to test functionality.
 """
@@ -12,15 +12,15 @@ async def test_websocket_connection():
     """Test WebSocket connection and receive updates."""
     uri = "ws://localhost:8080/api/ws/test_task_123"
 
-    print("🔌 Connecting to WebSocket...")
-    print(f"📡 URI: {uri}")
+    print("ðŸ”Œ Connecting to WebSocket...")
+    print(f"ðŸ“¡ URI: {uri}")
     print("-" * 60)
 
     try:
         async with websockets.connect(uri) as websocket:
-            print("✅ Connected successfully!")
+            print("âœ… Connected successfully!")
             print("-" * 60)
-            print("📥 Listening for updates for 30 seconds...\n")
+            print("ðŸ“¥ Listening for updates for 30 seconds...\n")
 
             await websocket.send("Hello from test client!")
 
@@ -31,7 +31,7 @@ async def test_websocket_connection():
                 try:
                     message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
                     data = json.loads(message)
-                    print(f"📨 Update received at {data.get('timestamp')}:")
+                    print(f"ðŸ“¨ Update received at {data.get('timestamp')}:")
                     print(f"   Type: {data.get('type', 'N/A')}")
                     print(f"   Message: {data.get('message', 'N/A')}")
 
@@ -45,20 +45,20 @@ async def test_websocket_connection():
                 except json.JSONDecodeError:
                     print(f"Raw message: {message}")
 
-            print(f"\n✅ Test completed after {timeout} seconds.")
+            print(f"\nâœ… Test completed after {timeout} seconds.")
 
     except websockets.exceptions.WebSocketException as e:
-        print(f"❌ WebSocket error: {e}")
-        print("\n💡 Make sure the server is running on localhost:8080")
+        print(f"âŒ WebSocket error: {e}")
+        print("\nðŸ’¡ Make sure the server is running on localhost:8080")
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"âŒ Unexpected error: {e}")
 
 
 async def test_http_endpoints():
     """Test HTTP endpoints."""
     base_url = "http://localhost:8080"
     print("\n" + "=" * 60)
-    print("🧪 Testing HTTP Endpoints")
+    print("ðŸ§ª Testing HTTP Endpoints")
     print("=" * 60)
 
     async with aiohttp.ClientSession() as session:
@@ -74,28 +74,28 @@ async def test_http_endpoints():
                     print(f"- Testing {name} ({endpoint}): Status {response.status}")
                     assert response.status == 200
             except Exception as e:
-                print(f"  ❌ FAILED: {e}")
+                print(f"  âŒ FAILED: {e}")
 
-    print("\n✅ HTTP tests completed.")
+    print("\nâœ… HTTP tests completed.")
     print("=" * 60)
 
 
 async def main():
     """Run all tests."""
     print("\n" + "=" * 60)
-    print("🧪 FOREX COMPANION - LIVE UPDATES TEST SUITE")
+    print("ðŸ§ª FOREX COMPANION - LIVE UPDATES TEST SUITE")
     print("=" * 60)
 
     try:
         await test_http_endpoints()
     except Exception as e:
-        print(f"\n❌ HTTP tests failed: {e}. Make sure the server is running!")
+        print(f"\nâŒ HTTP tests failed: {e}. Make sure the server is running!")
         return
 
     await test_websocket_connection()
 
     print("\n" + "=" * 60)
-    print("🎉 All tests completed!")
+    print("ðŸŽ‰ All tests completed!")
     print("=" * 60)
 
 
@@ -103,4 +103,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n⏹️  Tests interrupted by user.")
+        print("\n\nâ¹ï¸  Tests interrupted by user.")

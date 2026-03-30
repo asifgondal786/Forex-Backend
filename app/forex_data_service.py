@@ -1,4 +1,4 @@
-"""
+﻿"""
 Forex Data Service - Fetches real-time data from multiple sources
 Integrates with Google Generative AI (Gemini) for market analysis and predictions
 """
@@ -708,7 +708,7 @@ class ForexDataService:
 forex_service = ForexDataService()
 
 
-# ── Phase 13: Notification wiring ────────────────────────────────────────
+# â”€â”€ Phase 13: Notification wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from app.services.notification_dispatcher import NotificationDispatcher
 _dispatcher_fd = NotificationDispatcher()
 
@@ -737,4 +737,4 @@ async def _notify_market(user_id: str, pair: str, event: str, time_utc: str):
             "time":  time_utc,
         }
     )
-# ── End Phase 13 ─────────────────────────────────────────────────────────
+# â”€â”€ End Phase 13 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

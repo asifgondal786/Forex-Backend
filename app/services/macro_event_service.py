@@ -1,4 +1,4 @@
-"""
+﻿"""
 Macro Event Service
 Provides a lightweight "Macro Event Shield" for high-impact economic events
 such as FOMC, CPI, and NFP.

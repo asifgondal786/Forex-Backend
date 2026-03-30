@@ -1,4 +1,4 @@
-"""Middleware components for FastAPI application."""
+﻿"""Middleware components for FastAPI application."""
 
 from .audit import AuditMiddleware
 

@@ -1,15 +1,15 @@
-"""
+﻿"""
 Backend/app/market_routes.py
 
 FastAPI router for live market data endpoints.
-Register under /api/v1/market via main.py — no changes needed here
+Register under /api/v1/market via main.py â€” no changes needed here
 regardless of whether the data source is OANDA or Twelve Data.
 
 Endpoints:
-  GET /api/v1/market/prices          — prices for default pairs (EUR_USD, GBP_USD, USD_JPY)
-  GET /api/v1/market/prices?pairs=.. — prices for specific pairs
-  GET /api/v1/market/supported       — list all supported instruments
-  GET /api/v1/market/health          — connectivity check
+  GET /api/v1/market/prices          â€” prices for default pairs (EUR_USD, GBP_USD, USD_JPY)
+  GET /api/v1/market/prices?pairs=.. â€” prices for specific pairs
+  GET /api/v1/market/supported       â€” list all supported instruments
+  GET /api/v1/market/health          â€” connectivity check
 """
 
 import logging

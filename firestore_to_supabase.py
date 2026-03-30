@@ -1,4 +1,4 @@
-import firebase_admin
+﻿import firebase_admin
 from firebase_admin import credentials, firestore
 import os, json
 from datetime import timezone
@@ -45,8 +45,8 @@ stats = {c: {"read":0,"ok":0,"skip":0,"err":0} for c in
     ["users","tasks","notifications","ai_activity",
      "notification_preferences","user_subscriptions"]}
 
-# ── 1. USERS ──────────────────────────────────────────
-section("1 / 6  —  users")
+# â”€â”€ 1. USERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+section("1 / 6  â€”  users")
 docs = list(db.collection("users").stream())
 stats["users"]["read"] = len(docs)
 for doc in docs:
@@ -68,8 +68,8 @@ for doc in docs:
         log(f"ERR user: {row['id']}  {e}")
         stats["users"]["err"] += 1
 
-# ── 2. TASKS ──────────────────────────────────────────
-section("2 / 6  —  tasks")
+# â”€â”€ 2. TASKS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+section("2 / 6  â€”  tasks")
 docs = list(db.collection("tasks").stream())
 stats["tasks"]["read"] = len(docs)
 for doc in docs:
@@ -101,8 +101,8 @@ for doc in docs:
         log(f"ERR task: {doc.id}  {e}")
         stats["tasks"]["err"] += 1
 
-# ── 3. NOTIFICATIONS ──────────────────────────────────
-section("3 / 6  —  notifications")
+# â”€â”€ 3. NOTIFICATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+section("3 / 6  â€”  notifications")
 docs = list(db.collection("notifications").stream())
 stats["notifications"]["read"] = len(docs)
 for doc in docs:
@@ -129,8 +129,8 @@ for doc in docs:
         log(f"ERR notif: {doc.id}  {e}")
         stats["notifications"]["err"] += 1
 
-# ── 4. AI ACTIVITY ────────────────────────────────────
-section("4 / 6  —  ai_activity")
+# â”€â”€ 4. AI ACTIVITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+section("4 / 6  â€”  ai_activity")
 docs = list(db.collection("ai_activity").stream())
 stats["ai_activity"]["read"] = len(docs)
 for doc in docs:
@@ -154,8 +154,8 @@ for doc in docs:
         log(f"ERR ai_activity: {doc.id}  {e}")
         stats["ai_activity"]["err"] += 1
 
-# ── 5. NOTIFICATION PREFERENCES ───────────────────────
-section("5 / 6  —  notification_preferences")
+# â”€â”€ 5. NOTIFICATION PREFERENCES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+section("5 / 6  â€”  notification_preferences")
 docs = list(db.collection("notification_preferences").stream())
 stats["notification_preferences"]["read"] = len(docs)
 for doc in docs:
@@ -190,8 +190,8 @@ for doc in docs:
         log(f"ERR notif_prefs: {uid}  {e}")
         stats["notification_preferences"]["err"] += 1
 
-# ── 6. USER SUBSCRIPTIONS ─────────────────────────────
-section("6 / 6  —  user_subscriptions")
+# â”€â”€ 6. USER SUBSCRIPTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+section("6 / 6  â€”  user_subscriptions")
 docs = list(db.collection("user_subscriptions").stream())
 stats["user_subscriptions"]["read"] = len(docs)
 for doc in docs:
@@ -217,7 +217,7 @@ for doc in docs:
         log(f"ERR subscription: {uid}  {e}")
         stats["user_subscriptions"]["err"] += 1
 
-# ── SUMMARY ───────────────────────────────────────────
+# â”€â”€ SUMMARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 print(f"\n{'='*50}\n  SUMMARY  [LIVE]\n{'='*50}")
 for c, s in stats.items():
     status = "OK" if s["err"] == 0 else "ERRORS"

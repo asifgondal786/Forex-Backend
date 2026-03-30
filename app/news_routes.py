@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/news_routes.py
 News feed, economic calendar, and macro shield endpoints.
 Phase 3: /news/events and /news/macro-shield now use live ForexFactory data.

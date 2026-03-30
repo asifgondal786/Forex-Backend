@@ -1,7 +1,7 @@
-"""
+﻿"""
 Natural Language Processing Service
 Converts human commands into structured trading tasks
-Example: "Sell USD when it hits 289 with 1% stop-loss" → Structured order
+Example: "Sell USD when it hits 289 with 1% stop-loss" â†’ Structured order
 """
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -371,7 +371,7 @@ class NaturalLanguageService:
 
         elif cmd_type == CommandType.STOP_ALL:
             return [
-                "⚠️ CRITICAL ACTION - Are you sure?",
+                "âš ï¸ CRITICAL ACTION - Are you sure?",
                 "1. All open trades will be closed",
                 "2. All pending orders will be cancelled",
                 "3. Automation will be disabled",
@@ -423,21 +423,21 @@ class NaturalLanguageService:
         cmd_type = parsed.command_type
 
         if cmd_type == CommandType.BUY_ORDER:
-            return f"✅ Buy order ready! {parsed.parameters.get('pair')} at {parsed.parameters.get('entry_price')}. Stop at {parsed.parameters.get('stop_loss')}. Ready to execute?"
+            return f"âœ… Buy order ready! {parsed.parameters.get('pair')} at {parsed.parameters.get('entry_price')}. Stop at {parsed.parameters.get('stop_loss')}. Ready to execute?"
 
         elif cmd_type == CommandType.SELL_ORDER:
-            return f"✅ Sell order ready! {parsed.parameters.get('pair')} at {parsed.parameters.get('entry_price')}. Stop at {parsed.parameters.get('stop_loss')}. Execute?"
+            return f"âœ… Sell order ready! {parsed.parameters.get('pair')} at {parsed.parameters.get('entry_price')}. Stop at {parsed.parameters.get('stop_loss')}. Execute?"
 
         elif cmd_type == CommandType.SET_ALERT:
-            return f"🔔 Alert set! I'll notify you when {parsed.parameters.get('pair')} {parsed.parameters.get('condition')} {parsed.parameters.get('trigger_price')}"
+            return f"ðŸ”” Alert set! I'll notify you when {parsed.parameters.get('pair')} {parsed.parameters.get('condition')} {parsed.parameters.get('trigger_price')}"
 
         elif cmd_type == CommandType.STOP_ALL:
-            return "🛑 KILL SWITCH ACTIVATED! All trading stopped. All positions will be closed."
+            return "ðŸ›‘ KILL SWITCH ACTIVATED! All trading stopped. All positions will be closed."
 
         elif cmd_type == CommandType.ENABLE_AUTOMATION:
-            return f"🤖 Automation enabled for {', '.join(parsed.parameters.get('pairs', []))}. I'll handle trades while you sleep!"
+            return f"ðŸ¤– Automation enabled for {', '.join(parsed.parameters.get('pairs', []))}. I'll handle trades while you sleep!"
 
         elif cmd_type == CommandType.GET_ANALYSIS:
-            return f"📊 Analyzing {', '.join(parsed.parameters.get('pairs', ['all pairs']))}... Reports ready in a moment!"
+            return f"ðŸ“Š Analyzing {', '.join(parsed.parameters.get('pairs', ['all pairs']))}... Reports ready in a moment!"
 
-        return "✅ Command processed!"
+        return "âœ… Command processed!"

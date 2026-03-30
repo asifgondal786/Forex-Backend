@@ -1,4 +1,4 @@
-import firebase_admin
+﻿import firebase_admin
 from firebase_admin import credentials, firestore
 import json
 from datetime import datetime
@@ -35,4 +35,4 @@ for collection in collections:
 with open("firestore_export.json", "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 
-print("✅ Firestore export completed successfully.")
+print("âœ… Firestore export completed successfully.")

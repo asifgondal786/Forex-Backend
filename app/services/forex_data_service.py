@@ -1,4 +1,4 @@
-import httpx
+﻿import httpx
 from datetime import datetime
 import asyncio
 import random
@@ -64,7 +64,7 @@ class ForexDataService:
         Fetches historical data for a currency pair.
         NOTE: Historical data is not available on the free plan of exchangerate-api.com.
         """
-        print("⚠️ Warning: Historical data is not available on the free plan of exchangerate-api.com.")
+        print("âš ï¸ Warning: Historical data is not available on the free plan of exchangerate-api.com.")
         return None
 
     def _generate_mock_price(self, currency_pair: str):

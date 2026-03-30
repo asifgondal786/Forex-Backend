@@ -1,4 +1,4 @@
-"""
+﻿"""
 Complete WebSocket Routes with Live Forex Data Integration
 """
 import os

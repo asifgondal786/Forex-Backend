@@ -1,24 +1,24 @@
-"""
-Firestore → Supabase Migration Script
+﻿"""
+Firestore â†’ Supabase Migration Script
 ======================================
 Fixes from original:
-  1. camelCase → snake_case field normalization
+  1. camelCase â†’ snake_case field normalization
   2. Per-collection schema mapping + nested object handling (JSONB / child tables)
   3. Upsert (ON CONFLICT DO NOTHING) instead of bare INSERT
-  4. Staging-first approach: load permissive → validate → promote
+  4. Staging-first approach: load permissive â†’ validate â†’ promote
   5. Dead-letter queue (DLQ) for bad rows
   6. FK deferral until after ID reconciliation
   7. Orphan tracking report
   8. Idempotent re-runs via source_firestore_id
 
 Patch v2 fixes:
-  FIX-A: users — conflict on "id"; email duplicates handled by row-level fallback
-  FIX-B: user_subscriptions — conflict on "id" (no unique constraint on user_id)
-  FIX-C: orphaned user_ids — placeholder users inserted BEFORE child tables
+  FIX-A: users â€” conflict on "id"; email duplicates handled by row-level fallback
+  FIX-B: user_subscriptions â€” conflict on "id" (no unique constraint on user_id)
+  FIX-C: orphaned user_ids â€” placeholder users inserted BEFORE child tables
 
 Patch v3 fixes:
   FIX-D: email-duplicate users already exist in Supabase with different IDs.
-          Build a firestore_id → supabase_id remap table by looking up emails,
+          Build a firestore_id â†’ supabase_id remap table by looking up emails,
           then rewrite all child record user_ids before inserting.
 """
 
@@ -35,9 +35,9 @@ from typing import Any, Optional
 
 from supabase import create_client, Client
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # CONFIG
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://vlmenitpmbibbqdlsick.supabase.co")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 EXPORT_FILE  = os.getenv("EXPORT_FILE", "firestore_export.json")
@@ -49,11 +49,11 @@ if not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ═══════════════════════════════════════════════════════════════════
-# FIX-D: ID REMAP  firestore_id → supabase_id
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# FIX-D: ID REMAP  firestore_id â†’ supabase_id
 # Populated by build_id_remap() before migration starts.
-# ═══════════════════════════════════════════════════════════════════
-ID_REMAP: dict[str, str] = {}   # firestore_id → real supabase_id
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ID_REMAP: dict[str, str] = {}   # firestore_id â†’ real supabase_id
 
 def build_id_remap(firestore_users: list[dict]) -> None:
     """
@@ -75,7 +75,7 @@ def build_id_remap(firestore_users: list[dict]) -> None:
             for row in (resp.data or []):
                 supabase_by_email[row["email"]] = row["id"]
         except Exception as e:
-            print(f"  ⚠  build_id_remap fetch error: {e}")
+            print(f"  âš   build_id_remap fetch error: {e}")
 
     remapped = 0
     for r in firestore_users:
@@ -87,7 +87,7 @@ def build_id_remap(firestore_users: list[dict]) -> None:
             remapped += 1
 
     if remapped:
-        print(f"\n── ID remap: {remapped} Firestore IDs → existing Supabase IDs (email match) ──")
+        print(f"\nâ”€â”€ ID remap: {remapped} Firestore IDs â†’ existing Supabase IDs (email match) â”€â”€")
 
 def update_remapped_users(firestore_users: list[dict]) -> None:
     """
@@ -97,7 +97,7 @@ def update_remapped_users(firestore_users: list[dict]) -> None:
     if not ID_REMAP:
         return
 
-    # Reverse map: supabase_id → firestore record
+    # Reverse map: supabase_id â†’ firestore record
     fs_by_id = {}
     for r in firestore_users:
         fs_id = r.get("id") or r.get("_id")
@@ -107,7 +107,7 @@ def update_remapped_users(firestore_users: list[dict]) -> None:
     if not fs_by_id:
         return
 
-    print(f"\n── Updating {len(fs_by_id)} existing users with Firestore data ──")
+    print(f"\nâ”€â”€ Updating {len(fs_by_id)} existing users with Firestore data â”€â”€")
     updated = failed = 0
     for supa_id, raw in fs_by_id.items():
         r = snake_keys(deep_normalize_ts(raw))
@@ -128,19 +128,19 @@ def update_remapped_users(firestore_users: list[dict]) -> None:
             supabase.table("users").update(patch).eq("id", supa_id).execute()
             updated += 1
         except Exception as e:
-            print(f"  ✗ update user {supa_id} error: {e}")
+            print(f"  âœ— update user {supa_id} error: {e}")
             failed += 1
 
-    print(f"  user updates  ✅ {updated}  ❌ {failed}")
+    print(f"  user updates  âœ… {updated}  âŒ {failed}")
 
 
 def remap_user_id(uid: str) -> str:
     """Return the canonical Supabase user_id, following any remap."""
     return ID_REMAP.get(uid, uid)
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # UTILITIES
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 _camel_re = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
@@ -181,9 +181,9 @@ def row_hash(record: dict) -> str:
     dumped = json.dumps(record, sort_keys=True, default=str)
     return hashlib.sha256(dumped.encode()).hexdigest()[:16]
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # DLQ
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 DLQ: list[dict] = []
 
 def dlq_add(collection: str, record: dict, error: str):
@@ -200,11 +200,11 @@ def dlq_flush():
     path = f"dlq_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(DLQ, f, indent=2, default=str)
-    print(f"\n⚠  DLQ: {len(DLQ)} bad rows written to {path}")
+    print(f"\nâš   DLQ: {len(DLQ)} bad rows written to {path}")
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # ALLOWED COLUMNS
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 ALLOWED_COLUMNS = {
     "users": {
         "id", "source_firestore_id", "email", "name", "plan",
@@ -252,9 +252,9 @@ def filter_columns(table: str, row: dict) -> dict:
         return row
     return {k: v for k, v in row.items() if k in allowed}
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # TRANSFORMERS
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def transform_users(raw: dict) -> dict:
     r = snake_keys(deep_normalize_ts(raw))
@@ -428,10 +428,10 @@ TRANSFORMERS = {
     "ai_activity":              (transform_ai_activity,              "ai_activity"),
 }
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # CONFLICT COLUMN MAP
 # FIX-B: user_subscriptions uses "id" not "user_id" (no unique constraint on user_id)
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 CONFLICT_COLS = {
     "users":                    "id",
     "user_preferences":         "user_id",
@@ -443,9 +443,9 @@ CONFLICT_COLS = {
     "ai_activity":              "id",
 }
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # UPSERT ENGINE
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tuple[int, int]:
     if not rows:
@@ -457,7 +457,7 @@ def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tupl
         batch = rows[i : i + BATCH_SIZE]
 
         if DRY_RUN:
-            print(f"  [DRY RUN] would upsert {len(batch)} rows → {table}")
+            print(f"  [DRY RUN] would upsert {len(batch)} rows â†’ {table}")
             success += len(batch)
             continue
 
@@ -470,7 +470,7 @@ def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tupl
             success += len(batch)
         except Exception as e:
             err_msg = str(e)
-            print(f"  ✗ {table} batch [{i}:{i+len(batch)}] error: {err_msg[:120]}")
+            print(f"  âœ— {table} batch [{i}:{i+len(batch)}] error: {err_msg[:120]}")
             for row in batch:
                 try:
                     (
@@ -485,10 +485,10 @@ def upsert_batch(table: str, rows: list[dict], conflict_col: str = "id") -> tupl
 
     return success, fail
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # FIX-C: Insert placeholder users for orphaned user_ids
 # so FK constraints on child tables don't fail.
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def ensure_placeholder_users(data: dict) -> int:
     """
@@ -517,7 +517,7 @@ def ensure_placeholder_users(data: dict) -> int:
     if not orphan_ids:
         return 0
 
-    print(f"\n── Inserting {len(orphan_ids)} placeholder users for orphaned FK refs ──")
+    print(f"\nâ”€â”€ Inserting {len(orphan_ids)} placeholder users for orphaned FK refs â”€â”€")
 
     placeholders = [
         {
@@ -543,23 +543,23 @@ def ensure_placeholder_users(data: dict) -> int:
             ).execute()
             inserted += len(batch)
         except Exception as e:
-            print(f"  ✗ placeholder batch error: {e}")
+            print(f"  âœ— placeholder batch error: {e}")
 
-    print(f"  placeholder users  ✅ {inserted}  ❌ {len(placeholders) - inserted}")
+    print(f"  placeholder users  âœ… {inserted}  âŒ {len(placeholders) - inserted}")
     return inserted
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # COLLECTION MIGRATOR
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def migrate_collection(name: str, records: list[dict]) -> tuple[int, int]:
     transformer_fn, primary_table = TRANSFORMERS.get(name, (None, name))
 
     if transformer_fn is None:
-        print(f"  ⚠  No transformer for '{name}' — skipping.")
+        print(f"  âš   No transformer for '{name}' â€” skipping.")
         return 0, len(records)
 
-    print(f"\n── {name}  ({len(records)} records) ──")
+    print(f"\nâ”€â”€ {name}  ({len(records)} records) â”€â”€")
 
     primary_rows: list[dict] = []
     child_buckets: dict[str, list[dict]] = {}
@@ -583,18 +583,18 @@ def migrate_collection(name: str, records: list[dict]) -> tuple[int, int]:
 
     s, f = upsert_batch(primary_table, primary_rows, CONFLICT_COLS.get(primary_table, "id"))
     total_s += s; total_f += f
-    print(f"  {primary_table:<35} ✅ {s}  ❌ {f}")
+    print(f"  {primary_table:<35} âœ… {s}  âŒ {f}")
 
     for child_table, rows in child_buckets.items():
         cs, cf = upsert_batch(child_table, rows, CONFLICT_COLS.get(child_table, "id"))
         total_s += cs; total_f += cf
-        print(f"  {child_table:<35} ✅ {cs}  ❌ {cf}")
+        print(f"  {child_table:<35} âœ… {cs}  âŒ {cf}")
 
     return total_s, total_f
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # ORPHAN REPORT
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def orphan_report(data: dict) -> None:
     user_ids = set()
@@ -604,7 +604,7 @@ def orphan_report(data: dict) -> None:
             if uid:
                 user_ids.add(uid)
 
-    print("\n── Orphan / FK mismatch report ──")
+    print("\nâ”€â”€ Orphan / FK mismatch report â”€â”€")
     for col in ("user_subscriptions", "notification_preferences",
                 "notifications", "tasks", "ai_activity"):
         records = data.get(col, [])
@@ -615,9 +615,9 @@ def orphan_report(data: dict) -> None:
         print(f"  {col}: {len(orphans)}/{len(records)} orphaned user refs")
     print("  (Placeholders will be inserted automatically before child tables)\n")
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # MAIN
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 COLLECTION_ORDER = [
     "users",
@@ -631,15 +631,15 @@ COLLECTION_ORDER = [
 
 def main():
     if DRY_RUN:
-        print("🔍 DRY RUN mode — no data will be written.\n")
+        print("ðŸ” DRY RUN mode â€” no data will be written.\n")
 
     with open(EXPORT_FILE, "r", encoding="utf-8") as f:
         data: dict = json.load(f)
 
-    print(f"Loaded {EXPORT_FILE}  –  {len(data)} collections")
+    print(f"Loaded {EXPORT_FILE}  â€“  {len(data)} collections")
     orphan_report(data)
 
-    # FIX-D: build firestore_id → supabase_id remap from email matches
+    # FIX-D: build firestore_id â†’ supabase_id remap from email matches
     build_id_remap(data.get("users", []))
 
     # Update existing users with Firestore data (name, plan, avatar)
@@ -654,7 +654,7 @@ def main():
     for collection in COLLECTION_ORDER:
         records = data.get(collection)
         if not isinstance(records, list):
-            print(f"  (skipping {collection} — not found or not a list)")
+            print(f"  (skipping {collection} â€” not found or not a list)")
             continue
         s, f = migrate_collection(collection, records)
         total_success += s
@@ -671,17 +671,17 @@ def main():
 
     dlq_flush()
 
-    print("\n══════════════════════════════════════")
+    print("\nâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•")
     print("       FINAL MIGRATION REPORT         ")
-    print("══════════════════════════════════════")
+    print("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•")
     print(f"  Run time  : {run_ts}")
-    print(f"  ✅ Success : {total_success}")
-    print(f"  ❌ Failed  : {total_failed}")
-    print(f"  ⚠  DLQ rows: {len(DLQ)}")
+    print(f"  âœ… Success : {total_success}")
+    print(f"  âŒ Failed  : {total_failed}")
+    print(f"  âš   DLQ rows: {len(DLQ)}")
     if total_failed == 0 and not DLQ:
-        print("\n  🎉 Clean migration!")
+        print("\n  ðŸŽ‰ Clean migration!")
     else:
-        print("\n  Fix DLQ rows and re-run — script is idempotent (safe to retry).")
+        print("\n  Fix DLQ rows and re-run â€” script is idempotent (safe to retry).")
 
 
 if __name__ == "__main__":

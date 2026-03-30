@@ -1,10 +1,10 @@
-"""
-Tajir Macro Event Shield — Core Engine
+﻿"""
+Tajir Macro Event Shield â€” Core Engine
 Phase 18
 
 Responsibilities:
   1. Cache fetched events in Supabase (macro_events table)
-  2. Check if a given symbol is inside a ±30 min news window
+  2. Check if a given symbol is inside a Â±30 min news window
   3. Dispatch pre-event alerts via WhatsApp / SMS / Push
   4. Expose is_news_window() used by Risk Guardian MarketSnapshot
 """
@@ -25,22 +25,22 @@ from macro_scraper import fetch_calendar_events, currencies_for_symbol
 
 logger = logging.getLogger("macro_shield.engine")
 
-# ─── Config ───────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-BLOCK_WINDOW_MINUTES   = 30     # block ±30 min around event
+BLOCK_WINDOW_MINUTES   = 30     # block Â±30 min around event
 ALERT_ADVANCE_MINUTES  = 60     # send alert 60 min before event
 CACHE_TTL_MINUTES      = 30     # refresh cache every 30 min
 MONITORED_CURRENCIES   = {"USD", "EUR", "GBP", "JPY"}
 
 
-# ─── In-Memory Cache (backed by Supabase for persistence) ────────────────────
+# â”€â”€â”€ In-Memory Cache (backed by Supabase for persistence) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 _event_cache: list[MacroEvent] = []
 _cache_fetched_at: Optional[datetime] = None
 _alert_sent_ids: set[str] = set()   # tracks which events have had alerts sent
 
 
-# ─── Cache Layer ──────────────────────────────────────────────────────────────
+# â”€â”€â”€ Cache Layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def refresh_event_cache(supabase=None) -> list[MacroEvent]:
     """
@@ -108,15 +108,15 @@ async def _upsert_events_to_supabase(supabase, events: list[MacroEvent]):
         logger.error("Supabase upsert failed: %s", e)
 
 
-# ─── Window Checker ───────────────────────────────────────────────────────────
+# â”€â”€â”€ Window Checker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def check_news_window(
     symbol: str,
     supabase=None,
 ) -> NewsWindowResult:
     """
-    Check if the given symbol is within ±30 min of a high-impact news event.
-    Returns a NewsWindowResult — is_blocked=True means the Risk Guardian
+    Check if the given symbol is within Â±30 min of a high-impact news event.
+    Returns a NewsWindowResult â€” is_blocked=True means the Risk Guardian
     should set is_news_window=True on the MarketSnapshot.
     """
     currencies = currencies_for_symbol(symbol)
@@ -142,7 +142,7 @@ async def check_news_window(
         delta = event.event_time - now
         minutes_to = delta.total_seconds() / 60
 
-        # Inside window: event is within ±30 minutes
+        # Inside window: event is within Â±30 minutes
         if -BLOCK_WINDOW_MINUTES <= minutes_to <= BLOCK_WINDOW_MINUTES:
             window_ends = event.event_time + window
             return NewsWindowResult(
@@ -154,7 +154,7 @@ async def check_news_window(
                 window_ends_at=window_ends,
                 reason=(
                     f"{event.title} ({event.currency}) "
-                    f"{'in {:.0f} min'.format(minutes_to) if minutes_to > 0 else 'just released'} — "
+                    f"{'in {:.0f} min'.format(minutes_to) if minutes_to > 0 else 'just released'} â€” "
                     f"trading blocked until {window_ends.strftime('%H:%M')} UTC"
                 ),
             )
@@ -162,20 +162,20 @@ async def check_news_window(
     return NewsWindowResult(
         is_blocked=False,
         symbol=symbol,
-        reason="No high-impact events within ±30 minutes",
+        reason="No high-impact events within Â±30 minutes",
     )
 
 
 async def is_news_window(symbol: str, supabase=None) -> bool:
     """
-    Convenience function — used directly by MarketSnapshot population.
+    Convenience function â€” used directly by MarketSnapshot population.
     Drop-in for the stub in risk_middleware.py get_market_snapshot().
     """
     result = await check_news_window(symbol, supabase)
     return result.is_blocked
 
 
-# ─── Upcoming Events ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Upcoming Events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def get_upcoming_events(
     currencies: Optional[list[str]] = None,
@@ -199,7 +199,7 @@ async def get_upcoming_events(
     ]
 
 
-# ─── Alert Dispatcher ────────────────────────────────────────────────────────
+# â”€â”€â”€ Alert Dispatcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def dispatch_pre_event_alerts(
     supabase=None,
@@ -247,8 +247,8 @@ async def dispatch_pre_event_alerts(
 
 def _format_alert_message(event: MacroEvent, minutes_to: float) -> str:
     lines = [
-        f"⚡ High-impact news in {minutes_to:.0f} minutes",
-        f"{event.title} — {event.currency}",
+        f"âš¡ High-impact news in {minutes_to:.0f} minutes",
+        f"{event.title} â€” {event.currency}",
         f"Time: {event.event_time.strftime('%H:%M')} UTC",
     ]
     if event.forecast:
@@ -281,7 +281,7 @@ async def _send_alert(
     PUSH (Firebase FCM):
         await notification_service.fcm.send(
             token=user_fcm_token,
-            title="⚡ News Alert",
+            title="âš¡ News Alert",
             body=alert.message,
         )
     """
@@ -298,12 +298,12 @@ async def _send_alert(
 
         alert.status  = AlertStatus.SENT
         alert.sent_at = datetime.now(tz=timezone.utc)
-        logger.debug("Alert sent: %s → %s via %s", alert.event.title, alert.user_id, alert.channel)
+        logger.debug("Alert sent: %s â†’ %s via %s", alert.event.title, alert.user_id, alert.channel)
 
     except Exception as e:
         alert.status = AlertStatus.FAILED
         alert.error  = str(e)
-        logger.error("Alert failed: %s via %s — %s", alert.event.title, alert.channel, e)
+        logger.error("Alert failed: %s via %s â€” %s", alert.event.title, alert.channel, e)
 
     return alert
 
@@ -311,7 +311,7 @@ async def _send_alert(
 async def _get_subscribed_users(supabase) -> list[dict]:
     """
     Return users who have news alerts enabled.
-    STUB — replace with:
+    STUB â€” replace with:
         data = supabase.table("user_preferences")
                .select("user_id, phone, fcm_token")
                .eq("news_alerts_enabled", True)

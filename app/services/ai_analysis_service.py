@@ -1,4 +1,4 @@
-# app/services/ai_analysis_service.py
+﻿# app/services/ai_analysis_service.py
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Any

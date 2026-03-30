@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+﻿from fastapi import HTTPException
 
 from app.services.subscription_service import SubscriptionService
 

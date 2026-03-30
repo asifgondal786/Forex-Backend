@@ -1,4 +1,4 @@
-"""Async task queue with optional Redis backend for scaling."""
+﻿"""Async task queue with optional Redis backend for scaling."""
 
 from __future__ import annotations
 

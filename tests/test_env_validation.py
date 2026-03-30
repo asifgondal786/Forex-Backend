@@ -1,4 +1,4 @@
-from app.config.validate_env import validate_environment
+﻿from app.config.validate_env import validate_environment
 
 
 def _base_env() -> dict[str, str]:

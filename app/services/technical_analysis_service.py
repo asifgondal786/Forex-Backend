@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/services/technical_analysis_service.py
 Phase 4 - Technical Analysis
 Computes RSI and MACD from OHLC data fetched via Twelve Data.
@@ -36,7 +36,7 @@ async def _fetch_closes(pair: str, interval: str = "1h", count: int = 50) -> Lis
         data = resp.json()
         values = data.get("values", [])
         closes = [float(v["close"]) for v in values if "close" in v]
-        closes.reverse()  # oldest → newest
+        closes.reverse()  # oldest â†’ newest
         return closes
     except Exception as exc:
         logger.warning("Technical data fetch failed for %s: %s", pair, exc)

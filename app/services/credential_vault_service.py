@@ -1,4 +1,4 @@
-"""
+﻿"""
 Encrypted credential vault for broker secrets.
 
 Stores broker credentials encrypted at rest and returns only masked metadata

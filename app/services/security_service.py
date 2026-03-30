@@ -1,5 +1,5 @@
-"""
-Phase 14 — Security Service
+﻿"""
+Phase 14 â€” Security Service
 Handles: TOTP 2FA, trusted device registry, trade confirmation tokens
 """
 
@@ -17,9 +17,9 @@ from app.database import supabase
 
 
 
-# ─────────────────────────────────────────────
-# 2FA — TOTP (Google Authenticator compatible)
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# 2FA â€” TOTP (Google Authenticator compatible)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def generate_totp_secret(user_id: str) -> dict:
     """
@@ -42,7 +42,7 @@ def generate_totp_secret(user_id: str) -> dict:
     qr.save(buffer, format="PNG")
     qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    # Upsert into Supabase — mark as NOT verified yet
+    # Upsert into Supabase â€” mark as NOT verified yet
     supabase.table("user_2fa").upsert({
         "user_id": user_id,
         "totp_secret": secret,
@@ -74,7 +74,7 @@ def verify_and_enable_2fa(user_id: str, code: str) -> bool:
     secret = result.data["totp_secret"]
     totp = pyotp.TOTP(secret)
 
-    if totp.verify(code, valid_window=1):  # ±30s window
+    if totp.verify(code, valid_window=1):  # Â±30s window
         supabase.table("user_2fa").update({
             "is_enabled": True,
             "enabled_at": datetime.utcnow().isoformat(),
@@ -115,7 +115,7 @@ def is_2fa_enabled(user_id: str) -> bool:
 
 
 def disable_2fa(user_id: str, code: str) -> bool:
-    """Disable 2FA — requires valid TOTP code to confirm."""
+    """Disable 2FA â€” requires valid TOTP code to confirm."""
     if not verify_totp_code(user_id, code):
         return False
 
@@ -126,9 +126,9 @@ def disable_2fa(user_id: str, code: str) -> bool:
     return True
 
 
-# ─────────────────────────────────────────────
-# DEVICE VERIFICATION — Trusted Device Registry
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# DEVICE VERIFICATION â€” Trusted Device Registry
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _fingerprint_device(device_info: dict) -> str:
     """
@@ -227,9 +227,9 @@ def list_trusted_devices(user_id: str) -> list:
     return result.data or []
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # TRADE CONFIRMATION TOKENS
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 TRADE_TOKEN_TTL_MINUTES = 5  # Token expires in 5 minutes
 
@@ -284,7 +284,7 @@ def confirm_trade_token(user_id: str, token: str, trade_payload: dict) -> bool:
     if datetime.utcnow() > expires_at:
         return False
 
-    # Check payload hash matches — prevents replay on a different trade
+    # Check payload hash matches â€” prevents replay on a different trade
     expected_hash = hashlib.sha256(str(trade_payload).encode()).hexdigest()
     if record["trade_payload_hash"] != expected_hash:
         return False

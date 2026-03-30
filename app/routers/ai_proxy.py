@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Proxy Router - routes Flutter AI chat requests through the backend.
 The Gemini API key never touches the client; it lives in Railway env vars.
 """

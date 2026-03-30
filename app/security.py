@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import os
 import re
 from typing import Optional, Dict, Any
@@ -48,7 +48,7 @@ def _extract_bearer_token(auth_header: Optional[str]) -> Optional[str]:
 def _dev_auth_header_valid(connection: HTTPConnection) -> bool:
     """
     Validates the X-Dev-Auth shared secret header.
-    SECURITY: Returns False if no secret is configured — dev auth requires
+    SECURITY: Returns False if no secret is configured â€” dev auth requires
     an explicit secret. Previously returned True when secret was absent,
     which allowed any localhost request to bypass auth without a secret.
     """

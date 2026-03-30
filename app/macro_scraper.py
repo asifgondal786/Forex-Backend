@@ -1,12 +1,12 @@
-"""
-Tajir Macro Event Shield — Forex Factory Scraper
+﻿"""
+Tajir Macro Event Shield â€” Forex Factory Scraper
 Phase 18
 
 Fetches the Forex Factory economic calendar for the current week,
 parses high-impact events for USD, EUR, GBP, JPY, and returns
 structured MacroEvent objects.
 
-Forex Factory does not have a public API — we parse the HTML calendar.
+Forex Factory does not have a public API â€” we parse the HTML calendar.
 The scraper targets the JSON data embedded in the page (FF injects it),
 with a BeautifulSoup HTML fallback.
 
@@ -29,7 +29,7 @@ from app.macro_models import MacroEvent, EventImpact
 
 logger = logging.getLogger("macro_shield.scraper")
 
-# ─── Config ───────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 MONITORED_CURRENCIES = {"USD", "EUR", "GBP", "JPY"}
 MONITORED_IMPACT     = {EventImpact.HIGH}           # only high-impact events trigger the shield
@@ -46,7 +46,7 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-# Impact label mapping from FF HTML classes → our enum
+# Impact label mapping from FF HTML classes â†’ our enum
 FF_IMPACT_MAP = {
     "icon--ff-impact-red":    EventImpact.HIGH,
     "icon--ff-impact-ora":    EventImpact.MEDIUM,
@@ -57,7 +57,7 @@ FF_IMPACT_MAP = {
 }
 
 
-# ─── Main Fetch ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ Main Fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def fetch_calendar_events(
     days_ahead: int = 7,
@@ -90,13 +90,13 @@ async def fetch_calendar_events(
     ]
 
     logger.info(
-        "FF calendar: %d total events → %d high-impact monitored currency events",
+        "FF calendar: %d total events â†’ %d high-impact monitored currency events",
         len(events), len(filtered),
     )
     return filtered
 
 
-# ─── HTTP Fetch ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ HTTP Fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def _fetch_ff_page() -> str:
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
@@ -105,7 +105,7 @@ async def _fetch_ff_page() -> str:
         return resp.text
 
 
-# ─── Parser ───────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _parse_ff_html(html: str) -> list[MacroEvent]:
     """
@@ -179,7 +179,7 @@ def _parse_table(html: str) -> list[MacroEvent]:
 
     for row in table.find_all("tr", class_=re.compile(r"calendar__row")):
 
-        # Date cell — FF only puts date on first row of each day
+        # Date cell â€” FF only puts date on first row of each day
         date_cell = row.find("td", class_=re.compile(r"calendar__date"))
         if date_cell and date_cell.get_text(strip=True):
             current_date_str = date_cell.get_text(strip=True)
@@ -235,13 +235,13 @@ def _parse_table(html: str) -> list[MacroEvent]:
     return events
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _cell_text(row, class_fragment: str) -> Optional[str]:
     cell = row.find("td", class_=re.compile(class_fragment))
     if cell:
         text = cell.get_text(strip=True)
-        return text if text not in ("", "—", "-") else None
+        return text if text not in ("", "â€”", "-") else None
     return None
 
 
@@ -258,11 +258,11 @@ def _parse_ff_datetime(date_str: str, time_str: str) -> Optional[datetime]:
     if not date_str:
         return None
 
-    # Normalise date — strip day name if present
-    date_clean = re.sub(r'^[A-Za-z]{3}\s+', '', date_str.strip())  # "Mon Jan 13" → "Jan 13"
+    # Normalise date â€” strip day name if present
+    date_clean = re.sub(r'^[A-Za-z]{3}\s+', '', date_str.strip())  # "Mon Jan 13" â†’ "Jan 13"
     year = datetime.now(tz=timezone.utc).year
 
-    # Handle "All Day" or missing times — use market open 00:00 ET
+    # Handle "All Day" or missing times â€” use market open 00:00 ET
     if not time_str or time_str.lower() in ("all day", "tentative", ""):
         time_clean = "12:00am"
     else:
@@ -277,13 +277,13 @@ def _parse_ff_datetime(date_str: str, time_str: str) -> Optional[datetime]:
         return None
 
 
-# ─── Currency pair → relevant currencies ──────────────────────────────────────
+# â”€â”€â”€ Currency pair â†’ relevant currencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def currencies_for_symbol(symbol: str) -> list[str]:
     """
     Extract the two currencies from a forex symbol.
-    "EURUSD" → ["EUR", "USD"]
-    "GBPJPY" → ["GBP", "JPY"]
+    "EURUSD" â†’ ["EUR", "USD"]
+    "GBPJPY" â†’ ["GBP", "JPY"]
     """
     symbol = symbol.upper().replace("/", "").replace("_", "")
     if len(symbol) == 6:

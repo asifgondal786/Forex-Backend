@@ -1,4 +1,4 @@
-"""
+﻿"""
 Phase 7: Production Auth Validator
 Verifies all endpoints have proper authentication
 """
@@ -158,9 +158,9 @@ class AuthValidator:
                 print(f"  - {issue['file']}: {issue['path']}")
             print("\nAction Required: Add get_current_user_id dependency to marked endpoints")
         else:
-            print("\n" + "✓"*60)
-            print("✓ All endpoints properly authenticated!")
-            print("✓ Phase 7 Auth Validation: PASSED")
+            print("\n" + "âœ“"*60)
+            print("âœ“ All endpoints properly authenticated!")
+            print("âœ“ Phase 7 Auth Validation: PASSED")
 
 
 class RateLimitValidator:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+﻿from fastapi import APIRouter, Depends, HTTPException, status
 
 from .schemas.settings import SettingsResponse, SettingsUpdateRequest
 from .services.settings_service import SettingsService

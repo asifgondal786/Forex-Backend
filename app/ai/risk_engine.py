@@ -1,4 +1,4 @@
-"""Risk and position lifecycle helpers for AI trading workflows."""
+﻿"""Risk and position lifecycle helpers for AI trading workflows."""
 
 from __future__ import annotations
 

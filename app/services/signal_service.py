@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/services/signal_service.py
 Phase 4 - AI Signal Fusion
 Flow: Prices + News + RSI/MACD -> Gemini -> Fused confidence score + 3-level explainer
@@ -23,7 +23,7 @@ NEWS_API_BASE = "https://newsapi.org/v2"
 GEMINI_MODEL  = "gemini-2.0-flash"
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+# â”€â”€ Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TradeSignal(BaseModel):
     pair:             str
@@ -53,7 +53,7 @@ class SignalResponse(BaseModel):
     pairs:        list[str]
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def _fetch_news(query: str = "forex currency trading") -> list[str]:
     if not NEWS_API_KEY:
@@ -113,9 +113,9 @@ def _fuse_confidence(
     action_bias = "bullish" if action == "BUY" else "bearish" if action == "SELL" else "neutral"
 
     if technical_bias == action_bias:
-        score = min(score + 0.08, 0.95)   # indicators agree → boost
+        score = min(score + 0.08, 0.95)   # indicators agree â†’ boost
     elif technical_bias != "neutral" and technical_bias != action_bias:
-        score = max(score - 0.10, 0.25)   # indicators conflict → reduce
+        score = max(score - 0.10, 0.25)   # indicators conflict â†’ reduce
 
     return round(score, 3)
 
@@ -133,7 +133,7 @@ def _build_gemini_prompt(
         macd = technical.get("macd") or {}
         tech_block = f"""
 Technical Indicators:
-- RSI (14): {rsi:.1f} → {technical.get('technical_bias', 'neutral').upper()}
+- RSI (14): {rsi:.1f} â†’ {technical.get('technical_bias', 'neutral').upper()}
 - MACD: {macd.get('bias', 'neutral').upper()} (histogram: {macd.get('histogram', 0):.6f})
 """
 
@@ -168,7 +168,7 @@ Rules:
 """
 
 
-# ── Main service ──────────────────────────────────────────────────────────────
+# â”€â”€ Main service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def generate_signals(
     pairs: list[str] | None = None,
@@ -264,7 +264,7 @@ async def generate_signals(
         except Exception as _ne:
             logger.warning("Signal notification task failed: %s", _ne)
         logger.info(
-            "Signal [Phase4] %s %s conf=%.2f→%.2f tech=%s",
+            "Signal [Phase4] %s %s conf=%.2fâ†’%.2f tech=%s",
             action, pair, gemini_conf, fused_conf,
             technical.get("technical_bias", "n/a"),
         )
