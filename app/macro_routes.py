@@ -18,7 +18,7 @@ from fastapi import APIRouter, Query, HTTPException
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from macro_models import (
+from app.macro_models import (
     UpcomingEventsResponse, ShieldStatusResponse,
     NewsWindowResult,
 )

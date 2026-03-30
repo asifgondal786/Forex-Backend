@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from macro_models import (
+from app.macro_models import (
     MacroEvent, EventImpact, NewsWindowResult,
     EventAlert, AlertChannel, AlertStatus,
     UpcomingEventsResponse, ShieldStatusResponse,
