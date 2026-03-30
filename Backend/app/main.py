@@ -1286,6 +1286,10 @@ app.include_router(market_router)
 from .signal_routes import router as signal_router
 app.include_router(signal_router)
 
+# risk guardian router added
+from app.risk.risk_middleware import risk_router
+app.include_router(risk_router, prefix="/api/v1")
+
 
 # Register the router — add this alongside your other app.include_router() calls
 from app.routers.security import router as security_router
@@ -1298,6 +1302,12 @@ app.include_router(security_router)
 # charts router added
 from app.routers.charting import router as charting_router
 app.include_router(charting_router)
+
+# macro routes added
+from macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler
+app.include_router(macro_router, prefix="/api/v1")
+app.add_event_handler("startup",  start_shield_scheduler)
+app.add_event_handler("shutdown", stop_shield_scheduler)
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
