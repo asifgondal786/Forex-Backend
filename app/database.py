@@ -1,4 +1,6 @@
-﻿from sqlalchemy import create_engine
+from dotenv import load_dotenv
+load_dotenv()
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 import logging
@@ -33,3 +35,4 @@ else:
         "set" if _supabase_url else "MISSING",
         "set" if _supabase_key else "MISSING",
     )
+
