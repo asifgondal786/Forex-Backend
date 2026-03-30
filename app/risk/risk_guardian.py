@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from typing import Optional
 
-from risk_models import (
+from app.risk.risk_models import (
     TradeRequest, AccountSnapshot, MarketSnapshot,
     PositionScore, AccountScore, MarketScore,
     RiskGuardianResult, RiskDecision, TrustLevel,
