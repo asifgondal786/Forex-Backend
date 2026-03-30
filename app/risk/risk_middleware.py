@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from typing import Optional
 import logging
 
-from risk_models import (
+from app.risk.risk_models import (
     TradeRequest, AccountSnapshot, MarketSnapshot,
     RiskGuardianResult, RiskDecision,
 )
