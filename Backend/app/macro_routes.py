@@ -15,7 +15,13 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Query, HTTPException
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+try:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    SCHEDULER_AVAILABLE = True
+except ImportError:
+    AsyncIOScheduler = None
+    SCHEDULER_AVAILABLE = False
+    print("[WARN] apscheduler not installed — macro shield scheduler disabled")
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.macro_models import (
