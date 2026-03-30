@@ -1304,7 +1304,7 @@ from app.routers.charting import router as charting_router
 app.include_router(charting_router)
 
 # macro routes added
-from macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler
+from app.macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler
 app.include_router(macro_router, prefix="/api/v1")
 app.add_event_handler("startup",  start_shield_scheduler)
 app.add_event_handler("shutdown", stop_shield_scheduler)
