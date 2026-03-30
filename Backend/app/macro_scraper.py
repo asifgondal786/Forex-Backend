@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from bs4 import BeautifulSoup
 
-from macro_models import MacroEvent, EventImpact
+from app.macro_models import MacroEvent, EventImpact
 
 logger = logging.getLogger("macro_shield.scraper")
 
