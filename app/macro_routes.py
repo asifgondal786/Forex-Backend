@@ -1,5 +1,5 @@
-﻿"""
-Tajir Macro Event Shield â€” Scheduler + FastAPI Routes
+"""
+Tajir Macro Event Shield — Scheduler + FastAPI Routes
 Phase 18
 
 Add to your main FastAPI app:
@@ -28,7 +28,7 @@ from app.macro_models import (
     UpcomingEventsResponse, ShieldStatusResponse,
     NewsWindowResult,
 )
-from macro_shield import (
+from app.macro_shield import (
     refresh_event_cache,
     dispatch_pre_event_alerts,
     check_news_window,
@@ -42,7 +42,7 @@ macro_router = APIRouter(tags=["Macro Event Shield"])
 _scheduler: AsyncIOScheduler | None = None
 
 
-# â”€â”€â”€ Scheduler Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Scheduler Lifecycle ─────────────────────────────────────────────────────
 
 async def start_shield_scheduler(supabase=None, notification_service=None):
     """
@@ -91,7 +91,7 @@ async def stop_shield_scheduler():
         logger.info("Macro Event Shield scheduler stopped")
 
 
-# â”€â”€â”€ Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Routes ───────────────────────────────────────────────────────────────────
 
 @macro_router.get("/macro/upcoming", response_model=UpcomingEventsResponse)
 async def get_upcoming(
@@ -141,19 +141,19 @@ async def force_refresh():
     """
     Manually trigger a cache refresh.
     Useful for testing or after a failed scheduled refresh.
-    Protected â€” add your auth dependency in production.
+    Protected — add your auth dependency in production.
     """
     events = await refresh_event_cache()
     return {
-        "message": f"Cache refreshed â€” {len(events)} high-impact events loaded",
+        "message": f"Cache refreshed — {len(events)} high-impact events loaded",
         "refreshed_at": datetime.now(tz=timezone.utc).isoformat(),
     }
 
 
 @macro_router.get("/macro/health")
 async def shield_health():
-    """Quick health check for the shield â€” shows cache age and event count."""
-    from macro_shield import _cache_fetched_at, _event_cache
+    """Quick health check for the shield — shows cache age and event count."""
+    from app.macro_shield import _cache_fetched_at, _event_cache
     now = datetime.now(tz=timezone.utc)
     age_minutes = (
         round((now - _cache_fetched_at).total_seconds() / 60, 1)
