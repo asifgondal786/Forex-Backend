@@ -1,11 +1,11 @@
-"""
-Phase 16 — Mock Candle Generator
+﻿"""
+Phase 16 â€” Mock Candle Generator
 Generates realistic-looking OHLCV candlestick data for all major pairs.
 Used when OANDA is not configured (Phase 15 queued).
 Automatically replaced by real OANDA data once Phase 15 is activated.
 
 Uses a seeded random walk with realistic pip sizes, volatility,
-and spread per pair — so data looks genuine on the chart.
+and spread per pair â€” so data looks genuine on the chart.
 """
 
 import random
@@ -28,7 +28,7 @@ PAIR_CONFIG = {
     "GBPJPY": {"base": 189.460, "pip": 0.01000, "volatility": 0.18},
 }
 
-# Timeframe → candle duration in minutes
+# Timeframe â†’ candle duration in minutes
 TIMEFRAME_MINUTES = {
     "M1":  1,
     "M5":  5,

@@ -1,5 +1,5 @@
-"""
-Phase 14 — Security Router
+﻿"""
+Phase 14 â€” Security Router
 All security-related API endpoints:
   /security/2fa/setup
   /security/2fa/verify
@@ -32,9 +32,9 @@ from app.services import security_service
 router = APIRouter(prefix="/security", tags=["Security"])
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 2FA ENDPOINTS
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/2fa/setup", response_model=TwoFASetupResponse)
 async def setup_2fa(current_user: dict = Depends(get_current_user)):
@@ -115,9 +115,9 @@ async def disable_2fa(
     return TwoFAVerifyResponse(success=True, message="2FA disabled successfully.")
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # DEVICE VERIFICATION ENDPOINTS
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/devices/register", response_model=RegisterDeviceResponse)
 async def register_device(
@@ -186,7 +186,7 @@ async def revoke_device(
 
 @router.post("/devices/revoke-all", response_model=RevokeDeviceResponse)
 async def revoke_all_devices(current_user: dict = Depends(get_current_user)):
-    """Revoke ALL trusted devices — useful if account is compromised."""
+    """Revoke ALL trusted devices â€” useful if account is compromised."""
     user_id = current_user["uid"]
     count = security_service.revoke_all_devices(user_id)
     return RevokeDeviceResponse(
@@ -195,9 +195,9 @@ async def revoke_all_devices(current_user: dict = Depends(get_current_user)):
     )
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # TRADE CONFIRMATION TOKEN ENDPOINTS
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/trade/generate-token", response_model=GenerateTradeTokenResponse)
 async def generate_trade_token(

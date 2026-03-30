@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from datetime import datetime
 from .forex_data_service import ForexDataService
 from .ai_analysis_service import AIAnalysisService

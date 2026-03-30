@@ -1,4 +1,4 @@
-"""
+﻿"""
 Centralized email delivery service.
 Supports Brevo (preferred), Mailjet, and SMTP fallback.
 """

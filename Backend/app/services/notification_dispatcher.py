@@ -1,7 +1,7 @@
-"""
-Phase 13 — Notification Dispatcher
+﻿"""
+Phase 13 â€” Notification Dispatcher
 Central fan-out for all notification channels.
-Services call dispatcher.dispatch() — it handles channel selection,
+Services call dispatcher.dispatch() â€” it handles channel selection,
 user preferences, severity routing, and logging.
 
 Usage:
@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-import sib_api_v3_sdk                                  # Brevo — already installed
+import sib_api_v3_sdk                                  # Brevo â€” already installed
 from sib_api_v3_sdk.rest import ApiException
 from app.services.push_service import PushService
 from app.services.twilio_service import TwilioService
@@ -22,7 +22,7 @@ from app.database import supabase
 
 logger = logging.getLogger(__name__)
 
-# ── Brevo template IDs (set in Railway Variables) ──────────────────────────
+# â”€â”€ Brevo template IDs (set in Railway Variables) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEMPLATE_IDS = {
     "trade":  int(os.environ.get("BREVO_TRADE_TEMPLATE_ID", "0") or "0") if str(os.environ.get("BREVO_TRADE_TEMPLATE_ID", "0")).isdigit() else 0,
     "risk":   int(os.environ.get("BREVO_RISK_TEMPLATE_ID",   "0")),
@@ -30,10 +30,10 @@ TEMPLATE_IDS = {
     "market": int(os.environ.get("BREVO_MARKET_TEMPLATE_ID", "0")),
 }
 
-# ── Severity: which channels fire per event ────────────────────────────────
-# "high"   → email + push + whatsapp/sms
-# "medium" → email + push
-# "low"    → email only
+# â”€â”€ Severity: which channels fire per event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# "high"   â†’ email + push + whatsapp/sms
+# "medium" â†’ email + push
+# "low"    â†’ email only
 SEVERITY = {
     "trade":  "medium",
     "risk":   "high",
@@ -41,7 +41,7 @@ SEVERITY = {
     "market": "low",
 }
 
-# ── Human-readable push titles ─────────────────────────────────────────────
+# â”€â”€ Human-readable push titles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PUSH_TITLES = {
     "trade":  "Trade Executed",
     "risk":   "Risk Warning",
@@ -51,8 +51,8 @@ PUSH_TITLES = {
 
 PUSH_BODIES = {
     "trade":  lambda p: f"{p.get('direction','?')} {p.get('pair','?')} @ {p.get('price','?')}",
-    "risk":   lambda p: f"{p.get('pair','?')} drawdown {p.get('drawdown','?')} — review now",
-    "signal": lambda p: f"{p.get('pair','?')}: {p.get('signal','?')} — {p.get('confidence','?')} confidence",
+    "risk":   lambda p: f"{p.get('pair','?')} drawdown {p.get('drawdown','?')} â€” review now",
+    "signal": lambda p: f"{p.get('pair','?')}: {p.get('signal','?')} â€” {p.get('confidence','?')} confidence",
     "market": lambda p: f"{p.get('pair','?')}: {p.get('event','?')} at {p.get('time','?')}",
 }
 
@@ -66,7 +66,7 @@ class NotificationDispatcher:
         brevo_cfg.api_key["api-key"] = os.environ.get("BREVO_API_KEY", "")
         self.brevo  = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(brevo_cfg))
 
-    # ── Internal helpers ───────────────────────────────────────────────────
+    # â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _get_user(self, user_id: str) -> dict:
         """Fetch user email + notification prefs from Supabase."""
@@ -105,7 +105,7 @@ class NotificationDispatcher:
                 params=payload,
             )
             self.brevo.send_transac_email(send_email)
-            logger.info(f"[Dispatcher] Email sent: {event_type} → {user['email']}")
+            logger.info(f"[Dispatcher] Email sent: {event_type} â†’ {user['email']}")
             return "sent"
         except ApiException as e:
             logger.error(f"[Dispatcher] Brevo error: {e}")
@@ -117,7 +117,7 @@ class NotificationDispatcher:
         result = await self.push.send(user_id, title, body, {"event_type": event_type})
         return "sent" if result["sent"] > 0 else "no_devices"
 
-    # ── Public interface ───────────────────────────────────────────────────
+    # â”€â”€ Public interface â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async def dispatch(
         self,

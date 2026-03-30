@@ -1,37 +1,37 @@
-"""
-Tajir Phase 18 — Risk Guardian Bridge
-Patch for risk_middleware.py → get_market_snapshot()
+﻿"""
+Tajir Phase 18 â€” Risk Guardian Bridge
+Patch for risk_middleware.py â†’ get_market_snapshot()
 
 Replace the stub body of get_market_snapshot() in risk_middleware.py
 with the function below. This connects Phase 17 and Phase 18.
 
 BEFORE (Phase 17 stub):
-────────────────────────────────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async def get_market_snapshot(symbol: str) -> MarketSnapshot:
     return MarketSnapshot(
         symbol=symbol,
         current_spread_pips=1.5,
         atr_14=8.0,
-        is_news_window=False,      # ← was always False
+        is_news_window=False,      # â† was always False
         session="london",
         volatility_index=35.0,
     )
 
 AFTER (Phase 18 live):
-────────────────────────────────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Copy the function below into risk_middleware.py, replacing the stub.
 """
 
 from macro_shield import is_news_window as macro_is_news_window
 
-# ── Replace get_market_snapshot in risk_middleware.py with this ───────────────
+# â”€â”€ Replace get_market_snapshot in risk_middleware.py with this â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def get_market_snapshot(symbol: str) -> "MarketSnapshot":
     """
     Live market snapshot for Risk Guardian.
     Now includes real is_news_window from Macro Event Shield.
 
-    TODO — replace remaining stubs with your broker API:
+    TODO â€” replace remaining stubs with your broker API:
         current_spread_pips:  from broker tick data
         atr_14:               from broker OHLC (14-period ATR)
         session:              derive from current UTC hour
@@ -46,7 +46,7 @@ async def get_market_snapshot(symbol: str) -> "MarketSnapshot":
         symbol=symbol,
         current_spread_pips=1.5,      # TODO: replace with live broker spread
         atr_14=8.0,                   # TODO: replace with live ATR
-        is_news_window=news_blocked,  # ✅ now live from Macro Event Shield
+        is_news_window=news_blocked,  # âœ… now live from Macro Event Shield
         session=session,
         volatility_index=35.0,        # TODO: replace with live volatility
     )

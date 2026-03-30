@@ -1,4 +1,4 @@
-"""
+﻿"""
 Subscription and feature-gating service.
 
 Supports a free-first rollout with optional paid gating for selected features.

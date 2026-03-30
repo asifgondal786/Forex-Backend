@@ -1,4 +1,4 @@
-import secrets
+﻿import secrets
 from datetime import datetime, timedelta
 from app.database import supabase
 
@@ -10,7 +10,7 @@ def request_withdrawal(user_id: str, amount: float, wallet_address: str) -> dict
         "wallet_address": wallet_address, "confirm_token": token,
         "status": "pending_email_confirmation", "execute_at": execute_at,
     }).execute()
-    # TODO: wire your email provider here — send token to user's email
+    # TODO: wire your email provider here â€” send token to user's email
     return {"message": "Withdrawal requested. Check email to confirm.",
             "execute_at": execute_at, "request_id": record.data[0]["id"]}
 

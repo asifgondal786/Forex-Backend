@@ -1,4 +1,4 @@
-"""
+﻿"""
 Execution Intelligence Service
 Handles conditional automation, time-bound orders, and session-aware trading
 Integrates with Google Generative AI (Gemini) for intelligent condition analysis

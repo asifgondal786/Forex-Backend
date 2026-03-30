@@ -1,5 +1,5 @@
-"""
-Tajir Macro Event Shield — Models
+﻿"""
+Tajir Macro Event Shield â€” Models
 Phase 18
 """
 
@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 
 
-# ─── Enums ────────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Enums â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class EventImpact(str, Enum):
     HIGH   = "high"
@@ -29,7 +29,7 @@ class AlertStatus(str, Enum):
     FAILED    = "failed"
 
 
-# ─── Economic Event ───────────────────────────────────────────────────────────
+# â”€â”€â”€ Economic Event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class MacroEvent(BaseModel):
     id:           Optional[str] = None          # Supabase UUID after insert
@@ -44,7 +44,7 @@ class MacroEvent(BaseModel):
     fetched_at:   Optional[datetime] = None
 
 
-# ─── Window Check Result ──────────────────────────────────────────────────────
+# â”€â”€â”€ Window Check Result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class NewsWindowResult(BaseModel):
     is_blocked:       bool
@@ -56,7 +56,7 @@ class NewsWindowResult(BaseModel):
     reason:           str                       # plain English
 
 
-# ─── Alert Payload ────────────────────────────────────────────────────────────
+# â”€â”€â”€ Alert Payload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class EventAlert(BaseModel):
     user_id:   str
@@ -68,7 +68,7 @@ class EventAlert(BaseModel):
     error:     Optional[str] = None
 
 
-# ─── API Response Models ──────────────────────────────────────────────────────
+# â”€â”€â”€ API Response Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class UpcomingEventsResponse(BaseModel):
     events:       list[MacroEvent]

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Paper Trading Engine
 Simulates live trading without real money
 Builds user confidence before enabling real trading
@@ -260,7 +260,7 @@ class PaperTradingEngine:
             "open_trades": len(account.open_trades),
             "closed_trades": len(account.closed_trades),
             "created_at": account.created_at.isoformat(),
-            "message": "✅ Paper trading account - No real money involved. Use to test strategies with live market data!"
+            "message": "âœ… Paper trading account - No real money involved. Use to test strategies with live market data!"
         }
 
     async def get_paper_trades(self, user_id: str, status: str = "all") -> List[Dict]:
@@ -361,11 +361,11 @@ class PaperTradingEngine:
                 "max_drawdown": f"{account.max_drawdown:.2f}%",
             },
             "insights": [
-                "✅ Paper trading helps you test strategies risk-free",
-                f"📊 You've completed {account.total_trades} simulated trades",
-                f"🎯 Your win rate is {account.win_rate:.1f}%",
-                "💡 When ready, you can enable real trading with the same strategy",
-                "⚠️ Remember: Real trading involves actual financial risk"
+                "âœ… Paper trading helps you test strategies risk-free",
+                f"ðŸ“Š You've completed {account.total_trades} simulated trades",
+                f"ðŸŽ¯ Your win rate is {account.win_rate:.1f}%",
+                "ðŸ’¡ When ready, you can enable real trading with the same strategy",
+                "âš ï¸ Remember: Real trading involves actual financial risk"
             ],
             "recommendations": self._get_paper_trading_recommendations(account)
         }
@@ -378,14 +378,14 @@ class PaperTradingEngine:
             recommendations.append("Complete at least 10 trades to get meaningful statistics")
 
         if account.win_rate > 60:
-            recommendations.append("🟢 Strong performance! You may be ready for small real trades")
+            recommendations.append("ðŸŸ¢ Strong performance! You may be ready for small real trades")
         elif account.win_rate > 50:
-            recommendations.append("🟡 Decent performance. Keep paper trading to build consistency")
+            recommendations.append("ðŸŸ¡ Decent performance. Keep paper trading to build consistency")
         else:
-            recommendations.append("🔴 Win rate below 50%. Work on your strategy before real trading")
+            recommendations.append("ðŸ”´ Win rate below 50%. Work on your strategy before real trading")
 
         if account.max_drawdown > 30:
-            recommendations.append("⚠️ High drawdown - consider tighter stop losses")
+            recommendations.append("âš ï¸ High drawdown - consider tighter stop losses")
 
         return recommendations
 
@@ -395,11 +395,11 @@ class PaperTradingEngine:
         return {
             "purpose": "Test your trading strategy with live market data without risking real money",
             "benefits": [
-                "✅ Risk-free testing",
-                "✅ Real market prices",
-                "✅ Build confidence",
-                "✅ Develop strategy",
-                "✅ Track performance",
+                "âœ… Risk-free testing",
+                "âœ… Real market prices",
+                "âœ… Build confidence",
+                "âœ… Develop strategy",
+                "âœ… Track performance",
             ],
             "steps": [
                 "1. Create a paper trading account",

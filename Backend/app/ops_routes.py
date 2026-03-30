@@ -1,4 +1,4 @@
-"""Operational status and readiness endpoints."""
+﻿"""Operational status and readiness endpoints."""
 
 from __future__ import annotations
 

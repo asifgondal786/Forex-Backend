@@ -1,4 +1,4 @@
-"""
+﻿"""
 Phase 16 - Charting Router
 Serves OHLCV candle data and indicator data to the Flutter TradingView chart.
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/chart", tags=["Charting"])
 
-# ── Auth dependency (replaces missing app.core.firebase_auth) ──────────────────
+# â”€â”€ Auth dependency (replaces missing app.core.firebase_auth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Reuses the existing verify_firebase_token from firestore_client.
 # Returns the decoded token claims dict, same shape get_current_user would have.
 
@@ -51,7 +51,7 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
 
 
-# ── Data source selector ────────────────────────────────────────────────────────
+# â”€â”€ Data source selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _get_candles(pair: str, granularity: str, count: int) -> list[dict]:
     """
@@ -74,7 +74,7 @@ def _get_candles(pair: str, granularity: str, count: int) -> list[dict]:
     return generate_mock_candles(pair, granularity, count)
 
 
-# ── Candle Endpoint ─────────────────────────────────────────────────────────────
+# â”€â”€ Candle Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/candles/{pair}")
 async def get_candles(
@@ -103,7 +103,7 @@ async def get_candles(
     }
 
 
-# ── Indicator helpers ───────────────────────────────────────────────────────────
+# â”€â”€ Indicator helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _sma(closes: list[float], period: int) -> list[Optional[float]]:
     result = [None] * len(closes)
@@ -157,7 +157,7 @@ def _bollinger(closes: list[float], period: int = 20, std_dev: float = 2.0):
     return upper, middle, lower
 
 
-# ── Indicators Endpoint ─────────────────────────────────────────────────────────
+# â”€â”€ Indicators Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/indicators/{pair}")
 async def get_indicators(
@@ -203,7 +203,7 @@ async def get_indicators(
     }
 
 
-# ── Supported Pairs ─────────────────────────────────────────────────────────────
+# â”€â”€ Supported Pairs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/pairs")
 async def get_supported_pairs(current_user: dict = Depends(get_current_user)):

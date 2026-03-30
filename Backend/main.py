@@ -1,4 +1,4 @@
-"""
+﻿"""
 Deprecated entrypoint.
 Use Backend/app/main.py as the single source of truth.
 """

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Server Startup Script
 """
 import uvicorn

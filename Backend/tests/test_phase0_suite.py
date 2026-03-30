@@ -1,11 +1,11 @@
-"""
-Phase 0 Priority Test Suite — Tajir / Forex Companion AI
+﻿"""
+Phase 0 Priority Test Suite â€” Tajir / Forex Companion AI
 =========================================================
-  1. Auth middleware      — 401 on missing/bad token, 200 with valid token
-  2. Public path bypass   — exempt endpoints never return 401
-  3. Rate limiting        — 429 after limit exceeded
-  4. AI chat endpoint     — auth required, rate limit enforced
-  5. RLS smoke            — auth required on data endpoints
+  1. Auth middleware      â€” 401 on missing/bad token, 200 with valid token
+  2. Public path bypass   â€” exempt endpoints never return 401
+  3. Rate limiting        â€” 429 after limit exceeded
+  4. AI chat endpoint     â€” auth required, rate limit enforced
+  5. RLS smoke            â€” auth required on data endpoints
 
 Run with:
     pytest tests/test_phase0_suite.py -v
@@ -52,7 +52,7 @@ def client(app):
 
 class TestAuthMiddleware:
     """
-    /api/health is in _public_unauthenticated_auth_paths — use
+    /api/health is in _public_unauthenticated_auth_paths â€” use
     /api/tasks/queue/status which requires a valid Firebase token.
     """
 
@@ -132,7 +132,7 @@ class TestPublicPaths:
 
 # ===========================================================================
 # 3. RATE LIMITING
-# Uses the module-level client — avoids anyio event-loop crash that occurs
+# Uses the module-level client â€” avoids anyio event-loop crash that occurs
 # when creating a fresh TestClient inside a test with an active lifespan.
 # Auth middleware runs before rate-limit middleware, so we patch the token
 # verifier for the global-limit test so rate-limit is what fires the 429.
@@ -191,7 +191,7 @@ class TestRateLimiting:
 
 
 # ===========================================================================
-# 4. AI CHAT ENDPOINT  — body: {"messages": [{"role": "user", "content": "..."}]}
+# 4. AI CHAT ENDPOINT  â€” body: {"messages": [{"role": "user", "content": "..."}]}
 # ===========================================================================
 
 class TestAiChatEndpoint:

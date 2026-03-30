@@ -1,5 +1,5 @@
-"""
-Tajir AI Risk Guardian — Pydantic Models
+﻿"""
+Tajir AI Risk Guardian â€” Pydantic Models
 Phase 17
 """
 
@@ -8,12 +8,12 @@ from typing import Optional, Literal
 from enum import Enum
 
 
-# ─── Enums ────────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Enums â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RiskDecision(str, Enum):
-    APPROVE  = "approve"   # score 0–39
-    WARN     = "warn"      # score 40–69
-    BLOCK    = "block"     # score 70–100
+    APPROVE  = "approve"   # score 0â€“39
+    WARN     = "warn"      # score 40â€“69
+    BLOCK    = "block"     # score 70â€“100
 
 
 class TrustLevel(str, Enum):
@@ -28,7 +28,7 @@ class TradeDirection(str, Enum):
     SELL = "sell"
 
 
-# ─── Incoming Trade Request ────────────────────────────────────────────────────
+# â”€â”€â”€ Incoming Trade Request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TradeRequest(BaseModel):
     user_id:        str
@@ -46,7 +46,7 @@ class TradeRequest(BaseModel):
         return round(v, 2)
 
 
-# ─── Account Snapshot (fetched from DB for scoring) ───────────────────────────
+# â”€â”€â”€ Account Snapshot (fetched from DB for scoring) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AccountSnapshot(BaseModel):
     balance:            float
@@ -58,21 +58,21 @@ class AccountSnapshot(BaseModel):
     consecutive_losses: int   = Field(ge=0)
 
 
-# ─── Market Snapshot (from price feed) ────────────────────────────────────────
+# â”€â”€â”€ Market Snapshot (from price feed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class MarketSnapshot(BaseModel):
     symbol:             str
     current_spread_pips: float
     atr_14:             float          # Average True Range
-    is_news_window:     bool = False   # True = within ±30 min of high-impact news
+    is_news_window:     bool = False   # True = within Â±30 min of high-impact news
     session:            Literal["sydney", "tokyo", "london", "new_york", "overlap", "dead"]
-    volatility_index:   float = Field(ge=0, le=100)  # normalised 0–100
+    volatility_index:   float = Field(ge=0, le=100)  # normalised 0â€“100
 
 
-# ─── Sub-scores ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ Sub-scores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class PositionScore(BaseModel):
-    score:         float   # 0–100
+    score:         float   # 0â€“100
     flags:         list[str]
     lot_risk_pct:  float   # % of balance this lot risks
     margin_used:   float   # estimated margin in account currency
@@ -88,7 +88,7 @@ class MarketScore(BaseModel):
     flags:  list[str]
 
 
-# ─── Guardian Decision ────────────────────────────────────────────────────────
+# â”€â”€â”€ Guardian Decision â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RiskGuardianResult(BaseModel):
     composite_score:    float = Field(ge=0, le=100)

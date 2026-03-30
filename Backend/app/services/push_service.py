@@ -1,8 +1,8 @@
-"""
-Phase 13 — Push Service
+﻿"""
+Phase 13 â€” Push Service
 Sends Firebase Cloud Messaging push notifications using the Admin SDK.
 The firebase-admin SDK is already initialized in main.py via
-FIREBASE_SERVICE_ACCOUNT_JSON_B64 — no re-init needed here.
+FIREBASE_SERVICE_ACCOUNT_JSON_B64 â€” no re-init needed here.
 """
 
 import logging
@@ -31,7 +31,7 @@ class PushService:
         """
         tokens = self._get_tokens(user_id)
         if not tokens:
-            logger.info(f"[Push] No FCM tokens for user {user_id} — skipping")
+            logger.info(f"[Push] No FCM tokens for user {user_id} â€” skipping")
             return {"sent": 0, "failed": 0}
 
         message = messaging.MulticastMessage(

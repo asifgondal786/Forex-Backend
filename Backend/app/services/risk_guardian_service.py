@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/services/risk_guardian_service.py
 Phase 6 - Risk Guardian
 Kelly Criterion, drawdown controls, correlation risk dashboard.
@@ -16,7 +16,7 @@ TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_API_KEY", "")
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 
-# ── Kelly Criterion ───────────────────────────────────────────────────────────
+# â”€â”€ Kelly Criterion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def calculate_kelly(
     win_rate: float,
@@ -61,16 +61,16 @@ def calculate_kelly(
         "rr_ratio":           round(rr_ratio, 2),
         "win_rate_pct":       round(win_rate * 100, 1),
         "interpretation": (
-            "AGGRESSIVE — consider reducing Kelly fraction"
+            "AGGRESSIVE â€” consider reducing Kelly fraction"
             if full_kelly > 0.3
-            else "MODERATE — healthy position sizing"
+            else "MODERATE â€” healthy position sizing"
             if full_kelly > 0.1
-            else "CONSERVATIVE — edge may be weak"
+            else "CONSERVATIVE â€” edge may be weak"
         ),
     }
 
 
-# ── Drawdown Controls ─────────────────────────────────────────────────────────
+# â”€â”€ Drawdown Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def calculate_drawdown_controls(
     account_balance: float,
@@ -87,7 +87,7 @@ def calculate_drawdown_controls(
     risk_per_trade    = account_balance * risk_per_trade_pct
     max_portfolio_risk = risk_per_trade * max_open_trades
 
-    # Ruin threshold — stop trading if balance drops this much
+    # Ruin threshold â€” stop trading if balance drops this much
     ruin_threshold_pct = 0.20
     ruin_threshold_usd = account_balance * ruin_threshold_pct
 
@@ -113,9 +113,9 @@ def calculate_drawdown_controls(
     }
 
 
-# ── Correlation Risk ──────────────────────────────────────────────────────────
+# â”€â”€ Correlation Risk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-# Known forex correlations (static lookup — updated periodically)
+# Known forex correlations (static lookup â€” updated periodically)
 _CORRELATIONS = {
     ("EUR_USD", "GBP_USD"): 0.87,
     ("EUR_USD", "AUD_USD"): 0.72,
@@ -148,7 +148,7 @@ def calculate_correlation_risk(open_positions: List[Dict]) -> Dict:
     if len(open_positions) < 2:
         return {
             "risk_level":  "low",
-            "message":     "Only one position open — no correlation risk",
+            "message":     "Only one position open â€” no correlation risk",
             "pairs":       [p.get("pair", "") for p in open_positions],
             "correlations": [],
             "warnings":    [],
@@ -184,7 +184,7 @@ def calculate_correlation_risk(open_positions: List[Dict]) -> Dict:
             if abs(effective_corr) >= 0.75:
                 warnings.append(
                     f"{pairs[i].replace('_','/')} and {pairs[j].replace('_','/')} "
-                    f"are {round(abs(effective_corr)*100):.0f}% correlated — "
+                    f"are {round(abs(effective_corr)*100):.0f}% correlated â€” "
                     f"{'amplified' if effective_corr > 0 else 'hedged'} exposure"
                 )
 
@@ -210,7 +210,7 @@ def calculate_correlation_risk(open_positions: List[Dict]) -> Dict:
     }
 
 
-# ── Advanced Monte Carlo with stress testing ──────────────────────────────────
+# â”€â”€ Advanced Monte Carlo with stress testing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def run_stress_test(
     win_rate: float,

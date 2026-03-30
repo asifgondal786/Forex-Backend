@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI-Powered Forex Trading Engine
 Autonomous trading system that works while you sleep
 Integrates with Google Generative AI (Gemini) for intelligent decision-making
@@ -488,7 +488,7 @@ class ForexAIEngine:
         forecast_idx = last_idx + horizon_hours
         forecasted_price = np.polyval(coeffs, forecast_idx)
 
-        # Confidence based on R² score
+        # Confidence based on RÂ² score
         y_pred = np.polyval(coeffs, x)
         ss_res = np.sum((y - y_pred) ** 2)
         ss_tot = np.sum((y - np.mean(y)) ** 2)

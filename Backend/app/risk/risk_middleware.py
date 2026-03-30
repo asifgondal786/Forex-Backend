@@ -1,12 +1,12 @@
-"""
-Tajir AI Risk Guardian — FastAPI Route + Middleware
+﻿"""
+Tajir AI Risk Guardian â€” FastAPI Route + Middleware
 Phase 17
 
 Drop this file into your existing FastAPI app.
 Add `router` to your main app:  app.include_router(risk_router, prefix="/api/v1")
 
 The middleware function `guard_trade` is what you inject into your
-existing trade execution route — see the example at the bottom.
+existing trade execution route â€” see the example at the bottom.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
@@ -25,7 +25,7 @@ logger = logging.getLogger("risk_guardian")
 risk_router = APIRouter(tags=["Risk Guardian"])
 
 
-# ─── Request/Response wrappers ────────────────────────────────────────────────
+# â”€â”€â”€ Request/Response wrappers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class GuardianCheckRequest(BaseModel):
     trade:   TradeRequest
@@ -39,12 +39,12 @@ class GuardianCheckResponse(BaseModel):
     message:  str
 
 
-# ─── Dependency: fetch account snapshot from DB ───────────────────────────────
+# â”€â”€â”€ Dependency: fetch account snapshot from DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Replace this stub with your actual Supabase query
 
 async def get_account_snapshot(user_id: str) -> AccountSnapshot:
     """
-    STUB — replace with Supabase query:
+    STUB â€” replace with Supabase query:
         data = supabase.table("account_snapshots")
                .select("*")
                .eq("user_id", user_id)
@@ -65,7 +65,7 @@ async def get_account_snapshot(user_id: str) -> AccountSnapshot:
 
 async def get_market_snapshot(symbol: str) -> MarketSnapshot:
     """
-    STUB — replace with your broker/price-feed integration:
+    STUB â€” replace with your broker/price-feed integration:
         - ATR from MT5 or broker REST API
         - Spread from live tick
         - is_news_window from your economic calendar service
@@ -80,7 +80,7 @@ async def get_market_snapshot(symbol: str) -> MarketSnapshot:
     )
 
 
-# ─── Routes ───────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @risk_router.post("/risk/check", response_model=GuardianCheckResponse)
 async def check_risk(body: GuardianCheckRequest):
@@ -105,7 +105,7 @@ async def check_trade_for_user(
     trade: TradeRequest,
 ):
     """
-    Lightweight endpoint — pass trade only.
+    Lightweight endpoint â€” pass trade only.
     Account + market data fetched server-side.
     Used by the autonomous engine before sending to broker.
     """
@@ -126,7 +126,7 @@ async def check_trade_for_user(
     )
 
 
-# ─── Audit Log Route ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Audit Log Route â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AuditLogEntry(BaseModel):
     user_id:         str
@@ -141,7 +141,7 @@ class AuditLogEntry(BaseModel):
 async def get_audit_log(user_id: str, limit: int = 20):
     """
     Returns the last N risk evaluations for a user.
-    STUB — replace with Supabase query:
+    STUB â€” replace with Supabase query:
         data = supabase.table("risk_audit_log")
                .select("*")
                .eq("user_id", user_id)
@@ -152,7 +152,7 @@ async def get_audit_log(user_id: str, limit: int = 20):
     return []   # Replace with real query
 
 
-# ─── Middleware helper: inject into your trade execution route ─────────────────
+# â”€â”€â”€ Middleware helper: inject into your trade execution route â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def guard_trade(
     user_id: str,
@@ -162,7 +162,7 @@ async def guard_trade(
     Call this at the TOP of your existing trade execution function.
 
     Example usage in your existing route:
-    ──────────────────────────────────────────────────────────────────
+    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     @router.post("/trade/execute")
     async def execute_trade(user_id: str, trade: TradeRequest):
 
@@ -186,13 +186,13 @@ async def guard_trade(
             )
 
         # ... rest of your existing trade execution logic
-    ──────────────────────────────────────────────────────────────────
+    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     """
     account = await get_account_snapshot(user_id)
     market  = await get_market_snapshot(trade.symbol)
     result  = evaluate_trade(trade, account, market)
 
-    # ── Audit log write (replace stub with real Supabase insert) ──
+    # â”€â”€ Audit log write (replace stub with real Supabase insert) â”€â”€
     # await supabase.table("risk_audit_log").insert({
     #     "user_id":         user_id,
     #     "symbol":          trade.symbol,

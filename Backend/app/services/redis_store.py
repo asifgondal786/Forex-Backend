@@ -1,4 +1,4 @@
-"""Optional Redis integration for queueing and websocket registry state."""
+﻿"""Optional Redis integration for queueing and websocket registry state."""
 
 from __future__ import annotations
 

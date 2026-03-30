@@ -1,8 +1,8 @@
-"""
+﻿"""
 app/services/nlp_command_service.py
 Phase 7 - NLP Voice Copilot
 Parses natural language trading commands into structured actions.
-"Open a buy on GBP/USD with 1% risk" → {action: BUY, pair: GBP_USD, risk_pct: 0.01}
+"Open a buy on GBP/USD with 1% risk" â†’ {action: BUY, pair: GBP_USD, risk_pct: 0.01}
 """
 from __future__ import annotations
 
@@ -143,7 +143,7 @@ def parse_command(text: str, account_balance: float = 10000.0) -> Dict:
             "requires_confirmation": False,
         }
 
-    # Unknown — pass to Gemini
+    # Unknown â€” pass to Gemini
     return {
         "intent":    "CHAT",
         "confidence": 0.5,

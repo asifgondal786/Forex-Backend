@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/services/paper_trading_service.py
 Phase 5 - Paper Trading Engine
 Virtual trade execution against live Twelve Data prices.
@@ -19,7 +19,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 TABLE        = "paper_trades"
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _headers() -> Dict:
     return {
@@ -36,7 +36,7 @@ def _pnl(entry: float, current: float, direction: str, lot_size: float = 1000) -
     return round(diff * lot_size, 2)
 
 
-# ── Main service functions ────────────────────────────────────────────────────
+# â”€â”€ Main service functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async def open_paper_trade(
     user_id: str,
@@ -234,7 +234,7 @@ async def get_trade_by_id(trade_id: str) -> Optional[Dict]:
         logger.error("get_trade_by_id error: %s", e)
         return None
 
-# ── Phase 13: Notification wiring ────────────────────────────────────────
+# â”€â”€ Phase 13: Notification wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from app.services.notification_dispatcher import NotificationDispatcher
 _dispatcher_pt = NotificationDispatcher()
 
@@ -250,4 +250,4 @@ async def _notify_trade(user_id: str, pair: str, direction: str, price: float, s
             "size":      f"{size} lot",
         }
     )
-# ── End Phase 13 ─────────────────────────────────────────────────────────
+# â”€â”€ End Phase 13 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

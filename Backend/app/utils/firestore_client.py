@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 import json
 import logging
 import os
@@ -142,7 +142,7 @@ def verify_firebase_token(token: str) -> dict:
     password changes, or account deletion are rejected immediately rather
     than remaining valid until natural expiry (up to 1 hour).
 
-    Raises firebase_admin.auth exceptions — callers should catch and map
+    Raises firebase_admin.auth exceptions â€” callers should catch and map
     to appropriate HTTP responses.
     """
     init_firebase()
@@ -155,13 +155,13 @@ def verify_firebase_token(token: str) -> dict:
         logger.info("verify_firebase_token: token expired")
         raise
     except auth.InvalidIdTokenError as exc:
-        logger.warning("verify_firebase_token: invalid token — %s", exc)
+        logger.warning("verify_firebase_token: invalid token â€” %s", exc)
         raise
     except auth.UserDisabledError:
         logger.warning("verify_firebase_token: user account is disabled")
         raise
     except auth.CertificateFetchError as exc:
-        logger.error("verify_firebase_token: could not fetch Firebase public keys — %s", exc)
+        logger.error("verify_firebase_token: could not fetch Firebase public keys â€” %s", exc)
         raise
     except Exception as exc:
         logger.warning(

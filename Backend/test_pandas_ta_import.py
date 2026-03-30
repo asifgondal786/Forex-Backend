@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 try:
     import pandas_ta as ta
     print("pandas_ta imported, version:", getattr(ta, '__version__', 'unknown'))

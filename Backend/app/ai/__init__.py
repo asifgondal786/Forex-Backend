@@ -1,4 +1,4 @@
-"""AI module package for isolated strategy, risk, and Gemini integrations."""
+﻿"""AI module package for isolated strategy, risk, and Gemini integrations."""
 
 from .gemini_client import GeminiClient, gemini_client
 from .risk_engine import RiskEngine

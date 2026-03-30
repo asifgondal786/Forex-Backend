@@ -1,4 +1,4 @@
-"""
+﻿"""
 Risk Management & Governance Service
 Implements comprehensive trading safety controls
 """

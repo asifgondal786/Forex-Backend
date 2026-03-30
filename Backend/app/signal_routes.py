@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/signal_routes.py
 Phase 4 - Signal Fusion Endpoints
 """

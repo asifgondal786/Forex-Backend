@@ -1,5 +1,5 @@
-"""
-Tajir Phase 18 — Macro Event Shield Unit Tests
+﻿"""
+Tajir Phase 18 â€” Macro Event Shield Unit Tests
 Run with: pytest test_macro_shield.py -v
 """
 
@@ -15,7 +15,7 @@ from macro_scraper import currencies_for_symbol, _parse_ff_datetime
 from macro_shield import check_news_window, get_upcoming_events
 
 
-# ─── Fixtures ─────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def make_event(
     title="Non-Farm Payrolls",
@@ -35,7 +35,7 @@ def make_event(
     )
 
 
-# ─── Scraper Helper Tests ──────────────────────────────────────────────────────
+# â”€â”€â”€ Scraper Helper Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestCurrenciesForSymbol:
 
@@ -81,7 +81,7 @@ class TestDatetimeParser:
         assert dt is not None
 
 
-# ─── Window Checker Tests ──────────────────────────────────────────────────────
+# â”€â”€â”€ Window Checker Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestCheckNewsWindow:
 
@@ -147,7 +147,7 @@ class TestCheckNewsWindow:
         assert result.window_ends_at > event.event_time
 
 
-# ─── Upcoming Events Tests ────────────────────────────────────────────────────
+# â”€â”€â”€ Upcoming Events Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TestGetUpcomingEvents:
 

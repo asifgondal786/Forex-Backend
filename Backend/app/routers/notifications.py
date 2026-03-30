@@ -1,5 +1,5 @@
-"""
-Phase 13 — Multi-Channel Notifications
+﻿"""
+Phase 13 â€” Multi-Channel Notifications
 Router: /api/v1/notifications/...
 """
 
@@ -16,7 +16,7 @@ dispatcher  = NotificationDispatcher()
 push_svc    = PushService()
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+# â”€â”€ Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DeviceRegisterRequest(BaseModel):
     fcm_token: str
@@ -28,7 +28,7 @@ class NotificationPrefsRequest(BaseModel):
     whatsapp_enabled: Optional[bool] = None
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# â”€â”€ Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/device/register")
 async def register_device(body: DeviceRegisterRequest, user=Depends(get_current_user)):
@@ -69,7 +69,7 @@ async def test_push(user=Depends(get_current_user)):
     """Send a test push notification to all registered devices for this user."""
     await push_svc.send(
         user_id = user["uid"],
-        title   = "Tajir — Test Push",
+        title   = "Tajir â€” Test Push",
         body    = "Push notifications are working correctly.",
         data    = {"event_type": "test"}
     )

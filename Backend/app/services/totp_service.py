@@ -1,4 +1,4 @@
-import pyotp, qrcode, io, base64, os
+﻿import pyotp, qrcode, io, base64, os
 from app.database import supabase
 
 def generate_totp_secret(user_id: str) -> dict:

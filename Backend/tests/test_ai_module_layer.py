@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.ai.gemini_client import GeminiClient, _extract_json_block

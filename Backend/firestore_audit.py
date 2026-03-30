@@ -1,4 +1,4 @@
-import firebase_admin
+﻿import firebase_admin
 from firebase_admin import credentials, firestore
 
 cred = credentials.Certificate("firebase_key.json")
@@ -27,7 +27,7 @@ for col in ["users", "tasks", "signals", "notifications",
     try:
         audit_collection(col)
     except Exception as e:
-        print(f"\n{col}: not found or error — {e}")
+        print(f"\n{col}: not found or error â€” {e}")
 
 print("\n" + "="*40)
 print("All top-level collections in Firestore:")

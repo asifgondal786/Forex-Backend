@@ -1,9 +1,9 @@
-"""
-Tajir AI Risk Guardian — Core Scoring Engine
+﻿"""
+Tajir AI Risk Guardian â€” Core Scoring Engine
 Phase 17
 
 Three independent scorers feed a weighted composite score.
-Hard limits are checked separately — they bypass scoring and block immediately.
+Hard limits are checked separately â€” they bypass scoring and block immediately.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from app.risk.risk_models import (
 )
 
 
-# ─── Hard Limits (bypass scoring — instant BLOCK) ─────────────────────────────
+# â”€â”€â”€ Hard Limits (bypass scoring â€” instant BLOCK) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 HARD_LIMITS = {
     "max_lot_size":          10.0,    # absolute maximum lots regardless of balance
@@ -46,12 +46,12 @@ WEIGHTS = {
 }
 
 
-# ─── Position Scorer ──────────────────────────────────────────────────────────
+# â”€â”€â”€ Position Scorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def score_position(
     trade: TradeRequest,
     account: AccountSnapshot,
-    pip_value: float = 10.0,   # USD per pip per standard lot — parameterised for currency pairs
+    pip_value: float = 10.0,   # USD per pip per standard lot â€” parameterised for currency pairs
 ) -> PositionScore:
     score = 0.0
     flags: list[str] = []
@@ -61,23 +61,23 @@ def score_position(
         risk_amount = trade.lot_size * pip_value * trade.stop_loss_pips
         lot_risk_pct = (risk_amount / account.balance) * 100 if account.balance > 0 else 100.0
     else:
-        # No stop loss — assume full lot value as risk proxy
+        # No stop loss â€” assume full lot value as risk proxy
         lot_risk_pct = (trade.lot_size / (account.balance / 1000)) * 100
-        flags.append("No stop loss set — risk estimated from lot size")
+        flags.append("No stop loss set â€” risk estimated from lot size")
 
     if lot_risk_pct > 10:
         score += 40
         flags.append(f"Risk per trade is {lot_risk_pct:.1f}% of balance (limit: 10%)")
     elif lot_risk_pct > 5:
         score += 20
-        flags.append(f"Risk per trade is {lot_risk_pct:.1f}% of balance (recommended: ≤2%)")
+        flags.append(f"Risk per trade is {lot_risk_pct:.1f}% of balance (recommended: â‰¤2%)")
     elif lot_risk_pct > 2:
         score += 8
 
     # 2. Leverage penalty
     if trade.leverage > 100:
         score += 25
-        flags.append(f"Leverage {trade.leverage}:1 is very high (recommended: ≤50:1 for beginners)")
+        flags.append(f"Leverage {trade.leverage}:1 is very high (recommended: â‰¤50:1 for beginners)")
     elif trade.leverage > 50:
         score += 12
         flags.append(f"Leverage {trade.leverage}:1 is elevated")
@@ -87,7 +87,7 @@ def score_position(
         rr = trade.take_profit_pips / trade.stop_loss_pips
         if rr < 1.0:
             score += 15
-            flags.append(f"Risk:Reward ratio {rr:.2f} — TP is smaller than SL")
+            flags.append(f"Risk:Reward ratio {rr:.2f} â€” TP is smaller than SL")
         elif rr < 1.5:
             score += 5
 
@@ -110,7 +110,7 @@ def score_position(
     )
 
 
-# ─── Account Scorer ───────────────────────────────────────────────────────────
+# â”€â”€â”€ Account Scorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def score_account(account: AccountSnapshot) -> AccountScore:
     score = 0.0
@@ -119,24 +119,24 @@ def score_account(account: AccountSnapshot) -> AccountScore:
     # 1. Current drawdown
     if account.current_drawdown_pct > 15:
         score += 35
-        flags.append(f"Account drawdown {account.current_drawdown_pct:.1f}% — near hard limit (20%)")
+        flags.append(f"Account drawdown {account.current_drawdown_pct:.1f}% â€” near hard limit (20%)")
     elif account.current_drawdown_pct > 10:
         score += 20
-        flags.append(f"Account drawdown {account.current_drawdown_pct:.1f}% — caution zone")
+        flags.append(f"Account drawdown {account.current_drawdown_pct:.1f}% â€” caution zone")
     elif account.current_drawdown_pct > 5:
         score += 8
 
     # 2. Daily loss
     if account.daily_loss_pct > 3:
         score += 30
-        flags.append(f"Daily loss {account.daily_loss_pct:.1f}% — nearing daily limit (5%)")
+        flags.append(f"Daily loss {account.daily_loss_pct:.1f}% â€” nearing daily limit (5%)")
     elif account.daily_loss_pct > 1.5:
         score += 12
 
     # 3. Consecutive losses (emotional / system trading signal)
     if account.consecutive_losses >= 4:
         score += 20
-        flags.append(f"{account.consecutive_losses} consecutive losses — consider pausing")
+        flags.append(f"{account.consecutive_losses} consecutive losses â€” consider pausing")
     elif account.consecutive_losses >= 2:
         score += 8
         flags.append(f"{account.consecutive_losses} consecutive losses")
@@ -148,15 +148,15 @@ def score_account(account: AccountSnapshot) -> AccountScore:
     elif account.win_rate_7d < 45:
         score += 5
 
-    # 5. Too many open positions — correlation risk
+    # 5. Too many open positions â€” correlation risk
     if account.open_positions >= 8:
         score += 10
-        flags.append(f"{account.open_positions} positions open — high correlation risk")
+        flags.append(f"{account.open_positions} positions open â€” high correlation risk")
 
     return AccountScore(score=min(score, 100), flags=flags)
 
 
-# ─── Market Scorer ────────────────────────────────────────────────────────────
+# â”€â”€â”€ Market Scorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def score_market(market: MarketSnapshot) -> MarketScore:
     score = 0.0
@@ -167,7 +167,7 @@ def score_market(market: MarketSnapshot) -> MarketScore:
         spread_ratio = market.current_spread_pips / market.atr_14
         if spread_ratio > 0.3:
             score += 30
-            flags.append(f"Spread ({market.current_spread_pips:.1f} pips) is {spread_ratio*100:.0f}% of ATR — high cost")
+            flags.append(f"Spread ({market.current_spread_pips:.1f} pips) is {spread_ratio*100:.0f}% of ATR â€” high cost")
         elif spread_ratio > 0.15:
             score += 12
             flags.append(f"Spread elevated relative to ATR")
@@ -175,7 +175,7 @@ def score_market(market: MarketSnapshot) -> MarketScore:
     # 2. News window
     if market.is_news_window:
         score += 40
-        flags.append("High-impact news event within ±30 minutes")
+        flags.append("High-impact news event within Â±30 minutes")
 
     # 3. Volatility
     if market.volatility_index > 80:
@@ -188,14 +188,14 @@ def score_market(market: MarketSnapshot) -> MarketScore:
     # 4. Session quality
     if market.session == "dead":
         score += 15
-        flags.append("Market is in dead zone — low liquidity, erratic moves")
+        flags.append("Market is in dead zone â€” low liquidity, erratic moves")
     elif market.session == "sydney":
         score += 5
 
     return MarketScore(score=min(score, 100), flags=flags)
 
 
-# ─── Hard Limit Checker ───────────────────────────────────────────────────────
+# â”€â”€â”€ Hard Limit Checker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def check_hard_limits(
     trade: TradeRequest,
@@ -214,13 +214,13 @@ def check_hard_limits(
         violations.append(f"Account drawdown {account.current_drawdown_pct:.1f}% has reached the hard stop ({HARD_LIMITS['max_drawdown_pct']}%)")
 
     if account.daily_loss_pct >= HARD_LIMITS["max_daily_loss_pct"]:
-        violations.append(f"Daily loss limit reached ({account.daily_loss_pct:.1f}% ≥ {HARD_LIMITS['max_daily_loss_pct']}%) — no more trades today")
+        violations.append(f"Daily loss limit reached ({account.daily_loss_pct:.1f}% â‰¥ {HARD_LIMITS['max_daily_loss_pct']}%) â€” no more trades today")
 
     if account.open_positions >= HARD_LIMITS["max_open_positions"]:
         violations.append(f"Maximum open positions reached ({HARD_LIMITS['max_open_positions']})")
 
     if account.consecutive_losses >= HARD_LIMITS["max_consecutive_losses"]:
-        violations.append(f"{account.consecutive_losses} consecutive losses — trading paused for your protection")
+        violations.append(f"{account.consecutive_losses} consecutive losses â€” trading paused for your protection")
 
     if trade.stop_loss_pips is not None and trade.stop_loss_pips < HARD_LIMITS["min_stop_loss_pips"]:
         violations.append(f"Stop loss {trade.stop_loss_pips} pips is below minimum ({HARD_LIMITS['min_stop_loss_pips']} pips)")
@@ -231,7 +231,7 @@ def check_hard_limits(
     return violations
 
 
-# ─── Composite Scorer ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Composite Scorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def compute_composite(pos: PositionScore, acc: AccountScore, mkt: MarketScore) -> float:
     raw = (
@@ -250,7 +250,7 @@ def score_to_decision(score: float) -> RiskDecision:
     return RiskDecision.BLOCK
 
 
-# ─── Explanation Generator ────────────────────────────────────────────────────
+# â”€â”€â”€ Explanation Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def generate_explanation(
     decision: RiskDecision,
@@ -272,23 +272,23 @@ def generate_explanation(
 
     if decision == RiskDecision.APPROVE:
         return (
-            f"Risk score {composite:.0f}/100 — this trade looks acceptable. "
+            f"Risk score {composite:.0f}/100 â€” this trade looks acceptable. "
             f"{flag_text}"
         )
     elif decision == RiskDecision.WARN:
         return (
-            f"Risk score {composite:.0f}/100 — this trade has elevated risk. "
+            f"Risk score {composite:.0f}/100 â€” this trade has elevated risk. "
             f"{flag_text} "
             f"Review the details below before confirming."
         )
     return (
-        f"Risk score {composite:.0f}/100 — this trade has been blocked. "
+        f"Risk score {composite:.0f}/100 â€” this trade has been blocked. "
         f"{flag_text} "
         f"Consider reducing lot size or waiting for better conditions."
     )
 
 
-# ─── Suggested Safer Lot Size ─────────────────────────────────────────────────
+# â”€â”€â”€ Suggested Safer Lot Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def suggest_safer_lot(
     trade: TradeRequest,
@@ -304,7 +304,7 @@ def suggest_safer_lot(
     return round(max(safe_lots, 0.01), 2)
 
 
-# ─── Main Entry Point ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Main Entry Point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def evaluate_trade(
     trade: TradeRequest,

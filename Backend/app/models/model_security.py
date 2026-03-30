@@ -1,5 +1,5 @@
-"""
-Phase 14 — Security Models
+﻿"""
+Phase 14 â€” Security Models
 Pydantic models for all security-related API request/response payloads.
 """
 
@@ -8,14 +8,14 @@ from typing import Optional
 from datetime import datetime
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 2FA Models
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TwoFASetupResponse(BaseModel):
     """Returned when user initiates 2FA setup."""
     secret: str
-    qr_code_base64: str          # PNG QR code, base64 encoded — display in Flutter Image.memory()
+    qr_code_base64: str          # PNG QR code, base64 encoded â€” display in Flutter Image.memory()
     provisioning_uri: str        # For manual entry in authenticator apps
     message: str = "Scan QR code with Google Authenticator, then verify with a code."
 
@@ -39,9 +39,9 @@ class TwoFADisableRequest(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, description="6-digit TOTP code to confirm disable")
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Device Verification Models
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DeviceInfo(BaseModel):
     """Device metadata sent from Flutter."""
@@ -94,9 +94,9 @@ class RevokeDeviceResponse(BaseModel):
     message: str
 
 
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Trade Confirmation Token Models
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TradePayload(BaseModel):
     """The trade details that require confirmation before execution."""

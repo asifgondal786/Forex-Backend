@@ -1,4 +1,4 @@
-from __future__ import annotations
+ï»¿from __future__ import annotations
 from datetime import datetime
 from app.database import supabase
 from app.services.social_service import get_copy_subscribers
@@ -16,7 +16,7 @@ def mirror_trade(provider_id: str, trade: dict) -> list[dict]:
         risk_pct     = float(sub.get("copy_risk_pct") or 1.0)
         max_dd       = float(sub.get("max_drawdown_pct") or 10.0)
 
-        # Check follower drawdown — skip if breached
+        # Check follower drawdown â€” skip if breached
         if _is_drawdown_breached(follower_id, max_dd):
             _log_copy_trade(follower_id, provider_id, trade,
                            status="skipped",
@@ -27,7 +27,7 @@ def mirror_trade(provider_id: str, trade: dict) -> list[dict]:
         provider_risk = float(trade.get("risk_pct") or 1.0)
         scale_factor  = risk_pct / provider_risk if provider_risk else 1.0
         scaled_lots   = round(float(trade.get("lot_size") or 0.1) * scale_factor, 4)
-        scaled_lots   = max(0.01, min(scaled_lots, 10.0))  # clamp 0.01–10 lots
+        scaled_lots   = max(0.01, min(scaled_lots, 10.0))  # clamp 0.01â€“10 lots
 
         record = {
             "follower_id":     follower_id,

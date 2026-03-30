@@ -1,4 +1,4 @@
-"""
+﻿"""
 Market intelligence service used to build deep-study context for notifications.
 
 The goal is to ground notifications in multi-source evidence:

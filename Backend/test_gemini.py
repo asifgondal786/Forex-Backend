@@ -1,4 +1,4 @@
-import os, sys
+﻿import os, sys
 from app.ai.gemini_client import GeminiClient
 
 print("GEMINI_API_KEY set:", bool(os.getenv("GEMINI_API_KEY")))
