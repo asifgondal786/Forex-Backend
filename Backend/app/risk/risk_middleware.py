@@ -18,7 +18,7 @@ from app.risk.risk_models import (
     TradeRequest, AccountSnapshot, MarketSnapshot,
     RiskGuardianResult, RiskDecision,
 )
-from risk_guardian import evaluate_trade
+from app.risk.risk_guardian import evaluate_trade
 
 logger = logging.getLogger("risk_guardian")
 
