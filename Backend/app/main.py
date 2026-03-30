@@ -1278,6 +1278,14 @@ app.include_router(paper_router)
 app.include_router(signal_router)
 app.include_router(news_router)
 
+# market router added
+from .market_routes import router as market_router
+app.include_router(market_router)
+
+# signal router added
+from .signal_routes import router as signal_router
+app.include_router(signal_router)
+
 
 # Register the router — add this alongside your other app.include_router() calls
 from app.routers.security import router as security_router

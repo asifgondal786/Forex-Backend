@@ -1,30 +1,57 @@
 """
-Phase 16 — Charting Router
+Phase 16 - Charting Router
 Serves OHLCV candle data and indicator data to the Flutter TradingView chart.
 
 Endpoints:
-  GET /api/v1/chart/candles/{pair}     — OHLCV candlestick data
-  GET /api/v1/chart/indicators/{pair}  — SMA, EMA, RSI, Bollinger Bands
-  GET /api/v1/chart/pairs              — list of supported pairs
+  GET /api/v1/chart/candles/{pair}     - OHLCV candlestick data
+  GET /api/v1/chart/indicators/{pair}  - SMA, EMA, RSI, Bollinger Bands
+  GET /api/v1/chart/pairs              - list of supported pairs
 
 Data source priority:
   1. OANDA (Phase 15, when OANDA_API_KEY is set in Railway)
-  2. Mock generator (Phase 16 fallback — realistic random walk)
+  2. Mock generator (Phase 16 fallback - realistic random walk)
 """
 
 import os
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
-from datetime import datetime
 
-from app.core.firebase_auth import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from app.services.mock_candle_generator import generate_mock_candles, PAIR_CONFIG, TIMEFRAME_MINUTES
+from app.utils.firestore_client import verify_firebase_token
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/chart", tags=["Charting"])
 
+# ── Auth dependency (replaces missing app.core.firebase_auth) ──────────────────
+# Reuses the existing verify_firebase_token from firestore_client.
+# Returns the decoded token claims dict, same shape get_current_user would have.
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> dict:
+    """
+    FastAPI dependency that verifies a Firebase Bearer token.
+    Returns decoded claims on success.
+    Raises HTTP 401 if token is missing or invalid.
+    """
+    if not credentials or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    try:
+        claims = verify_firebase_token(credentials.credentials)
+        return claims
+    except Exception as exc:
+        logger.warning("Chart auth failed: %s", exc)
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+
+# ── Data source selector ────────────────────────────────────────────────────────
 
 def _get_candles(pair: str, granularity: str, count: int) -> list[dict]:
     """
@@ -33,7 +60,6 @@ def _get_candles(pair: str, granularity: str, count: int) -> list[dict]:
     - Falls back to mock generator (Phase 16)
     """
     if os.getenv("OANDA_API_KEY"):
-        # Phase 15 path — import only when available
         try:
             import asyncio
             from app.services.oanda_service import fetch_candles
@@ -43,15 +69,12 @@ def _get_candles(pair: str, granularity: str, count: int) -> list[dict]:
             if candles:
                 return candles
         except Exception as e:
-            logger.warning(f"OANDA candles failed, using mock: {e}")
+            logger.warning("OANDA candles failed, using mock: %s", e)
 
-    # Phase 16 path — mock generator
     return generate_mock_candles(pair, granularity, count)
 
 
-# ─────────────────────────────────────────────
-# Candle Endpoint
-# ─────────────────────────────────────────────
+# ── Candle Endpoint ─────────────────────────────────────────────────────────────
 
 @router.get("/candles/{pair}")
 async def get_candles(
@@ -80,9 +103,7 @@ async def get_candles(
     }
 
 
-# ─────────────────────────────────────────────
-# Indicators Endpoint
-# ─────────────────────────────────────────────
+# ── Indicator helpers ───────────────────────────────────────────────────────────
 
 def _sma(closes: list[float], period: int) -> list[Optional[float]]:
     result = [None] * len(closes)
@@ -96,7 +117,6 @@ def _ema(closes: list[float], period: int) -> list[Optional[float]]:
     if len(closes) < period:
         return result
     k = 2 / (period + 1)
-    # Seed with SMA
     result[period - 1] = sum(closes[:period]) / period
     for i in range(period, len(closes)):
         result[i] = round(closes[i] * k + result[i - 1] * (1 - k), 5)
@@ -123,17 +143,21 @@ def _rsi(closes: list[float], period: int = 14) -> list[Optional[float]]:
 
 
 def _bollinger(closes: list[float], period: int = 20, std_dev: float = 2.0):
-    upper, middle, lower = [None]*len(closes), [None]*len(closes), [None]*len(closes)
+    upper   = [None] * len(closes)
+    middle  = [None] * len(closes)
+    lower   = [None] * len(closes)
     for i in range(period - 1, len(closes)):
-        window = closes[i - period + 1: i + 1]
-        avg = sum(window) / period
+        window   = closes[i - period + 1: i + 1]
+        avg      = sum(window) / period
         variance = sum((x - avg) ** 2 for x in window) / period
-        std = variance ** 0.5
+        std      = variance ** 0.5
         middle[i] = round(avg, 5)
         upper[i]  = round(avg + std_dev * std, 5)
         lower[i]  = round(avg - std_dev * std, 5)
     return upper, middle, lower
 
+
+# ── Indicators Endpoint ─────────────────────────────────────────────────────────
 
 @router.get("/indicators/{pair}")
 async def get_indicators(
@@ -148,8 +172,7 @@ async def get_indicators(
     """
     Calculate and return technical indicators for the chart.
     Computed server-side from candle data.
-
-    Returns: SMA, EMA, RSI, Bollinger Bands — all time-aligned with candles.
+    Returns: SMA, EMA, RSI, Bollinger Bands - all time-aligned with candles.
     """
     candles = _get_candles(pair.upper(), granularity.upper(), count)
     if not candles:
@@ -158,10 +181,10 @@ async def get_indicators(
     times  = [c["time"]  for c in candles]
     closes = [c["close"] for c in candles]
 
-    sma_values            = _sma(closes, sma_period)
-    ema_values            = _ema(closes, ema_period)
-    rsi_values            = _rsi(closes, rsi_period)
-    bb_upper, bb_mid, bb_lower = _bollinger(closes, 20, 2.0)
+    sma_values                  = _sma(closes, sma_period)
+    ema_values                  = _ema(closes, ema_period)
+    rsi_values                  = _rsi(closes, rsi_period)
+    bb_upper, bb_mid, bb_lower  = _bollinger(closes, 20, 2.0)
 
     def _zip(values):
         return [{"time": t, "value": v} for t, v in zip(times, values) if v is not None]
@@ -180,9 +203,7 @@ async def get_indicators(
     }
 
 
-# ─────────────────────────────────────────────
-# Supported Pairs
-# ─────────────────────────────────────────────
+# ── Supported Pairs ─────────────────────────────────────────────────────────────
 
 @router.get("/pairs")
 async def get_supported_pairs(current_user: dict = Depends(get_current_user)):
