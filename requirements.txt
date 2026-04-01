@@ -1,4 +1,4 @@
-aiohappyeyeballs==2.6.1
+﻿aiohappyeyeballs==2.6.1
 aiohttp==3.9.1
 aiosignal==1.4.0
 aiosmtplib==3.0.1
@@ -92,7 +92,7 @@ numba==0.61.2
 numpy>=2.0.0
 packaging==26.0
 pandas==2.1.4
-pandas-ta==0.4.71b0
+pandas-ta==0.3.14b
 passlib==1.7.4
 pathspec==1.0.3
 pillow==10.2.0
@@ -154,6 +154,7 @@ structlog==24.1.0
 supabase==2.28.0
 supabase-auth==2.28.0
 supabase-functions==2.28.0
+sib-api-v3-sdk
 tenacity==9.1.4
 threadpoolctl==3.6.0
 tqdm==4.67.1
@@ -170,3 +171,4 @@ websockets==15.0
 wrapt==2.0.1
 yarl==1.22.0
 zstandard==0.25.0
+
