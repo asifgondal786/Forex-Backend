@@ -1,8 +1,32 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class HomeScreen extends StatelessWidget {
+import '../../providers/market_watch_provider.dart';
+import '../../providers/trade_signals_provider.dart';
+import '../../providers/news_events_provider.dart';
+import '../../providers/paper_trading_provider.dart';
+import '../../providers/app_shell_provider.dart';
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<MarketWatchProvider>().init();
+      context.read<TradeSignalsProvider>().init();
+      context.read<NewsEventsProvider>().init();
+      context.read<PaperTradingProvider>().init();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,24 +37,28 @@ class HomeScreen extends StatelessWidget {
         slivers: [
           _buildAppBar(scheme, context),
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _BalanceCard(scheme: scheme),
+                const _NewsMarquee(),
                 const SizedBox(height: 16),
-                _QuickActionsRow(scheme: scheme),
+                const _LiveBalanceCard(),
+                const SizedBox(height: 16),
+                const _QuickActionsRow(),
                 const SizedBox(height: 24),
-                _SectionHeader('Market Snapshot', scheme),
+                _SectionHeader('Market Snapshot', scheme,
+                    onSeeAll: () => context.read<AppShellProvider>().setTab(1)),
                 const SizedBox(height: 10),
-                _MarketSnapshot(scheme: scheme),
+                const _LiveMarketSnapshot(),
                 const SizedBox(height: 24),
-                _SectionHeader('Recent Signals', scheme),
+                _SectionHeader('Recent Signals', scheme,
+                    onSeeAll: () => context.read<AppShellProvider>().setTab(2)),
                 const SizedBox(height: 10),
-                _RecentSignals(scheme: scheme),
+                const _LiveRecentSignals(),
                 const SizedBox(height: 24),
                 _SectionHeader('AI Recommendation', scheme),
                 const SizedBox(height: 10),
-                _AiPreviewCard(scheme: scheme),
+                const _LiveAiPreviewCard(),
                 const SizedBox(height: 80),
               ]),
             ),
@@ -58,50 +86,173 @@ class HomeScreen extends StatelessWidget {
             child: const Icon(Icons.currency_exchange, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 10),
-          Text(
-            'Tajir',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-              color: scheme.onSurface,
-            ),
-          ),
+          Text('Tajir',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  color: scheme.onSurface)),
         ],
       ),
       actions: [
         IconButton(
           icon: Icon(Icons.notifications_outlined, color: scheme.onSurface),
-          onPressed: () {},
+          onPressed: () => context.read<AppShellProvider>().setTab(4),
         ),
         IconButton(
           icon: Icon(Icons.person_outline_rounded, color: scheme.onSurface),
-          onPressed: () {},
+          onPressed: () => Navigator.pushNamed(context, '/profile'),
         ),
       ],
     );
   }
 }
 
-class _BalanceCard extends StatelessWidget {
-  final ColorScheme scheme;
+// ─────────────────────────────────────────────────────────────────────────────
+// News Marquee Ticker — uses NewsEventsProvider.articles
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _BalanceCard({required this.scheme});
+class _NewsMarquee extends StatefulWidget {
+  const _NewsMarquee();
+
+  @override
+  State<_NewsMarquee> createState() => _NewsMarqueeState();
+}
+
+class _NewsMarqueeState extends State<_NewsMarquee> {
+  final ScrollController _ctrl = ScrollController();
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  void _start() {
+    _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
+      if (!_ctrl.hasClients) return;
+      final max = _ctrl.position.maxScrollExtent;
+      if (max <= 0) return;
+      if (_ctrl.offset >= max) {
+        _ctrl.jumpTo(0);
+      } else {
+        _ctrl.jumpTo(_ctrl.offset + 1.5);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final news = context.watch<NewsEventsProvider>();
+
+    final List<String> items = news.articles.isNotEmpty
+        ? news.articles
+            .take(10)
+            .map((a) => '${a.source} • ${a.headline}')
+            .toList()
+        : [
+            'EUR/USD • Bullish momentum on H4 continues',
+            'GBP/USD • BoE policy meeting in focus this week',
+            'USD/JPY • BOJ intervention risk elevated near 155',
+            'XAU/USD • Safe haven demand rising amid uncertainty',
+            'NFP data due Friday — expect high volatility',
+          ];
+
+    // Double the list for seamless looping
+    final text = '${items.join('     ◆     ')}     ◆     ${items.join('     ◆     ')}';
+
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(7),
+                bottomLeft: Radius.circular(7),
+              ),
+            ),
+            child: const Center(
+              child: Text('LIVE',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5)),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              controller: _ctrl,
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Center(
+                    child: Text(text,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurface.withValues(alpha: 0.8),
+                            fontWeight: FontWeight.w500)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live Balance Card — PaperTradingProvider.stats + openTrades
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LiveBalanceCard extends StatelessWidget {
+  const _LiveBalanceCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final paper = context.watch<PaperTradingProvider>();
+    final stats = paper.stats;
+
+    // Equity = starting 10k + total realized P&L
+    final equity = 10000.0 + stats.totalPnl;
+    final isPos = stats.totalPnl >= 0;
+    final pnlPct = stats.totalPnl / 10000 * 100;
+    final openPnl = paper.totalUnrealizedPnl;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [scheme.primary, scheme.primary.withOpacity(0.7)],
+          colors: [scheme.primary, scheme.primary.withValues(alpha: 0.7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: scheme.primary.withOpacity(0.35),
+            color: scheme.primary.withValues(alpha: 0.35),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -113,453 +264,420 @@ class _BalanceCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Account Balance',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text('Account Balance',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500)),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.circle, size: 6, color: Colors.greenAccent),
-                    SizedBox(width: 5),
-                    Text(
-                      'Paper Trading',
+                child: const Row(children: [
+                  Icon(Icons.circle, size: 6, color: Colors.greenAccent),
+                  SizedBox(width: 5),
+                  Text('Paper Trading',
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
+                          fontWeight: FontWeight.w600)),
+                ]),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            '\$10,248.32',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 36,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
-            ),
-          ),
+          Text('\$${equity.toStringAsFixed(2)}',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1)),
           const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 14),
-              const SizedBox(width: 4),
-              const Text(
-                '+\$248.32 (2.48%) today',
-                style: TextStyle(
-                  color: Colors.greenAccent,
+          Row(children: [
+            Icon(
+              isPos ? Icons.arrow_upward : Icons.arrow_downward,
+              color: isPos ? Colors.greenAccent : Colors.redAccent,
+              size: 14,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${isPos ? '+' : ''}\$${stats.totalPnl.toStringAsFixed(2)} (${pnlPct.toStringAsFixed(2)}%)',
+              style: TextStyle(
+                  color: isPos ? Colors.greenAccent : Colors.redAccent,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
+                  fontSize: 13),
+            ),
+          ]),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _BalanceStat('Open P&L', '+\$42.10', Colors.greenAccent),
-              const SizedBox(width: 20),
-              _BalanceStat('Win Rate', '73.2%', Colors.white),
-              const SizedBox(width: 20),
-              _BalanceStat('Trades', '47', Colors.white),
-            ],
-          ),
+          Row(children: [
+            _Stat('Open P&L',
+                '${openPnl >= 0 ? '+' : ''}\$${openPnl.toStringAsFixed(2)}',
+                openPnl >= 0 ? Colors.greenAccent : Colors.redAccent),
+            const SizedBox(width: 20),
+            _Stat('Win Rate',
+                '${(stats.winRate * 100).toStringAsFixed(1)}%', Colors.white),
+            const SizedBox(width: 20),
+            _Stat('Trades', '${stats.totalTrades}', Colors.white),
+          ]),
         ],
       ),
     );
   }
 }
 
-class _BalanceStat extends StatelessWidget {
+class _Stat extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-
-  const _BalanceStat(this.label, this.value, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 11,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickActionsRow extends StatelessWidget {
-  final ColorScheme scheme;
-
-  const _QuickActionsRow({required this.scheme});
+  const _Stat(this.label, this.value, this.color);
 
   @override
-  Widget build(BuildContext context) {
-    final actions = [
-      _QuickAction(
-        icon: Icons.trending_up_rounded,
-        label: 'Trade',
-        color: Colors.green,
-        onTap: () {},
-      ),
-      _QuickAction(
-        icon: Icons.auto_awesome_rounded,
-        label: 'Ask AI',
-        color: Colors.purple,
-        onTap: () {},
-      ),
-      _QuickAction(
-        icon: Icons.bar_chart_rounded,
-        label: 'Charts',
-        color: Colors.blue,
-        onTap: () {},
-      ),
-      _QuickAction(
-        icon: Icons.account_balance_wallet_rounded,
-        label: 'Portfolio',
-        color: Colors.orange,
-        onTap: () {},
-      ),
-    ];
-
-    return Row(
-      children: actions
-          .map((a) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: actions.indexOf(a) < actions.length - 1 ? 8 : 0,
-                  ),
-                  child: _QuickActionWidget(action: a, scheme: scheme),
-                ),
-              ))
-          .toList(),
-    );
-  }
-}
-
-class _QuickAction {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-}
-
-class _QuickActionWidget extends StatelessWidget {
-  final _QuickAction action;
-  final ColorScheme scheme;
-
-  const _QuickActionWidget({required this.action, required this.scheme});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: action.onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: action.color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: action.color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(action.icon, color: action.color, size: 22),
-            const SizedBox(height: 6),
-            Text(
-              action.label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: action.color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final ColorScheme scheme;
-
-  const _SectionHeader(this.title, this.scheme);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-            color: scheme.onSurface,
-          ),
-        ),
-        Text(
-          'See all',
-          style: TextStyle(
-            fontSize: 13,
-            color: scheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MarketSnapshot extends StatelessWidget {
-  final ColorScheme scheme;
-
-  const _MarketSnapshot({required this.scheme});
-
-  @override
-  Widget build(BuildContext context) {
-    final pairs = [
-      _MarketItem('EUR/USD', '1.08432', '+0.12%', true),
-      _MarketItem('GBP/JPY', '191.234', '-0.34%', false),
-      _MarketItem('XAU/USD', '2341.5', '+0.87%', true),
-    ];
-
-    return Row(
-      children: pairs
-          .map((p) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: pairs.indexOf(p) < pairs.length - 1 ? 8 : 0,
-                  ),
-                  child: _MarketItemCard(item: p, scheme: scheme),
-                ),
-              ))
-          .toList(),
-    );
-  }
-}
-
-class _MarketItem {
-  final String pair;
-  final String price;
-  final String change;
-  final bool positive;
-
-  const _MarketItem(this.pair, this.price, this.change, this.positive);
-}
-
-class _MarketItemCard extends StatelessWidget {
-  final _MarketItem item;
-  final ColorScheme scheme;
-
-  const _MarketItemCard({required this.item, required this.scheme});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = item.positive ? Colors.green : Colors.red;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
+  Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            item.pair,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurface.withOpacity(0.6),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            item.price,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: scheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            item.change,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
+          Text(label,
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 14, fontWeight: FontWeight.w700)),
         ],
-      ),
-    );
-  }
+      );
 }
 
-class _RecentSignals extends StatelessWidget {
-  final ColorScheme scheme;
+// ─────────────────────────────────────────────────────────────────────────────
+// Quick Actions — all wired to real navigation
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _RecentSignals({required this.scheme});
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow();
 
   @override
   Widget build(BuildContext context) {
-    final signals = [
-      _SignalPreview('EUR/USD', 'BUY', '78%', 'Strong bullish momentum on H4'),
-      _SignalPreview('GBP/JPY', 'SELL', '65%', 'Resistance rejection at 191.80'),
-      _SignalPreview('XAU/USD', 'BUY', '82%', 'Safe haven demand rising'),
+    final shell = context.read<AppShellProvider>();
+    final actions = [
+      (Icons.trending_up_rounded, 'Trade', Colors.green,
+          () => shell.setTab(2)),
+      (Icons.auto_awesome_rounded, 'Ask AI', Colors.purple,
+          () => Navigator.pushNamed(context, '/ai-chat')),
+      (Icons.bar_chart_rounded, 'Charts', Colors.blue,
+          () => Navigator.pushNamed(context, '/charts')),
+      (Icons.account_balance_wallet_rounded, 'Portfolio', Colors.orange,
+          () => shell.setTab(3)),
     ];
 
-    return Column(
-      children: signals
-          .map((s) => _SignalPreviewCard(signal: s, scheme: scheme))
-          .toList(),
-    );
-  }
-}
-
-class _SignalPreview {
-  final String pair;
-  final String direction;
-  final String probability;
-  final String summary;
-
-  const _SignalPreview(
-      this.pair, this.direction, this.probability, this.summary);
-}
-
-class _SignalPreviewCard extends StatelessWidget {
-  final _SignalPreview signal;
-  final ColorScheme scheme;
-
-  const _SignalPreviewCard({required this.signal, required this.scheme});
-
-  @override
-  Widget build(BuildContext context) {
-    final isBuy = signal.direction == 'BUY';
-    final color = isBuy ? Colors.green : Colors.red;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              signal.direction,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  signal.pair,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14),
-                ),
-                Text(
-                  signal.summary,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurface.withOpacity(0.5),
+    return Row(
+      children: List.generate(actions.length, (i) {
+        final (icon, label, color, onTap) = actions[i];
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < actions.length - 1 ? 8 : 0),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: color.withValues(alpha: 0.2)),
                   ),
+                  child: Column(children: [
+                    Icon(icon, color: color, size: 22),
+                    const SizedBox(height: 6),
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: color)),
+                  ]),
                 ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              signal.probability,
-              style: const TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
               ),
             ),
           ),
-        ],
-      ),
+        );
+      }),
     );
   }
 }
 
-class _AiPreviewCard extends StatelessWidget {
-  final ColorScheme scheme;
+// ─────────────────────────────────────────────────────────────────────────────
+// Live Market Snapshot — MarketWatchProvider.quotes (PairQuote.symbol/.mid/.changePercent)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _AiPreviewCard({required this.scheme});
+class _LiveMarketSnapshot extends StatelessWidget {
+  const _LiveMarketSnapshot();
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final mw = context.watch<MarketWatchProvider>();
+
+    if (mw.isLoading && mw.quotes.isEmpty) {
+      return SizedBox(
+        height: 72,
+        child: Center(
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: scheme.primary)),
+      );
+    }
+
+    // quotes getter already applies filters — read all by using quoteFor or
+    // just take from the underlying list via the public getter (no filter set)
+    final top = mw.quotes.take(3).toList();
+
+    if (top.isEmpty) {
+      return _fallback(scheme);
+    }
+
+    return Row(
+      children: List.generate(top.length, (i) {
+        final q = top[i];
+        final isPos = q.changePercent >= 0;
+        final color = isPos ? Colors.green : Colors.red;
+        final digits = q.symbol.contains('JPY') ? 3 : 5;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < top.length - 1 ? 8 : 0),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(q.symbol,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurface.withValues(alpha: 0.6))),
+                  const SizedBox(height: 4),
+                  Text(q.mid.toStringAsFixed(digits),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: scheme.onSurface)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${isPos ? '+' : ''}${q.changePercent.toStringAsFixed(2)}%',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _fallback(ColorScheme scheme) {
+    final items = [
+      ('EUR/USD', '1.08432', '+0.12%', true),
+      ('GBP/JPY', '191.234', '-0.34%', false),
+      ('XAU/USD', '2341.5', '+0.87%', true),
+    ];
+    return Row(
+      children: List.generate(items.length, (i) {
+        final (pair, price, change, isPos) = items[i];
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < items.length - 1 ? 8 : 0),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(pair,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurface.withValues(alpha: 0.6))),
+                  const SizedBox(height: 4),
+                  Text(price,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: scheme.onSurface)),
+                  const SizedBox(height: 2),
+                  Text(change,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isPos ? Colors.green : Colors.red)),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live Recent Signals — TradeSignalsProvider.signals (List<TradeSignal>)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LiveRecentSignals extends StatelessWidget {
+  const _LiveRecentSignals();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final provider = context.watch<TradeSignalsProvider>();
+
+    if (provider.isLoading && !provider.hasSignals) {
+      return SizedBox(
+        height: 80,
+        child: Center(
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: scheme.primary)),
+      );
+    }
+
+    final signals = provider.signals.take(3).toList();
+
+    if (signals.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text('No signals yet — refreshing...',
+              style: TextStyle(
+                  color: scheme.onSurface.withValues(alpha: 0.4),
+                  fontSize: 13)),
+        ),
+      );
+    }
+
+    return Column(
+      children: signals.map((s) {
+        final label = switch (s.type) {
+          SignalType.buy  => 'BUY',
+          SignalType.sell => 'SELL',
+          SignalType.hold => 'HOLD',
+        };
+        final color = switch (s.type) {
+          SignalType.buy  => Colors.green,
+          SignalType.sell => Colors.red,
+          SignalType.hold => Colors.orange,
+        };
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(label,
+                  style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.symbol,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text(
+                    s.explanation,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.5)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${s.confidence}%',
+                style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12),
+              ),
+            ),
+          ]),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live AI Preview — highest-confidence TradeSignal
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LiveAiPreviewCard extends StatelessWidget {
+  const _LiveAiPreviewCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final provider = context.watch<TradeSignalsProvider>();
+
+    TradeSignal? top;
+    if (provider.hasSignals) {
+      top = provider.signals
+          .reduce((a, b) => a.confidence >= b.confidence ? a : b);
+    }
+
+    final pair = top?.symbol ?? 'EUR/USD';
+    final label = top == null
+        ? 'BUY'
+        : switch (top.type) {
+            SignalType.buy  => 'BUY',
+            SignalType.sell => 'SELL',
+            SignalType.hold => 'HOLD',
+          };
+    final reason = top?.explanation ??
+        'EUR/USD shows a high-probability bullish continuation. '
+            'London session breakout above 1.0850 is the key level to watch.';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.purple.withOpacity(0.1),
-            Colors.blue.withOpacity(0.1),
-          ],
-        ),
+        gradient: LinearGradient(colors: [
+          Colors.purple.withValues(alpha: 0.1),
+          Colors.blue.withValues(alpha: 0.1),
+        ]),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.purple.withOpacity(0.2)),
+        border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,7 +685,7 @@ class _AiPreviewCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.purple.withOpacity(0.15),
+              color: Colors.purple.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.auto_awesome_rounded,
@@ -578,33 +696,45 @@ class _AiPreviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'AI Copilot',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: Colors.purple,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'EUR/USD shows a high-probability bullish continuation. London session breakout above 1.0850 is the key level to watch.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurface.withOpacity(0.8),
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () {},
-                  child: Text(
-                    'Get full analysis →',
-                    style: TextStyle(
-                      color: Colors.purple,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                Row(children: [
+                  const Text('AI Copilot',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: Colors.purple)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
+                    child: Text('$pair • $label',
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.purple,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+                const SizedBox(height: 4),
+                Text(reason,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.onSurface.withValues(alpha: 0.8),
+                        height: 1.5)),
+                const SizedBox(height: 10),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/ai-chat'),
+                    child: const Text('Get full analysis →',
+                        style: TextStyle(
+                            color: Colors.purple,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13)),
                   ),
                 ),
               ],
@@ -612,6 +742,44 @@ class _AiPreviewCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section Header
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final ColorScheme scheme;
+  final VoidCallback? onSeeAll;
+
+  const _SectionHeader(this.title, this.scheme, {this.onSeeAll});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title,
+            style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: scheme.onSurface)),
+        if (onSeeAll != null)
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: onSeeAll,
+              child: Text('See all',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ),
+      ],
     );
   }
 }
