@@ -309,12 +309,23 @@ except ImportError:
     MONITORING_ROUTES_AVAILABLE = False
     print("[WARN] Monitoring routes not available")
 
+
+import os as _os
+ 
+# DeepSeek AI proxy — enabled when AI_ROUTES_AVAILABLE=true
+_ai_routes_flag = _os.getenv("AI_ROUTES_AVAILABLE", "false").lower() in {"true", "1", "yes"}
 try:
     from .routers.ai_proxy import router as ai_proxy_router
     AI_PROXY_AVAILABLE = True
-except ImportError:
+    if _ai_routes_flag:
+        logger.info("[Startup] DeepSeek AI routes: ACTIVE")
+    else:
+        logger.info("[Startup] DeepSeek AI routes: DISABLED (set AI_ROUTES_AVAILABLE=true)")
+except ImportError as _e:
     AI_PROXY_AVAILABLE = False
-    print("[WARN] AI proxy routes not available")
+    logger.warning("[WARN] AI proxy routes not available: %s", _e)
+"""
+    
 
 from .enhanced_websocket_manager import ws_manager  # noqa: E402
 from .forex_data_service import forex_service  # noqa: E402
@@ -342,6 +353,12 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("[Startup] Forex Companion AI Backend Starting...")
     logger.info("=" * 60)
+    
+    logger.info(f"[Startup] DeepSeek AI: {'ACTIVE' if _ai_routes_flag and AI_PROXY_AVAILABLE else 'DISABLED'}")
+    logger.info(f"[Startup] Forex APIs: Twelve Data={'✓' if os.getenv('TWELVE_DATA_API_KEY') else '✗'} "
+            f"FCS={'✓' if os.getenv('FCS_API_KEY') else '✗'} "
+            f"Finnhub={'✓' if os.getenv('FINNHUB_KEY') else '✗'} "
+            f"iTick={'✓' if os.getenv('ITICK_API_KEY') else '✗'}")
 
     try:
         public_api_base = _public_api_base_url()
@@ -945,6 +962,10 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/news/events",
     "/api/v1/news/macro-shield",
     "/api/v1/news/health",
+    "/api/v1/ai/health",
+    "/api/v1/market/rates",
+    "/api/v1/market/snapshot",
+    "/api/v1/market/forex-health",
 }
 
 @app.middleware("http")
@@ -1291,6 +1312,12 @@ app.include_router(notification_router_v2)
 # market router added
 from .market_routes import router as market_router
 app.include_router(market_router)
+
+ from .ai.deepseek_client import close_client as close_deepseek
+    try:
+        await close_deepseek()
+    except Exception:
+        pass
 
 # signal router added
 from .signal_routes import router as signal_router

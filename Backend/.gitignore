@@ -51,3 +51,7 @@ dlq_*.json
 
 .env.development
 .env.production
+
+# .env
+.env.*
+*.bak
