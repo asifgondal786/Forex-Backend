@@ -1,740 +1,622 @@
-﻿"""
-Forex Data Service - Fetches real-time data from multiple sources
-Integrates with Google Generative AI (Gemini) for market analysis and predictions
-"""
+# =============================================================
+# D:\Tajir\Backend\app\services\forex_data_service.py
+#
+# Forex Data Service — 8-API fallback chain
+# Priority order:
+#   1. Twelve Data       (TWELVE_DATA_API_KEY)
+#   2. FCS API           (FCS_API_KEY)
+#   3. ForexRatesAPI     (FOREXRATEAPI_API_KEY)
+#   4. ExchangeRatesAPI  (EXCHANGERATESAPI_API_KEY)
+#   5. iTick             (ITICK_API_KEY)
+#   6. Finnhub           (FINNHUB_KEY)
+#   7. MarketAux news    (MARKETAUX_NEWS_ENDPOINT)
+#   8. GDELT sentiment   (GDELT_SENTIMENT_ENDPOINT)
+#
+# All cache TTLs respect .env values:
+#   FOREX_RATES_MIN_FETCH_INTERVAL_SECONDS
+#   FOREX_FORECAST_CACHE_TTL_SECONDS
+#   FOREX_NEWS_CACHE_TTL_SECONDS
+#   FOREX_SENTIMENT_CACHE_TTL_SECONDS
+# =============================================================
+
+from __future__ import annotations
+
 import asyncio
-import aiohttp
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+import logging
 import os
 import time
-from dotenv import load_dotenv
+from typing import Any
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
+import httpx
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
-# Load environment variables
-load_dotenv()
+logger = logging.getLogger("app.services.forex_data_service")
 
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_AVAILABLE = bool(GEMINI_API_KEY) and genai is not None
-if GEMINI_AVAILABLE:
-    genai.configure(api_key=GEMINI_API_KEY)
+# ── .env keys ─────────────────────────────────────────────────────────────────
+_TWELVE_DATA_KEY     = os.getenv("TWELVE_DATA_API_KEY", "")
+_FCS_KEY             = os.getenv("FCS_API_KEY", "")
+_FOREXRATE_KEY       = os.getenv("FOREXRATEAPI_API_KEY", "")
+_EXCHANGERATES_KEY   = os.getenv("EXCHANGERATESAPI_API_KEY", "")
+_ITICK_KEY           = os.getenv("ITICK_API_KEY", "")
+_FINNHUB_KEY         = os.getenv("FINNHUB_KEY", "")
+_MARKETAUX_ENDPOINT  = os.getenv("MARKETAUX_NEWS_ENDPOINT", "")
+_GDELT_ENDPOINT      = os.getenv("GDELT_SENTIMENT_ENDPOINT", "")
+
+# ── Cache TTLs from .env ──────────────────────────────────────────────────────
+_RATES_TTL       = int(os.getenv("FOREX_RATES_MIN_FETCH_INTERVAL_SECONDS", "3"))
+_FORECAST_TTL    = int(os.getenv("FOREX_FORECAST_CACHE_TTL_SECONDS", "20"))
+_NEWS_TTL        = int(os.getenv("FOREX_NEWS_CACHE_TTL_SECONDS", "30"))
+_SENTIMENT_TTL   = int(os.getenv("FOREX_SENTIMENT_CACHE_TTL_SECONDS", "15"))
+
+# ── Supported pairs ───────────────────────────────────────────────────────────
+_DEFAULT_PAIRS = [
+    "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD",
+    "USD/CAD", "USD/CHF", "NZD/USD", "USD/PKR",
+]
+
+# ── Simple in-memory TTL cache ────────────────────────────────────────────────
+_cache: dict[str, tuple[Any, float]] = {}
 
 
-class ForexDataService:
-    """Service to fetch real-time forex data from multiple sources"""
+def _cache_get(key: str) -> Any | None:
+    entry = _cache.get(key)
+    if entry is None:
+        return None
+    value, expires_at = entry
+    if time.monotonic() > expires_at:
+        del _cache[key]
+        return None
+    return value
 
-    def __init__(self):
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.running = False
-        self._latest_rates: Dict[str, float] = {}
-        self._latest_usd_base_rates: Dict[str, float] = {}
-        self._price_history: Dict[str, List[float]] = {}
-        self._last_rates_fetch_monotonic = 0.0
-        self._rate_failure_streak = 0
-        self._next_rates_retry_monotonic = 0.0
-        self._last_rates_error_log_monotonic = 0.0
-        self._last_rates_error_text = ""
-        self._cached_news: List[Dict[str, Any]] = []
-        self._cached_news_monotonic = 0.0
-        self._cached_sentiment: Dict[str, Any] = {}
-        self._cached_sentiment_monotonic = 0.0
-        self._pair_forecast_cache: Dict[str, Dict[str, Any]] = {}
-        self._pair_forecast_cache_monotonic: Dict[str, float] = {}
-        try:
-            self._min_rates_fetch_interval_seconds = max(
-                1,
-                int(os.getenv("FOREX_RATES_MIN_FETCH_INTERVAL_SECONDS", "3")),
-            )
-        except Exception:
-            self._min_rates_fetch_interval_seconds = 3
-        self._news_cache_ttl_seconds = self._env_int("FOREX_NEWS_CACHE_TTL_SECONDS", 30, minimum=1)
-        self._sentiment_cache_ttl_seconds = self._env_int(
-            "FOREX_SENTIMENT_CACHE_TTL_SECONDS",
-            15,
-            minimum=1,
+
+def _cache_set(key: str, value: Any, ttl: int) -> None:
+    _cache[key] = (value, time.monotonic() + ttl)
+
+
+# ── Shared HTTP client ────────────────────────────────────────────────────────
+_http: httpx.AsyncClient | None = None
+
+
+def _client() -> httpx.AsyncClient:
+    global _http
+    if _http is None or _http.is_closed:
+        _http = httpx.AsyncClient(timeout=10.0)
+    return _http
+
+
+async def close() -> None:
+    global _http
+    if _http and not _http.is_closed:
+        await _http.aclose()
+        _http = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RATES — 5-provider fallback chain
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _rates_twelve_data(pairs: list[str]) -> dict[str, float] | None:
+    if not _TWELVE_DATA_KEY:
+        return None
+    try:
+        symbols = ",".join(p.replace("/", "") for p in pairs)
+        r = await _client().get(
+            "https://api.twelvedata.com/price",
+            params={"symbol": symbols, "apikey": _TWELVE_DATA_KEY},
         )
-        self._pair_forecast_cache_ttl_seconds = self._env_int(
-            "FOREX_FORECAST_CACHE_TTL_SECONDS",
-            20,
-            minimum=1,
-        )
-
-    def _env_int(self, name: str, default: int, minimum: int = 1) -> int:
-        raw = os.getenv(name)
-        if raw is None:
-            return default
-        try:
-            parsed = int(raw.strip())
-        except Exception:
-            return default
-        return parsed if parsed >= minimum else default
-
-    def _cache_is_fresh(self, cached_at_monotonic: float, ttl_seconds: int) -> bool:
-        return cached_at_monotonic > 0 and (time.monotonic() - cached_at_monotonic) < ttl_seconds
-
-    def _cache_age_seconds(self, cached_at_monotonic: float) -> float:
-        if cached_at_monotonic <= 0:
-            return -1.0
-        return max(0.0, time.monotonic() - cached_at_monotonic)
-
-    async def initialize(self):
-        """Initialize the HTTP session"""
-        if not self.session or self.session.closed:
-            connector = aiohttp.TCPConnector(
-                limit=20,
-                ttl_dns_cache=300,
-                enable_cleanup_closed=True,
-            )
-            timeout = aiohttp.ClientTimeout(total=12, connect=5, sock_connect=5, sock_read=10)
-            self.session = aiohttp.ClientSession(connector=connector, timeout=timeout)
-
-    async def close(self):
-        """Close the HTTP session"""
-        if self.session:
-            await self.session.close()
-            self.session = None
-
-    async def get_forex_factory_news(self) -> List[Dict]:
-        """
-        Fetch news from Forex Factory calendar
-        Note: This is a simplified version. Real implementation would need web scraping.
-        """
-        if self._cache_is_fresh(self._cached_news_monotonic, self._news_cache_ttl_seconds):
-            return [dict(item) for item in self._cached_news]
-
-        try:
-            # For production, you'd use web scraping or a paid API.
-            # For now, we'll simulate with structured data.
-            news = [
-                {
-                    "time": datetime.now().isoformat(),
-                    "currency": "USD",
-                    "impact": "high",
-                    "event": "Non-Farm Payrolls",
-                    "actual": "N/A",
-                    "forecast": "180K",
-                    "previous": "199K"
-                },
-                {
-                    "time": datetime.now().isoformat(),
-                    "currency": "EUR",
-                    "impact": "medium",
-                    "event": "ECB Interest Rate Decision",
-                    "actual": "N/A",
-                    "forecast": "4.50%",
-                    "previous": "4.50%"
-                }
-            ]
-            self._cached_news = [dict(item) for item in news]
-            self._cached_news_monotonic = time.monotonic()
-            return news
-        except Exception as e:
-            print(f"Error fetching Forex Factory news: {e}")
-            return []
-
-    async def get_currency_rates(self) -> Dict[str, float]:
-        """
-        Fetch real-time currency exchange rates
-        Using exchangerate-api.com (free tier)
-        """
-        now = time.monotonic()
-        if (
-            self._latest_rates
-            and (now - self._last_rates_fetch_monotonic) < self._min_rates_fetch_interval_seconds
-        ):
-            return dict(self._latest_rates)
-
-        if now < self._next_rates_retry_monotonic and self._latest_rates:
-            return dict(self._latest_rates)
-
-        try:
-            # Free API - no key required for basic usage
-            url = "https://api.exchangerate-api.com/v4/latest/USD"
-
-            if not self.session:
-                await self.initialize()
-
-            async with self.session.get(url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    rates = data.get("rates", {})
-                    usd_base = {}
-                    for code, value in rates.items():
-                        if isinstance(value, (int, float)) and value > 0:
-                            usd_base[str(code).upper()] = float(value)
-
-                    self._latest_usd_base_rates = usd_base
-
-                    parsed_rates = {
-                        "EUR/USD": (1 / usd_base["EUR"]) if usd_base.get("EUR") else None,
-                        "GBP/USD": (1 / usd_base["GBP"]) if usd_base.get("GBP") else None,
-                        "USD/JPY": usd_base.get("JPY"),
-                        "USD/CHF": usd_base.get("CHF"),
-                        "AUD/USD": (1 / usd_base["AUD"]) if usd_base.get("AUD") else None,
-                        "USD/CAD": usd_base.get("CAD"),
-                        "NZD/USD": (1 / usd_base["NZD"]) if usd_base.get("NZD") else None,
-                        "USD/PKR": usd_base.get("PKR"),
-                    }
-                    clean_rates = {
-                        pair: float(price)
-                        for pair, price in parsed_rates.items()
-                        if isinstance(price, (int, float)) and price > 0
-                    }
-                    if clean_rates:
-                        self._latest_rates = dict(clean_rates)
-                        self._update_price_history(clean_rates)
-                        self._last_rates_fetch_monotonic = now
-                        self._rate_failure_streak = 0
-                        self._next_rates_retry_monotonic = 0.0
-                    return clean_rates
-
-                self._record_rates_fetch_error(
-                    f"HTTP {response.status} from exchangerate-api.com"
-                )
-        except Exception as e:
-            self._record_rates_fetch_error(str(e))
-            if self._latest_rates:
-                return dict(self._latest_rates)
-            return {
-                "EUR/USD": 1.08,
-                "GBP/USD": 1.27,
-                "USD/JPY": 154.0,
-                "USD/CHF": 0.78,
-                "AUD/USD": 0.66,
-                "USD/CAD": 1.37,
-                "NZD/USD": 0.60,
-                "USD/PKR": 279.0,
-            }
-
-        if self._latest_rates:
-            return dict(self._latest_rates)
-        return {
-            "EUR/USD": 1.08,
-            "GBP/USD": 1.27,
-            "USD/JPY": 154.0,
-            "USD/CHF": 0.78,
-            "AUD/USD": 0.66,
-            "USD/CAD": 1.37,
-            "NZD/USD": 0.60,
-            "USD/PKR": 279.0,
-        }
-
-    def _record_rates_fetch_error(self, error_text: str) -> None:
-        now = time.monotonic()
-        self._rate_failure_streak += 1
-        backoff_seconds = float(min(90, 2 ** min(self._rate_failure_streak, 6)))
-        self._next_rates_retry_monotonic = now + backoff_seconds
-
-        should_log = (
-            error_text != self._last_rates_error_text
-            or (now - self._last_rates_error_log_monotonic) >= 30
-        )
-        if should_log:
-            print(
-                f"Error fetching currency rates: {error_text}. "
-                f"Retry backoff: {int(backoff_seconds)}s"
-            )
-            self._last_rates_error_text = error_text
-            self._last_rates_error_log_monotonic = now
-
-    def _normalize_pair(self, pair: str) -> str:
-        cleaned = str(pair or "").strip().upper().replace("-", "/").replace(" ", "")
-        if "/" in cleaned:
-            return cleaned
-        if len(cleaned) == 6:
-            return f"{cleaned[:3]}/{cleaned[3:]}"
-        return cleaned
-
-    def _pair_digits(self, pair: str) -> int:
-        pair_upper = pair.upper()
-        if "JPY" in pair_upper or "PKR" in pair_upper:
-            return 2
-        return 4
-
-    def _update_price_history(self, rates: Dict[str, float]) -> None:
-        for pair, price in rates.items():
-            history = self._price_history.setdefault(pair, [])
-            history.append(float(price))
-            if len(history) > 240:
-                del history[:-240]
-
-    def _derive_pair_from_usd_table(self, pair: str) -> Optional[float]:
-        if "/" not in pair:
-            return None
-        base, quote = pair.split("/", 1)
-        base = base.strip().upper()
-        quote = quote.strip().upper()
-        table = self._latest_usd_base_rates
-        if not table:
-            return None
-
-        if base == quote:
-            return 1.0
-        if base == "USD":
-            value = table.get(quote)
-            return float(value) if isinstance(value, (int, float)) and value > 0 else None
-        if quote == "USD":
-            base_rate = table.get(base)
-            if isinstance(base_rate, (int, float)) and base_rate > 0:
-                return 1.0 / float(base_rate)
-            return None
-
-        base_rate = table.get(base)
-        quote_rate = table.get(quote)
-        if (
-            isinstance(base_rate, (int, float))
-            and isinstance(quote_rate, (int, float))
-            and base_rate > 0
-            and quote_rate > 0
-        ):
-            return float(quote_rate) / float(base_rate)
+        r.raise_for_status()
+        data = r.json()
+        result: dict[str, float] = {}
+        # Twelve Data returns single object if one symbol, list otherwise
+        if isinstance(data, dict) and "price" in data:
+            # Single pair
+            result[pairs[0]] = float(data["price"])
+        else:
+            for pair in pairs:
+                sym = pair.replace("/", "")
+                if sym in data and "price" in data[sym]:
+                    result[pair] = float(data[sym]["price"])
+        return result if result else None
+    except Exception as exc:
+        logger.warning("Twelve Data rates failed: %s", exc)
         return None
 
-    def _normalize_horizon(self, horizon: str) -> str:
-        value = str(horizon or "").strip().lower()
-        if value in {"intraday", "intra", "4h", "6h", "12h", "today"}:
-            return "intraday"
-        if value in {"1w", "week", "weekly", "7d", "7day"}:
-            return "1w"
-        return "1d"
 
-    async def get_pair_forecast(self, pair: str, horizon: str = "1d") -> Dict[str, Any]:
-        """
-        Produce a structured near-term forecast with horizon and confidence.
-        """
-        normalized_pair = self._normalize_pair(pair)
-        normalized_horizon = self._normalize_horizon(horizon)
-        cache_key = f"{normalized_pair}:{normalized_horizon}"
-        cached_at = self._pair_forecast_cache_monotonic.get(cache_key, 0.0)
-        if self._cache_is_fresh(cached_at, self._pair_forecast_cache_ttl_seconds):
-            cached_forecast = self._pair_forecast_cache.get(cache_key)
-            if isinstance(cached_forecast, dict):
-                return dict(cached_forecast)
-
-        rates = await self.get_currency_rates()
-        current_price = rates.get(normalized_pair)
-        if current_price is None:
-            derived = self._derive_pair_from_usd_table(normalized_pair)
-            if derived is not None:
-                current_price = float(derived)
-                rates[normalized_pair] = current_price
-                self._latest_rates[normalized_pair] = current_price
-                self._update_price_history({normalized_pair: current_price})
-
-        if current_price is None or current_price <= 0:
-            raise ValueError(f"Pair {normalized_pair} is not available for forecasting")
-
-        news = await self.get_forex_factory_news()
-        sentiment = await self.analyze_market_with_gemini(rates, news)
-        trend = str(sentiment.get("trend", "neutral")).lower()
-        volatility = str(sentiment.get("volatility", "medium")).lower()
-        risk_level = str(sentiment.get("risk_level", "moderate")).lower()
-
-        history = self._price_history.get(normalized_pair, [])
-        lookback = 8 if normalized_horizon == "intraday" else 20 if normalized_horizon == "1d" else 60
-        if len(history) >= 2:
-            anchor_price = history[-lookback] if len(history) >= lookback else history[0]
-            latest_prev = history[-2]
-            momentum_pct = (
-                ((history[-1] - anchor_price) / anchor_price) * 100
-                if anchor_price
-                else 0.0
+async def _rates_fcs(pairs: list[str]) -> dict[str, float] | None:
+    if not _FCS_KEY:
+        return None
+    try:
+        result: dict[str, float] = {}
+        for pair in pairs:
+            symbol = pair.replace("/", "_")
+            r = await _client().get(
+                "https://fcsapi.com/api-v3/forex/latest",
+                params={"symbol": symbol, "access_key": _FCS_KEY},
             )
-            latest_change_pct = (
-                ((history[-1] - latest_prev) / latest_prev) * 100
-                if latest_prev
-                else 0.0
-            )
-        else:
-            momentum_pct = 0.0
-            latest_change_pct = 0.0
+            r.raise_for_status()
+            data = r.json()
+            if data.get("status") and data.get("response"):
+                price = data["response"][0].get("c")
+                if price:
+                    result[pair] = float(price)
+        return result if result else None
+    except Exception as exc:
+        logger.warning("FCS rates failed: %s", exc)
+        return None
 
-        trend_score = 1.0 if "bull" in trend else -1.0 if "bear" in trend else 0.0
-        momentum_score = 1.0 if momentum_pct > 0.05 else -1.0 if momentum_pct < -0.05 else 0.0
-        combined_bias_score = (trend_score * 0.65) + (momentum_score * 0.35)
-        if abs(combined_bias_score) < 0.15:
-            if latest_change_pct > 0.02:
-                combined_bias_score = 0.18
-            elif latest_change_pct < -0.02:
-                combined_bias_score = -0.18
 
-        trend_bias = "bullish" if combined_bias_score > 0.2 else "bearish" if combined_bias_score < -0.2 else "neutral"
-        horizon_base = {
-            "intraday": 0.25,
-            "1d": 0.55,
-            "1w": 1.60,
-        }[normalized_horizon]
-        volatility_multiplier = 1.6 if "high" in volatility else 0.7 if "low" in volatility else 1.0
-        risk_multiplier = 0.85 if "high" in risk_level else 1.05 if "low" in risk_level else 1.0
-        expected_mid_pct = horizon_base * volatility_multiplier * risk_multiplier * combined_bias_score
-        spread_pct = horizon_base * (1.05 if "high" in volatility else 0.75)
-        expected_low_pct = expected_mid_pct - spread_pct
-        expected_high_pct = expected_mid_pct + spread_pct
-
-        target_low = current_price * (1 + (expected_low_pct / 100))
-        target_high = current_price * (1 + (expected_high_pct / 100))
-
-        history_strength = min(len(history) / 40.0, 1.0)
-        direction_alignment = (
-            1.0 if trend_score == momentum_score and trend_score != 0 else
-            0.6 if trend_score == 0 or momentum_score == 0 else
-            0.35
+async def _rates_forexrateapi(base: str = "USD") -> dict[str, float] | None:
+    if not _FOREXRATE_KEY:
+        return None
+    try:
+        r = await _client().get(
+            f"https://v6.exchangerate-api.com/v6/{_FOREXRATE_KEY}/latest/{base}"
         )
-        confidence = int(round(
-            max(
-                45.0,
-                min(
-                    92.0,
-                    50.0 + (history_strength * 22.0) + (direction_alignment * 18.0) -
-                    (8.0 if "high" in volatility else 0.0),
-                ),
-            )
-        ))
+        r.raise_for_status()
+        data = r.json()
+        if data.get("result") == "success":
+            return data.get("conversion_rates", {})
+        return None
+    except Exception as exc:
+        logger.warning("ForexRatesAPI failed: %s", exc)
+        return None
 
-        digits = self._pair_digits(normalized_pair)
-        if trend_bias == "bullish":
-            timing_guidance = (
-                f"Bias favors upside. Consider scaling out near {target_high:.{digits}f} and "
-                f"protecting below {target_low:.{digits}f}."
-            )
-        elif trend_bias == "bearish":
-            timing_guidance = (
-                f"Bias is defensive. Prefer waiting for stabilization above {target_low:.{digits}f} "
-                f"before adding exposure."
-            )
-        else:
-            timing_guidance = (
-                f"Bias is mixed. Favor partial exits around range extremes between "
-                f"{target_low:.{digits}f} and {target_high:.{digits}f}."
-            )
 
-        forecast = {
-            "pair": normalized_pair,
-            "horizon": normalized_horizon,
-            "generated_at": datetime.now().isoformat(),
-            "current_price": round(float(current_price), digits),
-            "trend_bias": trend_bias,
-            "volatility": volatility,
-            "risk_level": risk_level,
-            "confidence_percent": confidence,
-            "expected_change_percent": {
-                "low": round(expected_low_pct, 3),
-                "mid": round(expected_mid_pct, 3),
-                "high": round(expected_high_pct, 3),
-            },
-            "target_range": {
-                "low": round(target_low, digits),
-                "high": round(target_high, digits),
-            },
-            "timing_guidance": timing_guidance,
-            "supporting_factors": [
-                f"trend={trend}",
-                f"volatility={volatility}",
-                f"risk={risk_level}",
-                f"momentum={momentum_pct:.3f}%",
-            ],
-            "disclaimer": "Simulation-grade forecast. Not financial advice.",
-        }
-        self._pair_forecast_cache[cache_key] = dict(forecast)
-        self._pair_forecast_cache_monotonic[cache_key] = time.monotonic()
-        return forecast
+async def _rates_exchangeratesapi(base: str = "USD") -> dict[str, float] | None:
+    if not _EXCHANGERATES_KEY:
+        return None
+    try:
+        r = await _client().get(
+            "https://api.exchangeratesapi.io/v1/latest",
+            params={"access_key": _EXCHANGERATES_KEY, "base": base},
+        )
+        r.raise_for_status()
+        data = r.json()
+        if data.get("success"):
+            return data.get("rates", {})
+        return None
+    except Exception as exc:
+        logger.warning("ExchangeRatesAPI failed: %s", exc)
+        return None
 
-    async def analyze_market_with_gemini(self, rates: Dict[str, float], news: List[Dict]) -> Dict[str, any]:
-        """
-        Use Google Generative AI (Gemini) to analyze market conditions from real-time data
-        """
+
+async def _rates_itick(pairs: list[str]) -> dict[str, float] | None:
+    if not _ITICK_KEY:
+        return None
+    try:
+        result: dict[str, float] = {}
+        for pair in pairs:
+            symbol = pair.replace("/", "")
+            r = await _client().get(
+                f"https://api.itick.org/forex/quote",
+                params={"token": _ITICK_KEY, "symbol": symbol},
+            )
+            r.raise_for_status()
+            data = r.json()
+            price = (data.get("data") or {}).get("c") or (data.get("data") or {}).get("ask")
+            if price:
+                result[pair] = float(price)
+        return result if result else None
+    except Exception as exc:
+        logger.warning("iTick rates failed: %s", exc)
+        return None
+
+
+async def get_rates(pairs: list[str] | None = None) -> dict[str, Any]:
+    """
+    Get live forex rates with 5-provider fallback chain.
+    Returns: {"rates": {"EUR/USD": 1.0851, ...}, "source": "twelve_data", "cached": bool}
+    """
+    pairs = pairs or _DEFAULT_PAIRS
+    cache_key = f"rates:{','.join(sorted(pairs))}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    # Fallback chain
+    providers = [
+        ("twelve_data",    _rates_twelve_data(pairs)),
+        ("fcs",            _rates_fcs(pairs)),
+        ("itick",          _rates_itick(pairs)),
+    ]
+
+    rates: dict[str, float] | None = None
+    source = "unavailable"
+
+    for name, coro in providers:
         try:
-            if not GEMINI_AVAILABLE:
-                return self.get_default_sentiment(rates)
+            result = await coro
+            if result:
+                rates = result
+                source = name
+                break
+        except Exception:
+            continue
 
-            model = genai.GenerativeModel("gemini-1.5-flash")
-
-            # Format news for analysis
-            news_text = "\n".join([
-                f"- {news_item['currency']}: {news_item['event']} (Impact: {news_item['impact']})"
-                for news_item in news
-            ])
-
-            # Format rates for analysis
-            rates_text = "\n".join([
-                f"- {pair}: {rate:.5f}"
-                for pair, rate in rates.items()
-            ])
-
-            prompt = f"""
-            You are a professional forex market analyst with deep expertise in technical and fundamental analysis.
-            
-            Analyze the current forex market conditions:
-            
-            EXCHANGE RATES:
-            {rates_text}
-            
-            ECONOMIC NEWS:
-            {news_text}
-            
-            Please provide a comprehensive analysis including:
-            1. Overall market sentiment (bullish, bearish, neutral)
-            2. Volatility assessment (low, medium, high)
-            3. Risk level (low, moderate, high)
-            4. Key currency pairs to watch with reasoning
-            5. Trading opportunities identification
-            6. Potential market-moving factors
-            
-            Format your response as JSON with clear, actionable insights.
-            """
-
-            response = model.generate_content(prompt)
-
-            import json
+    # If pair-level lookups failed, try base-currency providers
+    if not rates:
+        for name, coro in [
+            ("forexratesapi",   _rates_forexrateapi("USD")),
+            ("exchangeratesapi", _rates_exchangeratesapi("USD")),
+        ]:
             try:
-                analysis = json.loads(response.text)
-                analysis["timestamp"] = datetime.now().isoformat()
-                analysis["major_pairs"] = rates
+                all_rates = await coro
+                if all_rates:
+                    # Convert to pair format
+                    rates = {}
+                    for pair in pairs:
+                        base, quote = pair.split("/")
+                        if base == "USD" and quote in all_rates:
+                            rates[pair] = all_rates[quote]
+                        elif quote == "USD" and base in all_rates:
+                            rates[pair] = round(1 / all_rates[base], 6)
+                    source = name
+                    break
             except Exception:
-                analysis = self.get_default_sentiment(rates)
-                analysis["ai_analysis"] = response.text
+                continue
 
-            return analysis
+    payload = {
+        "rates":  rates or {},
+        "source": source,
+        "pairs":  pairs,
+    }
+    if rates:
+        _cache_set(cache_key, payload, _RATES_TTL)
 
-        except Exception as e:
-            print(f"Gemini analysis failed: {e}")
-            return self.get_default_sentiment(rates)
+    return {**payload, "cached": False}
 
-    def get_default_sentiment(self, rates: Dict[str, float]) -> Dict[str, any]:
-        """Fallback market sentiment analysis when AI is unavailable"""
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "trend": "bullish",
-            "major_pairs": rates,
-            "volatility": "medium",
-            "risk_level": "moderate"
-        }
 
-    async def predict_price_movements(self, pair: str, historical_data: List[Dict]) -> Dict[str, any]:
-        """
-        Use Google Generative AI (Gemini) to predict future price movements
-        """
+# ─────────────────────────────────────────────────────────────────────────────
+# OHLC / Candles — Twelve Data primary
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_ohlc(
+    pair: str,
+    interval: str = "1min",
+    outputsize: int = 100,
+) -> dict[str, Any]:
+    cache_key = f"ohlc:{pair}:{interval}:{outputsize}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    symbol = pair.replace("/", "")
+    result: dict[str, Any] = {"pair": pair, "interval": interval, "candles": [], "source": "unavailable"}
+
+    # Twelve Data OHLC
+    if _TWELVE_DATA_KEY:
         try:
-            if not GEMINI_AVAILABLE:
-                return {
-                    "success": False,
-                    "message": "Gemini is unavailable (missing package or API key)",
-                    "prediction": None
-                }
-
-            model = genai.GenerativeModel("gemini-1.5-flash")
-
-            # Format historical data for analysis
-            data_text = "\n".join([
-                f"- Time: {data['timestamp']}, Price: {data['close']:.5f}"
-                for data in historical_data[-50:]  # Last 50 data points
-            ])
-
-            prompt = f"""
-            You are an expert technical analyst specializing in forex price prediction.
-            
-            Predict the future price movement for {pair} using historical data:
-            
-            HISTORICAL DATA (Last 50 periods):
-            {data_text}
-            
-            Please provide:
-            1. Price direction prediction (up, down, sideways)
-            2. Confidence level (0-100%)
-            3. Target price levels (support, resistance)
-            4. Timeframe for this prediction
-            5. Technical indicators supporting this prediction
-            6. Risk assessment
-            
-            Format your response as JSON.
-            """
-
-            response = model.generate_content(prompt)
-
-            import json
-            try:
-                prediction = json.loads(response.text)
-                prediction["pair"] = pair
-                prediction["timestamp"] = datetime.now().isoformat()
-            except Exception:
-                prediction = {
-                    "direction": "neutral",
-                    "confidence": 50,
-                    "support": None,
-                    "resistance": None,
-                    "timeframe": "1H",
-                    "indicators": ["Cannot parse structured response"],
-                    "risk": "medium"
-                }
-
-            return {
-                "success": True,
-                "message": "Prediction generated successfully",
-                "prediction": prediction
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Prediction failed: {str(e)}",
-                "prediction": None
-            }
-
-    async def get_market_sentiment(
-        self,
-        rates: Optional[Dict[str, float]] = None,
-        news: Optional[List[Dict]] = None,
-    ) -> Dict[str, any]:
-        """
-        Get market sentiment analysis
-        """
-        try:
-            if self._cache_is_fresh(
-                self._cached_sentiment_monotonic,
-                self._sentiment_cache_ttl_seconds,
-            ):
-                return dict(self._cached_sentiment)
-
-            effective_rates = rates if rates is not None else await self.get_currency_rates()
-            effective_news = news if news is not None else await self.get_forex_factory_news()
-            sentiment = await self.analyze_market_with_gemini(effective_rates, effective_news)
-            if isinstance(sentiment, dict) and sentiment:
-                self._cached_sentiment = dict(sentiment)
-                self._cached_sentiment_monotonic = time.monotonic()
-            return sentiment
-        except Exception as e:
-            print(f"Error getting market sentiment: {e}")
-            return {}
-
-    async def stream_live_data(self, callback, interval: int = 10, should_poll=None):
-        """
-        Stream live forex data at specified interval (seconds)
-
-        Args:
-            callback: Async function to call with new data
-            interval: Update interval in seconds
-        """
-        self.running = True
-        safe_interval = max(2, int(interval))
-        await self.initialize()
-
-        try:
-            while self.running:
-                if should_poll is not None:
-                    try:
-                        if not bool(should_poll()):
-                            await asyncio.sleep(safe_interval)
-                            continue
-                    except Exception:
-                        await asyncio.sleep(safe_interval)
-                        continue
-
-                try:
-                    # Fetch once per cycle and reuse for sentiment to avoid duplicate upstream calls.
-                    rates = await self.get_currency_rates()
-                    news = await self.get_forex_factory_news()
-                    sentiment = await self.get_market_sentiment(rates=rates, news=news)
-
-                    # Prepare update package
-                    update_data = {
-                        "timestamp": datetime.now().isoformat(),
-                        "rates": rates,
-                        "news": news[:3],  # Top 3 news items
-                        "sentiment": sentiment,
-                        "type": "live_update"
+            r = await _client().get(
+                "https://api.twelvedata.com/time_series",
+                params={
+                    "symbol":     symbol,
+                    "interval":   interval,
+                    "outputsize": outputsize,
+                    "apikey":     _TWELVE_DATA_KEY,
+                },
+            )
+            r.raise_for_status()
+            data = r.json()
+            if "values" in data:
+                result["candles"] = [
+                    {
+                        "datetime": v["datetime"],
+                        "open":     float(v["open"]),
+                        "high":     float(v["high"]),
+                        "low":      float(v["low"]),
+                        "close":    float(v["close"]),
                     }
+                    for v in data["values"]
+                ]
+                result["source"] = "twelve_data"
+                _cache_set(cache_key, result, _FORECAST_TTL)
+                return {**result, "cached": False}
+        except Exception as exc:
+            logger.warning("Twelve Data OHLC failed: %s", exc)
 
-                    # Send to callback
-                    await callback(update_data)
-                except Exception as e:
-                    print(f"Live data stream iteration error: {e}")
+    # FCS fallback OHLC
+    if _FCS_KEY:
+        try:
+            sym = pair.replace("/", "_")
+            r = await _client().get(
+                "https://fcsapi.com/api-v3/forex/candle",
+                params={
+                    "symbol":     sym,
+                    "period":     interval,
+                    "access_key": _FCS_KEY,
+                    "level":      outputsize,
+                },
+            )
+            r.raise_for_status()
+            data = r.json()
+            if data.get("status") and data.get("response"):
+                result["candles"] = [
+                    {
+                        "datetime": c.get("tm"),
+                        "open":     float(c.get("o", 0)),
+                        "high":     float(c.get("h", 0)),
+                        "low":      float(c.get("l", 0)),
+                        "close":    float(c.get("c", 0)),
+                    }
+                    for c in data["response"]
+                ]
+                result["source"] = "fcs"
+                _cache_set(cache_key, result, _FORECAST_TTL)
+                return {**result, "cached": False}
+        except Exception as exc:
+            logger.warning("FCS OHLC failed: %s", exc)
 
-                adaptive_sleep = safe_interval
-                if self._rate_failure_streak > 0:
-                    adaptive_sleep = max(
-                        adaptive_sleep,
-                        int(min(90, 2 ** min(self._rate_failure_streak, 6))),
-                    )
-                await asyncio.sleep(adaptive_sleep)
-
-        except asyncio.CancelledError:
-            print("Live data stream cancelled")
-        finally:
-            self.running = False
-            await self.close()
-
-    def stop_streaming(self):
-        """Stop the live data stream"""
-        self.running = False
-
-    def get_runtime_stats(self) -> Dict[str, Any]:
-        """Return runtime diagnostics for ops endpoints."""
-        now = time.monotonic()
-        next_retry_in = 0.0
-        if self._next_rates_retry_monotonic > now:
-            next_retry_in = self._next_rates_retry_monotonic - now
-
-        return {
-            "running": bool(self.running),
-            "session_open": bool(self.session and not self.session.closed),
-            "latest_rates_count": len(self._latest_rates),
-            "latest_usd_base_count": len(self._latest_usd_base_rates),
-            "price_history_pairs": len(self._price_history),
-            "rates_cache_age_seconds": round(
-                self._cache_age_seconds(self._last_rates_fetch_monotonic), 3
-            ),
-            "rates_min_fetch_interval_seconds": self._min_rates_fetch_interval_seconds,
-            "rate_failure_streak": int(self._rate_failure_streak),
-            "next_rates_retry_in_seconds": round(next_retry_in, 3),
-            "news_cache_age_seconds": round(
-                self._cache_age_seconds(self._cached_news_monotonic), 3
-            ),
-            "news_cache_ttl_seconds": self._news_cache_ttl_seconds,
-            "sentiment_cache_age_seconds": round(
-                self._cache_age_seconds(self._cached_sentiment_monotonic), 3
-            ),
-            "sentiment_cache_ttl_seconds": self._sentiment_cache_ttl_seconds,
-            "forecast_cache_items": len(self._pair_forecast_cache),
-            "forecast_cache_ttl_seconds": self._pair_forecast_cache_ttl_seconds,
-        }
+    return {**result, "cached": False}
 
 
-# Global instance
-forex_service = ForexDataService()
+# ─────────────────────────────────────────────────────────────────────────────
+# NEWS — Finnhub + MarketAux fallback
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_forex_news(pair: str | None = None, limit: int = 10) -> dict[str, Any]:
+    cache_key = f"news:{pair}:{limit}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    articles: list[dict] = []
+    source = "unavailable"
+
+    # Finnhub forex news
+    if _FINNHUB_KEY:
+        try:
+            r = await _client().get(
+                "https://finnhub.io/api/v1/news",
+                params={"category": "forex", "token": _FINNHUB_KEY},
+            )
+            r.raise_for_status()
+            data = r.json()
+            articles = [
+                {
+                    "headline": item.get("headline", ""),
+                    "summary":  item.get("summary", ""),
+                    "source":   item.get("source", ""),
+                    "url":      item.get("url", ""),
+                    "datetime": item.get("datetime"),
+                    "sentiment": None,
+                }
+                for item in (data or [])[:limit]
+            ]
+            source = "finnhub"
+        except Exception as exc:
+            logger.warning("Finnhub news failed: %s", exc)
+
+    # MarketAux fallback
+    if not articles and _MARKETAUX_ENDPOINT:
+        try:
+            params: dict[str, Any] = {"limit": limit}
+            if pair:
+                params["symbols"] = pair.replace("/", "")
+            r = await _client().get(_MARKETAUX_ENDPOINT, params=params)
+            r.raise_for_status()
+            data = r.json()
+            raw_articles = data.get("data", data.get("articles", []))
+            articles = [
+                {
+                    "headline": a.get("title", a.get("headline", "")),
+                    "summary":  a.get("description", a.get("summary", "")),
+                    "source":   a.get("source", ""),
+                    "url":      a.get("url", ""),
+                    "datetime": a.get("published_at", a.get("datetime")),
+                    "sentiment": (a.get("entities") or [{}])[0].get("sentiment_score"),
+                }
+                for a in raw_articles[:limit]
+            ]
+            source = "marketaux"
+        except Exception as exc:
+            logger.warning("MarketAux news failed: %s", exc)
+
+    payload = {"articles": articles, "source": source, "pair": pair}
+    if articles:
+        _cache_set(cache_key, payload, _NEWS_TTL)
+
+    return {**payload, "cached": False}
 
 
-# â”€â”€ Phase 13: Notification wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-from app.services.notification_dispatcher import NotificationDispatcher
-_dispatcher_fd = NotificationDispatcher()
+# ─────────────────────────────────────────────────────────────────────────────
+# SENTIMENT — GDELT
+# ─────────────────────────────────────────────────────────────────────────────
 
-async def _notify_signal(user_id: str, pair: str, signal: str, confidence: float):
-    """Call this from generate_signal() when confidence > 80%."""
-    if confidence < 0.80:
-        return  # Only fire for high-confidence signals
-    await _dispatcher_fd.dispatch(
-        user_id    = user_id,
-        event_type = "signal",
-        payload    = {
-            "pair":       pair,
-            "signal":     signal.upper(),
-            "confidence": f"{int(confidence * 100)}%",
-        }
+async def get_sentiment(pair: str | None = None) -> dict[str, Any]:
+    cache_key = f"sentiment:{pair}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    result: dict[str, Any] = {
+        "sentiment": "neutral",
+        "score": 0.0,
+        "source": "unavailable",
+        "pair": pair,
+    }
+
+    if _GDELT_ENDPOINT:
+        try:
+            params: dict[str, Any] = {}
+            if pair:
+                query = f"forex {pair.replace('/', ' ')}"
+                params["query"] = query
+            r = await _client().get(_GDELT_ENDPOINT, params=params)
+            r.raise_for_status()
+            data = r.json()
+
+            # GDELT GKG structure — extract tone
+            articles = data.get("articles", data.get("gkg", []))
+            if articles:
+                tones = [
+                    float(a.get("tone", {}).get("tone", 0))
+                    if isinstance(a.get("tone"), dict)
+                    else float(a.get("tone", 0))
+                    for a in articles
+                    if a.get("tone") is not None
+                ]
+                avg_tone = sum(tones) / len(tones) if tones else 0.0
+                sentiment = (
+                    "bullish" if avg_tone > 1
+                    else "bearish" if avg_tone < -1
+                    else "neutral"
+                )
+                result = {
+                    "sentiment": sentiment,
+                    "score": round(avg_tone, 4),
+                    "article_count": len(articles),
+                    "source": "gdelt",
+                    "pair": pair,
+                }
+                _cache_set(cache_key, result, _SENTIMENT_TTL)
+        except Exception as exc:
+            logger.warning("GDELT sentiment failed: %s", exc)
+
+    return {**result, "cached": False}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TECHNICAL INDICATORS — Twelve Data
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_indicators(
+    pair: str,
+    indicator: str = "rsi",
+    interval: str = "1h",
+    period: int = 14,
+) -> dict[str, Any]:
+    cache_key = f"indicator:{pair}:{indicator}:{interval}:{period}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    symbol = pair.replace("/", "")
+    result: dict[str, Any] = {
+        "pair": pair,
+        "indicator": indicator,
+        "value": None,
+        "source": "unavailable",
+    }
+
+    if not _TWELVE_DATA_KEY:
+        return {**result, "cached": False}
+
+    indicator_endpoints = {
+        "rsi":    "rsi",
+        "macd":   "macd",
+        "ema":    "ema",
+        "sma":    "sma",
+        "bbands": "bbands",
+        "stoch":  "stoch",
+        "adx":    "adx",
+        "atr":    "atr",
+    }
+    endpoint_name = indicator_endpoints.get(indicator.lower(), indicator.lower())
+
+    try:
+        r = await _client().get(
+            f"https://api.twelvedata.com/{endpoint_name}",
+            params={
+                "symbol":     symbol,
+                "interval":   interval,
+                "time_period": period,
+                "outputsize": 1,
+                "apikey":     _TWELVE_DATA_KEY,
+            },
+        )
+        r.raise_for_status()
+        data = r.json()
+
+        if "values" in data and data["values"]:
+            latest = data["values"][0]
+            result = {
+                "pair":      pair,
+                "indicator": indicator.upper(),
+                "interval":  interval,
+                "period":    period,
+                "value":     {k: float(v) for k, v in latest.items() if k != "datetime"},
+                "datetime":  latest.get("datetime"),
+                "source":    "twelve_data",
+            }
+            _cache_set(cache_key, result, _FORECAST_TTL)
+    except Exception as exc:
+        logger.warning("Twelve Data indicator %s failed: %s", indicator, exc)
+
+    return {**result, "cached": False}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGGREGATE market snapshot (used by WebSocket stream)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_market_snapshot(pairs: list[str] | None = None) -> dict[str, Any]:
+    """
+    Returns rates + sentiment for all pairs in one call.
+    Used by the WebSocket forex stream.
+    """
+    pairs = pairs or _DEFAULT_PAIRS
+    rates_data, sentiment_data = await asyncio.gather(
+        get_rates(pairs),
+        get_sentiment(),
+        return_exceptions=True,
     )
 
-async def _notify_market(user_id: str, pair: str, event: str, time_utc: str):
-    """Call this when an economic calendar event is detected for a watched pair."""
-    await _dispatcher_fd.dispatch(
-        user_id    = user_id,
-        event_type = "market",
-        payload    = {
-            "pair":  pair,
-            "event": event,
-            "time":  time_utc,
+    rates = {}
+    if isinstance(rates_data, dict):
+        rates = rates_data.get("rates", {})
+
+    sentiment = {}
+    if isinstance(sentiment_data, dict):
+        sentiment = {
+            "score":     sentiment_data.get("score", 0.0),
+            "sentiment": sentiment_data.get("sentiment", "neutral"),
+            "source":    sentiment_data.get("source", "unavailable"),
         }
-    )
-# â”€â”€ End Phase 13 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    return {
+        "rates":     rates,
+        "sentiment": sentiment,
+        "pairs":     pairs,
+        "timestamp": time.time(),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Health check
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def health_check() -> dict[str, Any]:
+    configured = {
+        "twelve_data":     bool(_TWELVE_DATA_KEY),
+        "fcs":             bool(_FCS_KEY),
+        "forexratesapi":   bool(_FOREXRATE_KEY),
+        "exchangeratesapi": bool(_EXCHANGERATES_KEY),
+        "itick":           bool(_ITICK_KEY),
+        "finnhub":         bool(_FINNHUB_KEY),
+        "marketaux":       bool(_MARKETAUX_ENDPOINT),
+        "gdelt":           bool(_GDELT_ENDPOINT),
+    }
+    active_count = sum(1 for v in configured.values() if v)
+    try:
+        test = await get_rates(["EUR/USD"])
+        live_source = test.get("source", "unavailable")
+    except Exception:
+        live_source = "error"
+
+    return {
+        "status":          "ok" if active_count > 0 else "degraded",
+        "providers_configured": active_count,
+        "providers":       configured,
+        "live_source":     live_source,
+        "cache_ttls": {
+            "rates_seconds":     _RATES_TTL,
+            "forecast_seconds":  _FORECAST_TTL,
+            "news_seconds":      _NEWS_TTL,
+            "sentiment_seconds": _SENTIMENT_TTL,
+        },
+    }

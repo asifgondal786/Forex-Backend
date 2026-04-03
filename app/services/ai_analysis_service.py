@@ -1,677 +1,371 @@
-﻿# app/services/ai_analysis_service.py
-import pandas as pd
-from datetime import datetime
-from typing import Dict, List, Any
-import pandas_ta as ta
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow import keras
-import os
+# =============================================================
+# D:\Tajir\Backend\app\services\ai_analysis_service.py
+#
+# AI Analysis Service — powered by DeepSeek
+# Replaces the old Gemini-based implementation.
+#
+# Provides:
+#   • analyze_market()       — full market intelligence report
+#   • generate_signal()      — BUY/SELL/HOLD with confidence
+#   • analyze_trade_risk()   — risk assessment before execution
+#   • explain_prediction()   — plain-English explanation
+#   • chat_with_ai()         — general trading AI assistant
+#   • analyze_news_impact()  — news → price impact scoring
+#   • autonomous_briefing()  — full autonomous agent stage report
+# =============================================================
 
-from ..ai import gemini_client
+from __future__ import annotations
 
-class AIAnalysisService:
+import logging
+from typing import Any
+
+from .forex_data_service import (
+    get_indicators,
+    get_market_snapshot,
+    get_forex_news,
+    get_sentiment,
+)
+from ..ai.deepseek_client import chat_completion_json, chat_completion
+
+logger = logging.getLogger("app.services.ai_analysis_service")
+
+# ── System prompts ────────────────────────────────────────────────────────────
+
+_MARKET_ANALYST_SYSTEM = """You are an expert forex market analyst with 20+ years experience.
+You provide precise, data-driven analysis. Always respond in valid JSON.
+Be concise, actionable, and base everything on the data provided.
+Never fabricate prices — use only what is given."""
+
+_RISK_MANAGER_SYSTEM = """You are a professional forex risk manager.
+Your job is to assess trade risk, suggest position sizing, and protect capital.
+Always respond in valid JSON. Be conservative and prioritize capital preservation."""
+
+_TRADING_ASSISTANT_SYSTEM = """You are Tajir AI, an expert forex trading assistant.
+You help traders understand markets, manage risk, and execute better trades.
+Be helpful, clear, and educational. Respond in plain English unless JSON is requested."""
+
+
+# ── Core analysis functions ───────────────────────────────────────────────────
+
+async def analyze_market(
+    pair: str,
+    timeframe: str = "1h",
+    include_news: bool = True,
+) -> dict[str, Any]:
     """
-    Advanced AI-powered market analysis using:
-    - Technical indicators (pandas-ta)
-    - Machine Learning models (LSTM)
-    - Pattern recognition
-    - Sentiment analysis
+    Full market intelligence report for a currency pair.
+    Combines live rates, indicators, news and sentiment into DeepSeek analysis.
     """
+    # Gather data concurrently
+    import asyncio
+    snapshot_task    = get_market_snapshot([pair])
+    indicators_task  = get_indicators(pair, "rsi", timeframe, 14)
+    macd_task        = get_indicators(pair, "macd", timeframe, 12)
+    news_task        = get_forex_news(pair, 5) if include_news else None
+    sentiment_task   = get_sentiment(pair)
 
-    def __init__(self):
-        self.scaler = MinMaxScaler()
-        self.lstm_model = None
-        self.load_models()
+    tasks = [snapshot_task, indicators_task, macd_task, sentiment_task]
+    if news_task:
+        tasks.append(news_task)
 
-    def load_models(self):
-        """Load pre-trained ML models"""
-        try:
-            # Load LSTM model for price prediction
-            if os.path.exists('models/lstm_forex.h5'):
-                self.lstm_model = keras.models.load_model('models/lstm_forex.h5')
-        except Exception as e:
-            print(f"Model loading error: {e}")
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def analyze_news_impact(self, news: List[Dict], currency_pairs: List[str]) -> Dict[str, Any]:
-        """
-        Use Google Generative AI (Gemini) to analyze news impact on currency pairs
-        """
-        try:
-            if not gemini_client.available:
-                return self._get_default_news_analysis(news, currency_pairs)
+    snapshot   = results[0] if not isinstance(results[0], Exception) else {}
+    rsi_data   = results[1] if not isinstance(results[1], Exception) else {}
+    macd_data  = results[2] if not isinstance(results[2], Exception) else {}
+    sentiment  = results[3] if not isinstance(results[3], Exception) else {}
+    news       = results[4] if (len(results) > 4 and not isinstance(results[4], Exception)) else {}
 
-            # Format news for analysis
-            news_text = "\n".join([
-                f"- {news_item['time']}: {news_item['currency']} - {news_item['event']} (Impact: {news_item['impact']})"
-                for news_item in news
-            ])
+    current_price = (snapshot.get("rates") or {}).get(pair, 0)
+    rsi_value     = (rsi_data.get("value") or {}).get("rsi")
+    macd_hist     = (macd_data.get("value") or {}).get("macd_hist")
+    news_headlines = [a.get("headline", "") for a in (news.get("articles") or [])[:3]]
 
-            prompt = f"""
-            You are an expert forex news analyst specializing in event impact analysis.
-            
-            Analyze the impact of economic news on currency pairs:
-            
-            NEWS ITEMS:
-            {news_text}
-            
-            CURRENCY PAIRS TO ANALYZE:
-            {', '.join(currency_pairs)}
-            
-            Please provide:
-            1. Overall market sentiment shift caused by these news items
-            2. Impact level for each currency pair
-            3. Expected volatility changes
-            4. Trading opportunities created by this news
-            5. Risk assessment
-            6. Timeframe for this analysis
-            
-            Format your response as JSON.
-            """
+    prompt = f"""Analyze {pair} on {timeframe} timeframe.
 
-            analysis = gemini_client.generate_json(
-                model_name="gemini-2.0-flash",
-                prompt=prompt,
-            )
-            if not analysis:
-                analysis = self._get_default_news_analysis(news, currency_pairs)
-                ai_text = gemini_client.generate_text(
-                    model_name="gemini-2.0-flash",
-                    prompt=prompt,
-                )
-                if ai_text:
-                    analysis["ai_analysis"] = ai_text
-            else:
-                analysis["timestamp"] = datetime.now().isoformat()
-            return analysis
+Current price: {current_price}
+RSI ({timeframe}): {rsi_value}
+MACD histogram: {macd_hist}
+Market sentiment: {sentiment.get('sentiment', 'neutral')} (score: {sentiment.get('score', 0)})
+Recent headlines: {news_headlines}
 
-        except Exception as e:
-            print(f"News analysis failed: {e}")
-            return self._get_default_news_analysis(news, currency_pairs)
+Provide analysis as JSON with these exact keys:
+{{
+  "pair": "{pair}",
+  "timeframe": "{timeframe}",
+  "current_price": <number>,
+  "trend": "bullish|bearish|sideways",
+  "trend_strength": "strong|moderate|weak",
+  "signal": "BUY|SELL|HOLD",
+  "confidence": <0-100>,
+  "entry_zone": {{"min": <number>, "max": <number>}},
+  "stop_loss": <number>,
+  "take_profit_1": <number>,
+  "take_profit_2": <number>,
+  "risk_reward": <number>,
+  "key_levels": {{"support": [<number>], "resistance": [<number>]}},
+  "reasoning": "<2-3 sentence analysis>",
+  "risk_warning": "<one sentence>",
+  "indicators": {{"rsi": {rsi_value}, "macd_hist": {macd_hist}}},
+  "news_impact": "positive|negative|neutral"
+}}"""
 
-    def _get_default_news_analysis(self, news: List[Dict], currency_pairs: List[str]) -> Dict[str, Any]:
-        """Fallback news analysis when AI is unavailable"""
-        impacts = {}
-        for pair in currency_pairs:
-            # Determine impact based on currency matches
-            news_currencies = [n['currency'] for n in news]
-            base_curr, quote_curr = pair.split('/')
-
-            if base_curr in news_currencies or quote_curr in news_currencies:
-                impacts[pair] = "medium"
-            else:
-                impacts[pair] = "low"
-
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "sentiment": "neutral",
-            "impact_levels": impacts,
-            "volatility": "medium",
-            "risk": "moderate",
-            "trading_opportunities": [],
-            "timeframe": "1H"
-        }
-
-    async def analyze_news_sentiment(self, news_text: str) -> Dict[str, Any]:
-        """
-        Use Google Generative AI (Gemini) to analyze sentiment from raw news text
-        """
-        try:
-            if not gemini_client.available:
-                return self._get_default_sentiment_analysis()
-
-            prompt = f"""
-            You are an expert financial news sentiment analyzer.
-            
-            Analyze the following news for forex market sentiment:
-            
-            {news_text}
-            
-            Please provide:
-            1. Overall sentiment (bullish, bearish, neutral)
-            2. Sentiment strength (weak, moderate, strong)
-            3. Key currency impacts
-            4. Volatility expectation
-            5. Risk assessment
-            6. Trading recommendation
-            
-            Format your response as JSON.
-            """
-
-            sentiment = gemini_client.generate_json(
-                model_name="gemini-1.5-pro",
-                prompt=prompt,
-            )
-            if not sentiment:
-                sentiment = self._get_default_sentiment_analysis()
-                ai_text = gemini_client.generate_text(
-                    model_name="gemini-1.5-pro",
-                    prompt=prompt,
-                )
-                if ai_text:
-                    sentiment["ai_analysis"] = ai_text
-            else:
-                sentiment["timestamp"] = datetime.now().isoformat()
-            return sentiment
-
-        except Exception as e:
-            print(f"News sentiment analysis failed: {e}")
-            return self._get_default_sentiment_analysis()
-
-    def _get_default_sentiment_analysis(self) -> Dict[str, Any]:
-        """Fallback sentiment analysis when AI is unavailable"""
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "sentiment": "neutral",
-            "strength": "moderate",
-            "currency_impacts": [],
-            "volatility": "medium",
-            "risk": "moderate",
-            "recommendation": "hold"
-        }
-    def is_healthy(self) -> bool:
-        """Check if service is operational"""
-        return True
-
-    async def analyze_market(
-        self,
-        market_data: pd.DataFrame,
-        depth: str = "detailed"
-    ) -> Dict[str, Any]:
-        """
-        Comprehensive market analysis
-        
-        Args:
-            market_data: DataFrame with OHLCV data
-            depth: quick, detailed, or deep
-            
-        Returns:
-            Complete analysis report
-        """
-
-        df = market_data.copy()
-
-        # Calculate technical indicators
-        indicators = self._calculate_indicators(df)
-
-        # Detect patterns
-        patterns = self._detect_patterns(df)
-
-        # Determine trend
-        trend_analysis = self._analyze_trend(df, indicators)
-
-        # Support/Resistance
-        support_resistance = self._find_support_resistance(df)
-
-        # Market sentiment
-        sentiment = self._analyze_sentiment(df, indicators)
-
-        # Generate recommendation
-        recommendation = self._generate_recommendation(
-            trend_analysis,
-            indicators,
-            patterns,
-            sentiment
+    try:
+        result = await chat_completion_json(
+            [{"role": "user", "content": prompt}],
+            system_prompt=_MARKET_ANALYST_SYSTEM,
+            temperature=0.1,
         )
-
+        result["source"]    = "deepseek"
+        result["data_from"] = snapshot.get("source", "unknown")
+        return result
+    except Exception as exc:
+        logger.error("analyze_market failed for %s: %s", pair, exc)
         return {
-            "trend": trend_analysis["direction"],
-            "strength": trend_analysis["strength"],
-            "support": support_resistance["support"],
-            "resistance": support_resistance["resistance"],
-            "indicators": indicators,
-            "patterns": patterns,
-            "sentiment": sentiment,
-            "recommendation": recommendation["action"],
-            "confidence": recommendation["confidence"],
-            "risk_level": recommendation["risk_level"],
-            "entry_suggestions": recommendation["entry_points"],
-            "stop_loss_suggestions": recommendation["stop_loss"],
-            "take_profit_suggestions": recommendation["take_profit"]
+            "pair":        pair,
+            "signal":      "HOLD",
+            "confidence":  0,
+            "error":       str(exc),
+            "reasoning":   "Analysis unavailable — AI service error.",
         }
 
-    def _calculate_indicators(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Calculate comprehensive technical indicators"""
 
-        # RSI
-        df['rsi'] = ta.rsi(df['close'], length=14)
+async def generate_signal(
+    pair: str,
+    timeframe: str = "1h",
+) -> dict[str, Any]:
+    """
+    Fast signal generation: BUY / SELL / HOLD with confidence score.
+    Optimised for low latency — fewer data sources than full analysis.
+    """
+    rates = await get_market_snapshot([pair])
+    rsi   = await get_indicators(pair, "rsi", timeframe, 14)
 
-        # MACD
-        macd = ta.macd(df['close'])
-        df['macd'] = macd['MACD_12_26_9']
-        df['macd_signal'] = macd['MACDs_12_26_9']
-        df['macd_hist'] = macd['MACDh_12_26_9']
+    price     = (rates.get("rates") or {}).get(pair, 0)
+    rsi_val   = (rsi.get("value") or {}).get("rsi")
 
-        # Bollinger Bands
-        bbands = ta.bbands(df['close'], length=20, std=2)
-        df['bb_upper'] = bbands['BBU_20_2.0']
-        df['bb_middle'] = bbands['BBM_20_2.0']
-        df['bb_lower'] = bbands['BBL_20_2.0']
+    prompt = f"""Generate a forex trading signal for {pair}.
+Price: {price}, RSI: {rsi_val}, Timeframe: {timeframe}
 
-        # Moving Averages
-        df['sma_20'] = ta.sma(df['close'], length=20)
-        df['sma_50'] = ta.sma(df['close'], length=50)
-        df['ema_12'] = ta.ema(df['close'], length=12)
-        df['ema_26'] = ta.ema(df['close'], length=26)
+Respond ONLY with JSON:
+{{
+  "pair": "{pair}",
+  "signal": "BUY|SELL|HOLD",
+  "confidence": <0-100>,
+  "entry": <price>,
+  "stop_loss": <price>,
+  "take_profit": <price>,
+  "reasoning": "<one sentence>"
+}}"""
 
-        # ATR (Average True Range)
-        df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=14)
+    try:
+        return await chat_completion_json(
+            [{"role": "user", "content": prompt}],
+            system_prompt=_MARKET_ANALYST_SYSTEM,
+            temperature=0.1,
+        )
+    except Exception as exc:
+        logger.error("generate_signal failed: %s", exc)
+        return {"pair": pair, "signal": "HOLD", "confidence": 0, "error": str(exc)}
 
-        # Stochastic
-        stoch = ta.stoch(df['high'], df['low'], df['close'])
-        df['stoch_k'] = stoch['STOCHk_14_3_3']
-        df['stoch_d'] = stoch['STOCHd_14_3_3']
 
-        # ADX (Average Directional Index)
-        adx = ta.adx(df['high'], df['low'], df['close'], length=14)
-        df['adx'] = adx['ADX_14']
+async def analyze_trade_risk(
+    pair: str,
+    direction: str,
+    entry_price: float,
+    stop_loss: float,
+    take_profit: float,
+    lot_size: float,
+    account_balance: float,
+) -> dict[str, Any]:
+    """
+    Risk assessment before trade execution.
+    Returns risk percentage, R:R ratio, and recommendation.
+    """
+    risk_pips   = abs(entry_price - stop_loss)
+    reward_pips = abs(take_profit - entry_price)
+    rr_ratio    = round(reward_pips / risk_pips, 2) if risk_pips else 0
+    risk_amount = lot_size * risk_pips * 10000  # approximate pip value
 
-        # Get latest values
-        latest = df.iloc[-1]
+    prompt = f"""Assess this forex trade risk:
+Pair: {pair}, Direction: {direction}
+Entry: {entry_price}, Stop Loss: {stop_loss}, Take Profit: {take_profit}
+Lot Size: {lot_size}, Account Balance: ${account_balance}
+Risk in pips: {risk_pips:.4f}, R:R ratio: {rr_ratio}
+Estimated risk amount: ${risk_amount:.2f}
 
+Respond ONLY with JSON:
+{{
+  "approved": true|false,
+  "risk_percentage": <0-100>,
+  "risk_rating": "low|medium|high|extreme",
+  "rr_ratio": {rr_ratio},
+  "max_recommended_lot": <number>,
+  "recommendation": "PROCEED|REDUCE_SIZE|WIDEN_STOP|ABORT",
+  "warnings": ["<warning1>", "<warning2>"],
+  "reasoning": "<2 sentence explanation>"
+}}"""
+
+    try:
+        return await chat_completion_json(
+            [{"role": "user", "content": prompt}],
+            system_prompt=_RISK_MANAGER_SYSTEM,
+            temperature=0.05,
+        )
+    except Exception as exc:
+        logger.error("analyze_trade_risk failed: %s", exc)
         return {
-            "rsi": {
-                "value": float(latest['rsi']),
-                "signal": self._interpret_rsi(latest['rsi'])
-            },
-            "macd": {
-                "value": float(latest['macd']),
-                "signal": float(latest['macd_signal']),
-                "histogram": float(latest['macd_hist']),
-                "interpretation": self._interpret_macd(latest)
-            },
-            "bollinger_bands": {
-                "upper": float(latest['bb_upper']),
-                "middle": float(latest['bb_middle']),
-                "lower": float(latest['bb_lower']),
-                "position": self._bb_position(latest)
-            },
-            "moving_averages": {
-                "sma_20": float(latest['sma_20']),
-                "sma_50": float(latest['sma_50']),
-                "ema_12": float(latest['ema_12']),
-                "ema_26": float(latest['ema_26']),
-                "trend": self._ma_trend(latest)
-            },
-            "atr": {
-                "value": float(latest['atr']),
-                "volatility": self._interpret_atr(latest['atr'], latest['close'])
-            },
-            "stochastic": {
-                "k": float(latest['stoch_k']),
-                "d": float(latest['stoch_d']),
-                "signal": self._interpret_stoch(latest['stoch_k'], latest['stoch_d'])
-            },
-            "adx": {
-                "value": float(latest['adx']),
-                "trend_strength": self._interpret_adx(latest['adx'])
-            }
+            "approved":    False,
+            "risk_rating": "unknown",
+            "recommendation": "ABORT",
+            "error": str(exc),
         }
 
-    def _detect_patterns(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
-        """Detect candlestick and chart patterns"""
-        patterns = []
 
-        # Candlestick patterns
-        df['doji'] = ta.cdl_doji(df['open'], df['high'], df['low'], df['close'])
-        df['hammer'] = ta.cdl_hammer(df['open'], df['high'], df['low'], df['close'])
-        df['engulfing'] = ta.cdl_engulfing(df['open'], df['high'], df['low'], df['close'])
+async def explain_prediction(
+    pair: str,
+    signal: str,
+    confidence: int,
+    reasoning: str,
+    audience: str = "intermediate",
+) -> str:
+    """
+    Converts AI signal data into plain-English explanation for the user.
+    audience: "beginner" | "intermediate" | "expert"
+    """
+    prompt = f"""Explain this forex signal to a {audience} trader:
+Pair: {pair}, Signal: {signal}, Confidence: {confidence}%
+Technical reasoning: {reasoning}
 
-        latest = df.iloc[-1]
+Write 2-3 clear sentences. No jargon for beginners. Be direct and helpful."""
 
-        if latest['doji'] != 0:
-            patterns.append({
-                "name": "Doji",
-                "type": "indecision",
-                "significance": "high",
-                "description": "Market indecision, potential reversal"
-            })
+    try:
+        return await chat_completion(
+            [{"role": "user", "content": prompt}],
+            system_prompt=_TRADING_ASSISTANT_SYSTEM,
+            temperature=0.4,
+        )
+    except Exception as exc:
+        return f"Analysis for {pair}: {signal} signal with {confidence}% confidence. {reasoning}"
 
-        if latest['hammer'] != 0:
-            patterns.append({
-                "name": "Hammer",
-                "type": "bullish_reversal",
-                "significance": "high",
-                "description": "Bullish reversal pattern at support"
-            })
 
-        if latest['engulfing'] != 0:
-            patterns.append({
-                "name": "Engulfing",
-                "type": "reversal",
-                "significance": "very_high",
-                "description": "Strong reversal signal"
-            })
+async def chat_with_ai(
+    messages: list[dict],
+    user_context: dict | None = None,
+) -> str:
+    """
+    General trading AI chat — powers the AI copilot chat interface.
+    Maintains conversation history via messages list.
+    """
+    context_note = ""
+    if user_context:
+        context_note = f"\nUser context: {user_context}"
 
-        # Chart patterns (simplified detection)
-        if self._is_double_top(df):
-            patterns.append({
-                "name": "Double Top",
-                "type": "bearish_reversal",
-                "significance": "high",
-                "description": "Bearish reversal pattern forming"
-            })
+    system = _TRADING_ASSISTANT_SYSTEM + context_note
 
-        if self._is_double_bottom(df):
-            patterns.append({
-                "name": "Double Bottom",
-                "type": "bullish_reversal",
-                "significance": "high",
-                "description": "Bullish reversal pattern forming"
-            })
+    try:
+        return await chat_completion(
+            messages,
+            system_prompt=system,
+            temperature=0.5,
+        )
+    except Exception as exc:
+        logger.error("chat_with_ai failed: %s", exc)
+        return "I'm having trouble connecting to the AI service. Please try again."
 
-        return patterns
 
-    def _analyze_trend(
-        self,
-        df: pd.DataFrame,
-        indicators: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze current market trend"""
+async def analyze_news_impact(
+    headlines: list[str],
+    pair: str,
+) -> dict[str, Any]:
+    """
+    Scores the impact of news headlines on a currency pair.
+    """
+    headlines_str = "\n".join(f"- {h}" for h in headlines[:10])
 
-        latest = df.iloc[-1]
+    prompt = f"""Analyze how these news headlines affect {pair}:
+{headlines_str}
 
-        # Price vs Moving Averages
-        price = latest['close']
-        sma_20 = indicators['moving_averages']['sma_20']
-        sma_50 = indicators['moving_averages']['sma_50']
+Respond ONLY with JSON:
+{{
+  "pair": "{pair}",
+  "overall_impact": "very_bullish|bullish|neutral|bearish|very_bearish",
+  "impact_score": <-5 to 5>,
+  "key_drivers": ["<driver1>", "<driver2>"],
+  "risk_events": ["<event1>"],
+  "trading_bias": "BUY|SELL|AVOID",
+  "confidence": <0-100>,
+  "summary": "<2 sentence summary>"
+}}"""
 
-        # Determine trend direction
-        if price > sma_20 > sma_50:
-            direction = "strong_uptrend"
-            strength = 0.8
-        elif price > sma_20:
-            direction = "uptrend"
-            strength = 0.6
-        elif price < sma_20 < sma_50:
-            direction = "strong_downtrend"
-            strength = 0.8
-        elif price < sma_20:
-            direction = "downtrend"
-            strength = 0.6
-        else:
-            direction = "sideways"
-            strength = 0.3
+    try:
+        return await chat_completion_json(
+            [{"role": "user", "content": prompt}],
+            system_prompt=_MARKET_ANALYST_SYSTEM,
+            temperature=0.1,
+        )
+    except Exception as exc:
+        return {"pair": pair, "overall_impact": "neutral", "error": str(exc)}
 
-        # ADX confirmation
-        adx = indicators['adx']['value']
-        if adx > 25:
-            strength *= 1.2  # Increase confidence
 
+async def autonomous_briefing(
+    pairs: list[str],
+    stage: str,
+    user_instruction: str | None = None,
+) -> dict[str, Any]:
+    """
+    Full autonomous agent stage briefing.
+    Called by the autonomous service at each pipeline stage.
+    """
+    import asyncio
+
+    # Gather snapshots for all pairs
+    snapshots = await asyncio.gather(
+        *[get_market_snapshot([p]) for p in pairs],
+        return_exceptions=True,
+    )
+
+    rates_summary = {}
+    for i, snap in enumerate(snapshots):
+        if isinstance(snap, dict):
+            rates_summary[pairs[i]] = (snap.get("rates") or {}).get(pairs[i], "N/A")
+
+    instruction_note = f"\nUser directive: {user_instruction}" if user_instruction else ""
+
+    prompt = f"""Autonomous stage briefing — Stage: {stage}
+Current rates: {rates_summary}{instruction_note}
+
+Provide a comprehensive JSON briefing:
+{{
+  "stage": "{stage}",
+  "market_summary": "<2 sentence overview>",
+  "opportunities": [
+    {{
+      "pair": "<pair>",
+      "action": "BUY|SELL|WATCH",
+      "confidence": <0-100>,
+      "reason": "<one sentence>"
+    }}
+  ],
+  "risks": ["<risk1>", "<risk2>"],
+  "recommended_actions": ["<action1>", "<action2>"],
+  "overall_market_bias": "risk_on|risk_off|neutral",
+  "next_stage_recommendation": "<monitoring|analysis|execution|standby>"
+}}"""
+
+    try:
+        result = await chat_completion_json(
+            [{"role": "user", "content": prompt}],
+            system_prompt=_MARKET_ANALYST_SYSTEM,
+            temperature=0.15,
+        )
+        result["rates"] = rates_summary
+        return result
+    except Exception as exc:
+        logger.error("autonomous_briefing failed: %s", exc)
         return {
-            "direction": direction,
-            "strength": min(strength, 1.0),
-            "momentum": self._calculate_momentum(df),
-            "adx_confirmation": adx > 25
+            "stage":    stage,
+            "error":    str(exc),
+            "rates":    rates_summary,
+            "market_summary": "Briefing unavailable.",
         }
-
-    def _find_support_resistance(self, df: pd.DataFrame) -> Dict[str, List[float]]:
-        """Find key support and resistance levels"""
-
-        # Using pivot points
-        highs = df['high'].tail(20).values
-        lows = df['low'].tail(20).values
-
-        resistance_levels = []
-        support_levels = []
-
-        # Find local maxima (resistance)
-        for i in range(1, len(highs) - 1):
-            if highs[i] > highs[i-1] and highs[i] > highs[i+1]:
-                resistance_levels.append(float(highs[i]))
-
-        # Find local minima (support)
-        for i in range(1, len(lows) - 1):
-            if lows[i] < lows[i-1] and lows[i] < lows[i+1]:
-                support_levels.append(float(lows[i]))
-
-        # Sort and take top 3
-        resistance_levels = sorted(list(set(resistance_levels)), reverse=True)[:3]
-        support_levels = sorted(list(set(support_levels)))[:3]
-
-        return {
-            "resistance": resistance_levels,
-            "support": support_levels
-        }
-
-    def _analyze_sentiment(
-        self,
-        df: pd.DataFrame,
-        indicators: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze market sentiment"""
-
-        bullish_signals = 0
-        bearish_signals = 0
-
-        # RSI
-        rsi = indicators['rsi']['value']
-        if rsi < 30:
-            bullish_signals += 2  # Oversold
-        elif rsi > 70:
-            bearish_signals += 2  # Overbought
-
-        # MACD
-        if indicators['macd']['histogram'] > 0:
-            bullish_signals += 1
-        else:
-            bearish_signals += 1
-
-        # Stochastic
-        if indicators['stochastic']['k'] < 20:
-            bullish_signals += 1
-        elif indicators['stochastic']['k'] > 80:
-            bearish_signals += 1
-
-        # Moving Average trend
-        ma_trend = indicators['moving_averages']['trend']
-        if ma_trend == "bullish":
-            bullish_signals += 2
-        elif ma_trend == "bearish":
-            bearish_signals += 2
-
-        total_signals = bullish_signals + bearish_signals
-
-        if total_signals == 0:
-            sentiment = "neutral"
-            score = 0.5
-        else:
-            score = bullish_signals / total_signals
-            if score > 0.6:
-                sentiment = "bullish"
-            elif score < 0.4:
-                sentiment = "bearish"
-            else:
-                sentiment = "neutral"
-
-        return {
-            "sentiment": sentiment,
-            "score": score,
-            "bullish_signals": bullish_signals,
-            "bearish_signals": bearish_signals
-        }
-
-    def _generate_recommendation(
-        self,
-        trend: Dict[str, Any],
-        indicators: Dict[str, Any],
-        patterns: List[Dict[str, Any]],
-        sentiment: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Generate trading recommendation"""
-
-        # Scoring system
-        bullish_score = 0
-        bearish_score = 0
-
-        # Trend analysis
-        if "uptrend" in trend["direction"]:
-            bullish_score += trend["strength"] * 3
-        elif "downtrend" in trend["direction"]:
-            bearish_score += trend["strength"] * 3
-
-        # Sentiment
-        if sentiment["sentiment"] == "bullish":
-            bullish_score += sentiment["score"] * 2
-        elif sentiment["sentiment"] == "bearish":
-            bearish_score += (1 - sentiment["score"]) * 2
-
-        # Patterns
-        for pattern in patterns:
-            if "bullish" in pattern["type"]:
-                bullish_score += 1
-            elif "bearish" in pattern["type"]:
-                bearish_score += 1
-
-        # RSI
-        rsi = indicators['rsi']['value']
-        if rsi < 30:
-            bullish_score += 1.5
-        elif rsi > 70:
-            bearish_score += 1.5
-
-        # Determine action
-        total_score = bullish_score + bearish_score
-        if total_score == 0:
-            action = "hold"
-            confidence = 0.5
-        else:
-            confidence = max(bullish_score, bearish_score) / total_score
-
-            if bullish_score > bearish_score and confidence > 0.6:
-                action = "buy"
-            elif bearish_score > bullish_score and confidence > 0.6:
-                action = "sell"
-            else:
-                action = "hold"
-
-        # Risk assessment
-        atr = indicators['atr']['value']
-        volatility = indicators['atr']['volatility']
-
-        if volatility == "high":
-            risk_level = "high"
-        elif volatility == "medium":
-            risk_level = "medium"
-        else:
-            risk_level = "low"
-
-        return {
-            "action": action,
-            "confidence": round(confidence, 2),
-            "risk_level": risk_level,
-            "entry_points": self._suggest_entry_points(indicators),
-            "stop_loss": self._suggest_stop_loss(indicators, action),
-            "take_profit": self._suggest_take_profit(indicators, action)
-        }
-
-    # Helper methods
-    def _interpret_rsi(self, rsi: float) -> str:
-        if rsi < 30:
-            return "oversold"
-        elif rsi > 70:
-            return "overbought"
-        else:
-            return "neutral"
-
-    def _interpret_macd(self, latest) -> str:
-        if latest['macd'] > latest['macd_signal']:
-            return "bullish"
-        else:
-            return "bearish"
-
-    def _bb_position(self, latest) -> str:
-        close = latest['close']
-        if close > latest['bb_upper']:
-            return "above_upper"
-        elif close < latest['bb_lower']:
-            return "below_lower"
-        else:
-            return "within_bands"
-
-    def _ma_trend(self, latest) -> str:
-        close = latest['close']
-        sma_20 = latest['sma_20']
-        sma_50 = latest['sma_50']
-
-        if close > sma_20 > sma_50:
-            return "bullish"
-        elif close < sma_20 < sma_50:
-            return "bearish"
-        else:
-            return "neutral"
-
-    def _interpret_atr(self, atr: float, price: float) -> str:
-        atr_percent = (atr / price) * 100
-        if atr_percent > 2:
-            return "high"
-        elif atr_percent > 1:
-            return "medium"
-        else:
-            return "low"
-
-    def _interpret_stoch(self, k: float, d: float) -> str:
-        if k < 20 and d < 20:
-            return "oversold"
-        elif k > 80 and d > 80:
-            return "overbought"
-        else:
-            return "neutral"
-
-    def _interpret_adx(self, adx: float) -> str:
-        if adx > 25:
-            return "strong"
-        elif adx > 20:
-            return "moderate"
-        else:
-            return "weak"
-
-    def _calculate_momentum(self, df: pd.DataFrame) -> float:
-        """Calculate price momentum"""
-        returns = df['close'].pct_change().tail(10)
-        return float(returns.mean() * 100)
-
-    def _is_double_top(self, df: pd.DataFrame) -> bool:
-        """Simplified double top detection"""
-        highs = df['high'].tail(20).values
-        if len(highs) < 10:
-            return False
-        # Implement proper double top detection logic
-        return False
-
-    def _is_double_bottom(self, df: pd.DataFrame) -> bool:
-        """Simplified double bottom detection"""
-        lows = df['low'].tail(20).values
-        if len(lows) < 10:
-            return False
-        # Implement proper double bottom detection logic
-        return False
-
-    def _suggest_entry_points(self, indicators: Dict[str, Any]) -> List[float]:
-        """Suggest potential entry points"""
-        bb_middle = indicators['bollinger_bands']['middle']
-        bb_lower = indicators['bollinger_bands']['lower']
-
-        return [
-            round(bb_middle, 5),
-            round(bb_lower, 5)
-        ]
-
-    def _suggest_stop_loss(self, indicators: Dict[str, Any], action: str) -> float:
-        """Suggest stop loss level"""
-        atr = indicators['atr']['value']
-        bb_middle = indicators['bollinger_bands']['middle']
-
-        if action == "buy":
-            return round(bb_middle - (2 * atr), 5)
-        else:
-            return round(bb_middle + (2 * atr), 5)
-
-    def _suggest_take_profit(self, indicators: Dict[str, Any], action: str) -> float:
-        """Suggest take profit level"""
-        atr = indicators['atr']['value']
-        bb_middle = indicators['bollinger_bands']['middle']
-
-        if action == "buy":
-            return round(bb_middle + (3 * atr), 5)
-        else:
-            return round(bb_middle - (3 * atr), 5)

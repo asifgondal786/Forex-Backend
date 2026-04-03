@@ -282,39 +282,3 @@ def startup_snapshot(config: AppConfig) -> dict[str, object]:
         "log_json": config.monitoring.log_json,
         "enable_file_logging": config.monitoring.enable_file_logging,
     }
-
-
-# ── Phase 14 Patch B — Forex + AI env validation ─────────────────────────
-import os as _os
-
-FOREX_API_KEYS_REQUIRED = [
-    "TWELVE_DATA_API_KEY",
-    "FCS_API_KEY",
-    "FOREXRATEAPI_API_KEY",
-    "EXCHANGERATESAPI_API_KEY",
-    "ITICK_API_KEY",
-    "FINNHUB_KEY",
-    "DEEPSEEK_API_KEY",
-]
-
-def startup_snapshot_phase14() -> dict:
-    """Call this inside your existing startup_snapshot() and merge the result."""
-    return {
-        "forex_providers_configured": sum(
-            1 for k in [
-                "TWELVE_DATA_API_KEY", "FCS_API_KEY", "FOREXRATEAPI_API_KEY",
-                "EXCHANGERATESAPI_API_KEY", "ITICK_API_KEY", "FINNHUB_KEY",
-            ]
-            if _os.getenv(k, "").strip()
-        ),
-        "deepseek_configured": bool(_os.getenv("DEEPSEEK_API_KEY", "").strip()),
-        "ai_routes_enabled":   _os.getenv("AI_ROUTES_AVAILABLE", "false").lower() in {"true", "1", "yes"},
-    }
-
-def validate_forex_env(raise_on_missing: bool = False) -> list:
-    """Returns list of missing required keys. Optionally raises ValueError."""
-    missing = [k for k in FOREX_API_KEYS_REQUIRED if not _os.getenv(k, "").strip()]
-    if raise_on_missing and missing:
-        raise ValueError(f"Missing required env vars: {missing}")
-    return missing
-# ── End Patch B ───────────────────────────────────────────────────────────
