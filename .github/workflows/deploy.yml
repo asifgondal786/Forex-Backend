@@ -23,10 +23,8 @@ jobs:
             cd /home/opc/Forex-Backend
             git pull origin main
             source venv/bin/activate
-            pip install -r requirements.txt --quiet
-
-            # Write Firebase env vars to .env file on server
-            cat > /home/opc/Forex-Backend/Backend/.env << 'ENVEOF'
+            pip install -r Backend/requirements.txt --quiet
+            sudo tee /etc/forex-backend/.env > /dev/null << 'ENVEOF'
             FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
             FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
             FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
@@ -48,5 +46,5 @@ jobs:
             TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             ENVEOF
-
+            sudo cp /etc/forex-backend/.env /home/opc/Forex-Backend/Backend/.env
             sudo systemctl restart forex-backend
