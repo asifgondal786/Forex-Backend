@@ -245,6 +245,15 @@ from .portfolio_routes import router as portfolio_router  # noqa: E402
 from .trade_routes import router as trade_router  # noqa: E402
 from .beginner_routes import router as beginner_router  # noqa: E402
 from .notification_routes import router as notification_router_v2  # noqa: E402
+from .market_routes import router as market_router  # noqa: E402
+from .signal_routes import router as signal_router  # noqa: E402
+from app.risk.risk_middleware import risk_router  # noqa: E402
+from app.security_routes import router as security_router  # noqa: E402
+from app.routers.charting import router as charting_router  # noqa: E402
+from app.macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler  # noqa: E402
+from app.social_routes import router as social_router  # noqa: E402
+from .paper_trading_routes import router as paper_router  # noqa: E402
+from .news_routes import router as news_router  # noqa: E402
 
 
 try:
@@ -321,7 +330,7 @@ except ImportError as _e:
     
 
 from .enhanced_websocket_manager import ws_manager  # noqa: E402
-from .forex_data_service import forex_service  # noqa: E402
+from . import forex_data_service  # noqa: E402
 from .services.task_queue_service import task_queue_service  # noqa: E402
 from .services.redis_store import redis_store  # noqa: E402
 from .services.rate_limiter import RateLimiter  # noqa: E402
@@ -578,7 +587,7 @@ async def lifespan(app: FastAPI):
     if forex_stream_enabled:
         ws_manager.stop_forex_stream()
     try:
-        await forex_service.close()
+        pass  # forex_service removed
     except Exception:
         pass
     if task_queue_enabled:
@@ -1300,12 +1309,6 @@ app.include_router(beginner_router)
 app.include_router(notification_router_v2)
 
 # Additional routers
-from .market_routes import router as market_router
-from .signal_routes import router as signal_router
-from app.risk.risk_middleware import risk_router
-from app.security_routes import router as security_router
-from app.routers.charting import router as charting_router
-from app.macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler
 
 app.include_router(market_router)
 app.include_router(signal_router)
@@ -1380,7 +1383,6 @@ async def api_health():
 
 
 # Phase 9 - Social and Autonomy
-from app.social_routes import router as social_router
 app.include_router(social_router)
 
 
