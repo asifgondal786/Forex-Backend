@@ -1239,6 +1239,14 @@ app.add_middleware(
     allow_origin_regex=_cors_origin_regex,
     max_age=_env_int("CORS_MAX_AGE_SECONDS", 86400),
 )
+# newly add middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://forexcompanion-e5a28.web.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _trusted_hosts = _get_trusted_hosts()
 if _trusted_hosts:
