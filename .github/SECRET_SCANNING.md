@@ -17,11 +17,17 @@ Your repository uses a lightweight secret scanner to prevent accidental commits 
   - Hardcoded secret assignments (`api_key = "..."`, etc.)
 
 ### 2. Git Hooks
-Automatic scanning at two points:
+Automatic validation at three points:
+
+#### Commit Message Hook (`.git/hooks/commit-msg`)
+- Runs on `git commit` (after editor closes)
+- Validates that commits have **meaningful messages** (min 3 characters)
+- **Blocks commit** if message is empty or too short
+- ✅ Ensures code history is traceable and meaningful
 
 #### Pre-commit Hook (`.git/hooks/pre-commit`)
-- Runs on `git commit`
-- Scans **staged changes** before they're committed
+- Runs on `git commit` (before commit is created)
+- Scans **staged changes** for secrets before they're committed
 - **Blocks commit** if secrets are detected
 - ✅ Prevents local commits of secrets
 
@@ -114,6 +120,22 @@ git push --no-verify
 ```
 
 ⚠️ **Use only for legitimate cases** (e.g., test fixtures with fake credentials). Consider safer alternatives first.
+
+### ⚠️ Empty Commit Messages
+
+The `--allow-empty-message` flag is **problematic** because:
+- It violates git best practices
+- Creates commits with no history/context
+- Breaks automated tooling that validates commit messages
+- Makes debugging and code review difficult
+
+**Do NOT use:** `git commit --allow-empty-message`
+
+**Instead, provide proper messages:**
+```bash
+git commit -m "Fix secret scanning in pre-commit hook"
+git commit  # Opens editor for detailed message
+```
 
 ## Best Practices
 
