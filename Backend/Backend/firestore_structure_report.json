@@ -1,0 +1,2445 @@
+{
+  "collections": {
+    "ai_activity": {
+      "record_count": 19,
+      "is_empty": false,
+      "top_level_field_count": 7,
+      "top_level_fields": {
+        "type": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 19
+          }
+        },
+        "emoji": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 19,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 19
+          }
+        },
+        "color": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 19,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 19
+          }
+        },
+        "userId": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 19
+          }
+        },
+        "message": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 19
+          }
+        },
+        "timestamp": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 19
+          }
+        },
+        "_id": {
+          "present_in_records": 19,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 19
+          }
+        }
+      },
+      "nested_paths": {},
+      "object_key_patterns": {},
+      "dynamic_key_paths": [],
+      "pk_candidates": [
+        {
+          "field": "_id",
+          "non_null_count": 19,
+          "unique_count": 19,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        }
+      ],
+      "sensitive_fields": []
+    },
+    "notification_preferences": {
+      "record_count": 2,
+      "is_empty": false,
+      "top_level_field_count": 16,
+      "top_level_fields": {
+        "updated_at": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 2
+          }
+        },
+        "autonomous_mode": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "bool": 2
+          }
+        },
+        "max_notifications_per_hour": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "int": 2
+          }
+        },
+        "autonomous_profile": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "channel_settings": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "object": 2
+          }
+        },
+        "autonomous_min_confidence": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "float": 2
+          }
+        },
+        "quiet_hours_start": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "user_id": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 2
+          }
+        },
+        "disabled_categories": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "array": 2
+          }
+        },
+        "digest_mode": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "bool": 2
+          }
+        },
+        "enabled_channels": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "array": 2
+          }
+        },
+        "digest_frequency": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "quiet_hours_end": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "_id": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 2
+          }
+        },
+        "autonomous_stage_alerts": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "bool": 1
+          }
+        },
+        "autonomous_stage_interval_seconds": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "int": 1
+          }
+        }
+      },
+      "nested_paths": {
+        "channel_settings.phone_number": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.discord_webhook_url": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.x_webhook_url": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.sms_webhook_url": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.whatsapp_number": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.email_to": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.telegram_chat_id": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channel_settings.whatsapp_webhook_url": {
+          "present_in_records": 1,
+          "presence_ratio": 0.5,
+          "optionality": "optional",
+          "types": {
+            "string": 1
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "enabled_channels[]": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "types": {
+            "string": 6
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        }
+      },
+      "object_key_patterns": {
+        "channel_settings": {
+          "object_instances": 2,
+          "unique_child_keys": 8,
+          "avg_key_coverage": 0.5,
+          "top_child_keys": [
+            "phone_number",
+            "discord_webhook_url",
+            "x_webhook_url",
+            "sms_webhook_url",
+            "whatsapp_number",
+            "email_to",
+            "telegram_chat_id",
+            "whatsapp_webhook_url"
+          ]
+        }
+      },
+      "dynamic_key_paths": [],
+      "pk_candidates": [
+        {
+          "field": "user_id",
+          "non_null_count": 2,
+          "unique_count": 2,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        },
+        {
+          "field": "_id",
+          "non_null_count": 2,
+          "unique_count": 2,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        }
+      ],
+      "sensitive_fields": []
+    },
+    "notifications": {
+      "record_count": 53,
+      "is_empty": false,
+      "top_level_field_count": 17,
+      "top_level_fields": {
+        "notificationId": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "message": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "shortMessage": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "userId": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "category": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "createdAt": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 53
+          }
+        },
+        "read": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "bool": 53
+          }
+        },
+        "title": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "actionUrl": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 53,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 53
+          }
+        },
+        "timestamp": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 53
+          }
+        },
+        "priority": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 53
+          }
+        },
+        "readAt": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 3
+          }
+        },
+        "_id": {
+          "present_in_records": 53,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 53
+          }
+        },
+        "richData": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "object": 49
+          }
+        },
+        "deliveryStatus": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "object": 43
+          }
+        },
+        "channelsToSend": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "array": 43
+          }
+        },
+        "deliveryUpdatedAt": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 43
+          }
+        }
+      },
+      "nested_paths": {
+        "richData.study_sources_analyzed": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "int": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.study_consensus_score": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sentiment_score": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample.USD/JPY": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample.AUD/USD": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample.EUR/USD": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample.USD/CHF": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample.GBP/USD": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.pair": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.risk_level": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.trend": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.volatility": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.chart_analysis.pair_price": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 6,
+            "null": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "array": 49
+          },
+          "array_len_min": 8,
+          "array_len_max": 8,
+          "array_len_avg": 8.0
+        },
+        "richData.deep_study.top_headlines[]": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines[].title": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines[].published_at": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "timestamp_str": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines[].impact": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines[].sentiment": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines[].source": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.top_headlines[].url": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 392
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.source_coverage": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.source_coverage.unavailable_sources": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "array": 49
+          },
+          "array_len_min": 2,
+          "array_len_max": 5,
+          "array_len_avg": 4.51
+        },
+        "richData.deep_study.source_coverage.unavailable_sources[]": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 221
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.source_coverage.unsupported_sources": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "array": 49
+          },
+          "array_len_min": 0,
+          "array_len_max": 5,
+          "array_len_avg": 0.1
+        },
+        "richData.deep_study.source_coverage.unsupported_sources[]": {
+          "present_in_records": 1,
+          "presence_ratio": 0.0189,
+          "optionality": "sparse",
+          "types": {
+            "string": 5
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.source_coverage.coverage_ratio": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.source_coverage.requested": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "int": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.source_coverage.analyzed": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "int": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.recommendation": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.confidence_band": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.consensus_score": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.evidence_summary": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.cached": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "bool": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.generated_at": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "timestamp_str": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "array": 49
+          },
+          "array_len_min": 20,
+          "array_len_max": 20,
+          "array_len_avg": 20.0
+        },
+        "richData.deep_study.sources[]": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 980
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].status": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 980
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].detail": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 980
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].source": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 980
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "array": 980
+          },
+          "array_len_min": 0,
+          "array_len_max": 3,
+          "array_len_avg": 2.06
+        },
+        "richData.deep_study.sources[].headline_count": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "int": 980
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[]": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "object": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[].sentiment": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "float": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[].published_at": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "timestamp_str": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[].impact": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[].title": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[].source": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.sources[].headlines[].url": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 2023
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.deep_study.pair": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.study_confidence_band": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.target_percent": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.level": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.pair": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.current": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.study_pair": {
+          "present_in_records": 49,
+          "presence_ratio": 0.9245,
+          "optionality": "optional",
+          "types": {
+            "string": 49
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.discord_webhook_url": {
+          "present_in_records": 13,
+          "presence_ratio": 0.2453,
+          "optionality": "sparse",
+          "types": {
+            "string": 13
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.x_webhook_url": {
+          "present_in_records": 13,
+          "presence_ratio": 0.2453,
+          "optionality": "sparse",
+          "types": {
+            "string": 13
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.telegram_chat_id": {
+          "present_in_records": 13,
+          "presence_ratio": 0.2453,
+          "optionality": "sparse",
+          "types": {
+            "string": 13
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.whatsapp_webhook_url": {
+          "present_in_records": 12,
+          "presence_ratio": 0.2264,
+          "optionality": "sparse",
+          "types": {
+            "string": 12
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.sl": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.phone_number": {
+          "present_in_records": 12,
+          "presence_ratio": 0.2264,
+          "optionality": "sparse",
+          "types": {
+            "string": 12
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.broker_order_id": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.whatsapp_number": {
+          "present_in_records": 12,
+          "presence_ratio": 0.2264,
+          "optionality": "sparse",
+          "types": {
+            "string": 12
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.sms_webhook_url": {
+          "present_in_records": 12,
+          "presence_ratio": 0.2264,
+          "optionality": "sparse",
+          "types": {
+            "string": 12
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.price": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.email_to": {
+          "present_in_records": 12,
+          "presence_ratio": 0.2264,
+          "optionality": "sparse",
+          "types": {
+            "string": 12
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.autonomous_policy": {
+          "present_in_records": 46,
+          "presence_ratio": 0.8679,
+          "optionality": "optional",
+          "types": {
+            "object": 46
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.autonomous_policy.suppressed": {
+          "present_in_records": 46,
+          "presence_ratio": 0.8679,
+          "optionality": "optional",
+          "types": {
+            "bool": 46
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.autonomous_policy.enabled": {
+          "present_in_records": 46,
+          "presence_ratio": 0.8679,
+          "optionality": "optional",
+          "types": {
+            "bool": 46
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.autonomous_policy.min_confidence": {
+          "present_in_records": 46,
+          "presence_ratio": 0.8679,
+          "optionality": "optional",
+          "types": {
+            "float": 46
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.autonomous_policy.reason": {
+          "present_in_records": 46,
+          "presence_ratio": 0.8679,
+          "optionality": "optional",
+          "types": {
+            "string": 46
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.autonomous_policy.priority": {
+          "present_in_records": 46,
+          "presence_ratio": 0.8679,
+          "optionality": "optional",
+          "types": {
+            "string": 46
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.execution_mode": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.tp": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.action": {
+          "present_in_records": 3,
+          "presence_ratio": 0.0566,
+          "optionality": "sparse",
+          "types": {
+            "string": 3
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "deliveryStatus.whatsapp": {
+          "present_in_records": 9,
+          "presence_ratio": 0.1698,
+          "optionality": "sparse",
+          "types": {
+            "string": 9
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "deliveryStatus.in_app": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "deliveryStatus.sms": {
+          "present_in_records": 9,
+          "presence_ratio": 0.1698,
+          "optionality": "sparse",
+          "types": {
+            "string": 9
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "deliveryStatus.email": {
+          "present_in_records": 9,
+          "presence_ratio": 0.1698,
+          "optionality": "sparse",
+          "types": {
+            "string": 9
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "channelsToSend[]": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 104
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.market_risk": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.stage": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.stage_label": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.user_instruction": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.stage_context": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.source_count": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.recommendation": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "string": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "richData.confidence": {
+          "present_in_records": 43,
+          "presence_ratio": 0.8113,
+          "optionality": "optional",
+          "types": {
+            "float": 43
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "deliveryStatus.push": {
+          "present_in_records": 34,
+          "presence_ratio": 0.6415,
+          "optionality": "optional",
+          "types": {
+            "string": 34
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        }
+      },
+      "object_key_patterns": {
+        "richData": {
+          "object_instances": 49,
+          "unique_child_keys": 32,
+          "avg_key_coverage": 0.5166,
+          "top_child_keys": [
+            "study_sources_analyzed",
+            "study_consensus_score",
+            "deep_study",
+            "study_confidence_band",
+            "pair",
+            "study_pair",
+            "autonomous_policy",
+            "market_risk",
+            "stage",
+            "stage_label",
+            "user_instruction",
+            "stage_context",
+            "source_count",
+            "recommendation",
+            "confidence"
+          ]
+        },
+        "richData.deep_study": {
+          "object_instances": 49,
+          "unique_child_keys": 12,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "sentiment_score",
+            "chart_analysis",
+            "top_headlines",
+            "source_coverage",
+            "recommendation",
+            "confidence_band",
+            "consensus_score",
+            "evidence_summary",
+            "cached",
+            "generated_at",
+            "sources",
+            "pair"
+          ]
+        },
+        "richData.deep_study.chart_analysis": {
+          "object_instances": 49,
+          "unique_child_keys": 6,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "major_pairs_sample",
+            "pair",
+            "risk_level",
+            "trend",
+            "volatility",
+            "pair_price"
+          ]
+        },
+        "richData.deep_study.chart_analysis.major_pairs_sample": {
+          "object_instances": 49,
+          "unique_child_keys": 5,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "USD/JPY",
+            "AUD/USD",
+            "EUR/USD",
+            "USD/CHF",
+            "GBP/USD"
+          ]
+        },
+        "richData.deep_study.top_headlines[]": {
+          "object_instances": 392,
+          "unique_child_keys": 6,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "title",
+            "published_at",
+            "impact",
+            "sentiment",
+            "source",
+            "url"
+          ]
+        },
+        "richData.deep_study.source_coverage": {
+          "object_instances": 49,
+          "unique_child_keys": 5,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "unavailable_sources",
+            "unsupported_sources",
+            "coverage_ratio",
+            "requested",
+            "analyzed"
+          ]
+        },
+        "richData.deep_study.sources[]": {
+          "object_instances": 980,
+          "unique_child_keys": 5,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "status",
+            "detail",
+            "source",
+            "headlines",
+            "headline_count"
+          ]
+        },
+        "richData.deep_study.sources[].headlines[]": {
+          "object_instances": 2023,
+          "unique_child_keys": 6,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "sentiment",
+            "published_at",
+            "impact",
+            "title",
+            "source",
+            "url"
+          ]
+        },
+        "richData.autonomous_policy": {
+          "object_instances": 46,
+          "unique_child_keys": 5,
+          "avg_key_coverage": 1.0,
+          "top_child_keys": [
+            "suppressed",
+            "enabled",
+            "min_confidence",
+            "reason",
+            "priority"
+          ]
+        },
+        "deliveryStatus": {
+          "object_instances": 43,
+          "unique_child_keys": 5,
+          "avg_key_coverage": 0.4837,
+          "top_child_keys": [
+            "in_app",
+            "push",
+            "whatsapp",
+            "sms",
+            "email"
+          ]
+        }
+      },
+      "dynamic_key_paths": [
+        "richData"
+      ],
+      "pk_candidates": [
+        {
+          "field": "_id",
+          "non_null_count": 53,
+          "unique_count": 53,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        }
+      ],
+      "sensitive_fields": []
+    },
+    "tasks": {
+      "record_count": 4,
+      "is_empty": false,
+      "top_level_field_count": 17,
+      "top_level_fields": {
+        "resultFileSize": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 4,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 4
+          }
+        },
+        "description": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": true,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "currentStep": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "int": 4
+          }
+        },
+        "id": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "endTime": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 4
+          }
+        },
+        "taskType": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "status": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "resultFileUrl": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "userId": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "startTime": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 4
+          }
+        },
+        "title": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "steps": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "array": 4
+          }
+        },
+        "createdAt": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 4
+          }
+        },
+        "resultFileName": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 4,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 4
+          }
+        },
+        "totalSteps": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "int": 4
+          }
+        },
+        "priority": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 4
+          }
+        },
+        "_id": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 4
+          }
+        }
+      },
+      "nested_paths": {
+        "steps[]": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "types": {
+            "object": 16
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "steps[].completedAt": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "types": {
+            "timestamp_str": 14
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "steps[].isCompleted": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "types": {
+            "bool": 16
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "steps[].name": {
+          "present_in_records": 4,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "types": {
+            "string": 16
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        }
+      },
+      "object_key_patterns": {
+        "steps[]": {
+          "object_instances": 16,
+          "unique_child_keys": 3,
+          "avg_key_coverage": 0.9583,
+          "top_child_keys": [
+            "isCompleted",
+            "name",
+            "completedAt"
+          ]
+        }
+      },
+      "dynamic_key_paths": [],
+      "pk_candidates": [
+        {
+          "field": "id",
+          "non_null_count": 4,
+          "unique_count": 4,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        },
+        {
+          "field": "_id",
+          "non_null_count": 4,
+          "unique_count": 4,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        }
+      ],
+      "sensitive_fields": [
+        "description"
+      ]
+    },
+    "user_subscriptions": {
+      "record_count": 2,
+      "is_empty": false,
+      "top_level_field_count": 9,
+      "top_level_fields": {
+        "subscribed_at": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 2
+          }
+        },
+        "source": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "user_id": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 2
+          }
+        },
+        "plan": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "updated_at": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 2
+          }
+        },
+        "status": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 2
+          }
+        },
+        "renews_on": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 2,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 2
+          }
+        },
+        "expires_on": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 2,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 2
+          }
+        },
+        "_id": {
+          "present_in_records": 2,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 2
+          }
+        }
+      },
+      "nested_paths": {},
+      "object_key_patterns": {},
+      "dynamic_key_paths": [],
+      "pk_candidates": [
+        {
+          "field": "user_id",
+          "non_null_count": 2,
+          "unique_count": 2,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        },
+        {
+          "field": "_id",
+          "non_null_count": 2,
+          "unique_count": 2,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        }
+      ],
+      "sensitive_fields": []
+    },
+    "users": {
+      "record_count": 24,
+      "is_empty": false,
+      "top_level_field_count": 8,
+      "top_level_fields": {
+        "created_at": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "timestamp_str": 24
+          }
+        },
+        "id": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": false,
+          "types": {
+            "string": 24
+          }
+        },
+        "preferences": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "object": 24
+          }
+        },
+        "avatar_url": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 24,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "null": 24
+          }
+        },
+        "email": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": true,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 24
+          }
+        },
+        "plan": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 24
+          }
+        },
+        "name": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": false,
+          "fk_like": false,
+          "types": {
+            "string": 24
+          }
+        },
+        "_id": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "null_count": 0,
+          "sensitive_name": false,
+          "id_like": true,
+          "fk_like": true,
+          "types": {
+            "string": 24
+          }
+        }
+      },
+      "nested_paths": {
+        "preferences.title": {
+          "present_in_records": 18,
+          "presence_ratio": 0.75,
+          "optionality": "optional",
+          "types": {
+            "string": 18
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "preferences.address": {
+          "present_in_records": 18,
+          "presence_ratio": 0.75,
+          "optionality": "optional",
+          "types": {
+            "string": 18
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "preferences.mobile": {
+          "present_in_records": 18,
+          "presence_ratio": 0.75,
+          "optionality": "optional",
+          "types": {
+            "string": 18
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        },
+        "preferences.username": {
+          "present_in_records": 24,
+          "presence_ratio": 1.0,
+          "optionality": "required",
+          "types": {
+            "string": 24
+          },
+          "array_len_min": null,
+          "array_len_max": null,
+          "array_len_avg": null
+        }
+      },
+      "object_key_patterns": {
+        "preferences": {
+          "object_instances": 24,
+          "unique_child_keys": 4,
+          "avg_key_coverage": 0.8125,
+          "top_child_keys": [
+            "username",
+            "title",
+            "address",
+            "mobile"
+          ]
+        }
+      },
+      "dynamic_key_paths": [],
+      "pk_candidates": [
+        {
+          "field": "id",
+          "non_null_count": 24,
+          "unique_count": 24,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        },
+        {
+          "field": "_id",
+          "non_null_count": 24,
+          "unique_count": 24,
+          "uniqueness_ratio": 1.0,
+          "candidate": true
+        }
+      ],
+      "sensitive_fields": [
+        "email"
+      ]
+    }
+  },
+  "global": {
+    "collection_count": 6,
+    "total_records": 104
+  }
+}

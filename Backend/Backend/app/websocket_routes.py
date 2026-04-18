@@ -1,0 +1,363 @@
+﻿"""
+Complete WebSocket Routes with Live Forex Data Integration
+"""
+import os
+import time
+import json
+from collections import defaultdict, deque
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
+from typing import Optional
+import asyncio
+from datetime import datetime, timezone
+
+from .enhanced_websocket_manager import ws_manager
+from .forex_data_service import forex_service
+from .utils.firestore_client import verify_firebase_token
+from .security import resolve_dev_user
+
+router = APIRouter(prefix="/api", tags=["Live Updates"])
+
+_ws_rate_limit_max = int(os.getenv("WS_CONN_MAX", "30"))
+_ws_rate_limit_window = int(os.getenv("WS_CONN_WINDOW_SECONDS", "60"))
+_ws_rate_limit_store = defaultdict(deque)
+_ws_heartbeat_interval = int(os.getenv("WS_HEARTBEAT_INTERVAL_SECONDS", "25"))
+_ws_heartbeat_timeout = int(os.getenv("WS_HEARTBEAT_TIMEOUT_SECONDS", "60"))
+
+
+def _ws_rate_limit_ok(websocket: WebSocket) -> bool:
+    client_host = websocket.client.host if websocket.client else "unknown"
+    now = time.time()
+    window_start = now - _ws_rate_limit_window
+    bucket = _ws_rate_limit_store[client_host]
+    while bucket and bucket[0] <= window_start:
+        bucket.popleft()
+    if len(bucket) >= _ws_rate_limit_max:
+        return False
+    bucket.append(now)
+    return True
+
+
+def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
+    auth_header = websocket.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header.split(" ", 1)[1].strip()
+    token = websocket.query_params.get("token")
+    if token:
+        return token
+    return None
+
+
+async def _require_ws_auth(websocket: WebSocket):
+    dev_user = resolve_dev_user(websocket)
+    if dev_user:
+        return dev_user, None, True
+
+    token = _extract_ws_token(websocket)
+    if not token:
+        return None, None, False
+
+    try:
+        decoded = verify_firebase_token(token)
+    except Exception:
+        return None, None, False
+
+    user_id = decoded.get("uid") or decoded.get("user_id")
+    if not user_id:
+        return None, None, False
+
+    requested_user = websocket.query_params.get("user_id")
+    if requested_user and requested_user != user_id:
+        return None, None, False
+
+    header_user = websocket.headers.get("x-user-id")
+    if header_user and header_user != user_id:
+        return None, None, False
+
+    return user_id, token, False
+
+
+def _extract_ws_message_type(message: str) -> str:
+    raw = (message or "").strip()
+    lowered = raw.lower()
+    if lowered in {"ping", "pong"}:
+        return lowered
+
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return "message"
+
+    if isinstance(payload, dict):
+        payload_type = str(payload.get("type", "")).strip().lower()
+        if payload_type in {"ping", "pong"}:
+            return payload_type
+    return "message"
+
+
+async def _run_ws_session(
+    websocket: WebSocket,
+    *,
+    task_id: str,
+    token: Optional[str],
+    is_dev: bool,
+    echo_messages: bool,
+):
+    heartbeat_interval = max(5, _ws_heartbeat_interval)
+    heartbeat_timeout = max(heartbeat_interval * 2, _ws_heartbeat_timeout)
+    last_seen = time.monotonic()
+
+    while True:
+        try:
+            data = await asyncio.wait_for(
+                websocket.receive_text(),
+                timeout=heartbeat_interval,
+            )
+        except asyncio.TimeoutError:
+            idle_seconds = time.monotonic() - last_seen
+            if idle_seconds >= heartbeat_timeout:
+                await websocket.close(code=4408, reason="Heartbeat timeout")
+                return
+            await websocket.send_json(
+                {
+                    "type": "ping",
+                    "task_id": task_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            continue
+
+        if not is_dev:
+            try:
+                verify_firebase_token(token)
+            except Exception:
+                await websocket.close(code=4401)
+                return
+
+        last_seen = time.monotonic()
+        ws_manager.mark_connection_alive(websocket)
+
+        message_type = _extract_ws_message_type(data)
+        if message_type == "ping":
+            await websocket.send_text("pong")
+            continue
+        if message_type == "pong":
+            continue
+
+        if echo_messages:
+            await ws_manager.send_update(
+                task_id=task_id,
+                message=f"Received: {data}",
+                update_type="info",
+                websocket=websocket,
+            )
+
+
+class UpdateRequest(BaseModel):
+    task_id: str
+    message: str
+    type: str = "info"
+    progress: Optional[float] = None
+
+
+# ============================================================================
+# WebSocket Endpoint
+# ============================================================================
+
+@router.websocket("/ws/{task_id}")
+async def websocket_endpoint(websocket: WebSocket, task_id: str):
+    """
+    WebSocket endpoint for real-time updates for a specific task.
+
+    Connect to: wss://<your-backend-domain>/api/ws/{task_id}
+    """
+    if not _ws_rate_limit_ok(websocket):
+        await websocket.close(code=4408)
+        return
+
+    user_id, token, is_dev = await _require_ws_auth(websocket)
+    if not user_id:
+        await websocket.close(code=4401)
+        return
+
+    await ws_manager.connect(websocket, task_id, user_id=user_id)
+    try:
+        await _run_ws_session(
+            websocket,
+            task_id=task_id,
+            token=token,
+            is_dev=is_dev,
+            echo_messages=True,
+        )
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"WebSocket error for task {task_id}: {e}")
+    finally:
+        ws_manager.disconnect(websocket, task_id=task_id, reason="session_closed")
+
+
+@router.websocket("/ws")
+async def websocket_global(websocket: WebSocket):
+    """
+    Global WebSocket endpoint for broadcasts.
+
+    Connect to: wss://<your-backend-domain>/api/ws
+    """
+    if not _ws_rate_limit_ok(websocket):
+        await websocket.close(code=4408)
+        return
+
+    user_id, token, is_dev = await _require_ws_auth(websocket)
+    if not user_id:
+        await websocket.close(code=4401)
+        return
+
+    await ws_manager.connect(websocket, "global", user_id=user_id)
+    try:
+        await _run_ws_session(
+            websocket,
+            task_id="global",
+            token=token,
+            is_dev=is_dev,
+            echo_messages=False,
+        )
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"Global WebSocket error: {e}")
+    finally:
+        ws_manager.disconnect(websocket, task_id="global", reason="session_closed")
+
+
+# ============================================================================
+# HTTP Endpoints for Updates
+# ============================================================================
+
+@router.post("/updates/send")
+async def send_update(update: UpdateRequest):
+    """Send an update to connected clients via HTTP."""
+    await ws_manager.send_update(
+        task_id=update.task_id,
+        message=update.message,
+        update_type=update.type,
+        progress=update.progress
+    )
+    return {"status": "success", "message": "Update sent", "task_id": update.task_id}
+
+
+@router.get("/updates/connections")
+async def get_all_connections():
+    """Get total number of active WebSocket connections."""
+    registry = await ws_manager.get_task_registry_snapshot_async()
+    task_ids = sorted(
+        {
+            str(item.get("task_id"))
+            for item in registry.values()
+            if isinstance(item, dict) and item.get("task_id")
+        }
+    )
+    if not task_ids:
+        task_ids = list(ws_manager.active_connections.keys())
+
+    return {
+        "total_connections": len(registry),
+        "local_connections": ws_manager.get_connection_count(),
+        "tasks": task_ids,
+        "registry": registry,
+        "heartbeat": {
+            "interval_seconds": _ws_heartbeat_interval,
+            "timeout_seconds": _ws_heartbeat_timeout,
+        },
+    }
+
+
+# ============================================================================
+# Forex Data Endpoints
+# ============================================================================
+
+@router.post("/forex/stream/start")
+async def start_forex_stream(interval: int = 10):
+    """Start streaming live forex data to all connected clients."""
+    await ws_manager.start_forex_stream(interval)
+    return {"status": "success", "message": f"Forex stream started with {interval}s interval."}
+
+
+@router.post("/forex/stream/stop")
+async def stop_forex_stream():
+    """Stop the forex data stream."""
+    ws_manager.stop_forex_stream()
+    return {"status": "success", "message": "Forex stream stopped"}
+
+
+@router.get("/forex/rates")
+async def get_forex_rates():
+    """Get current forex exchange rates."""
+    rates = await forex_service.get_currency_rates()
+    return {"status": "success", "rates": rates}
+
+
+@router.get("/forex/news")
+async def get_forex_news():
+    """Get latest forex news and economic calendar."""
+    news = await forex_service.get_forex_factory_news()
+    return {"status": "success", "news": news}
+
+
+@router.get("/forex/sentiment")
+async def get_market_sentiment():
+    """Get current market sentiment analysis."""
+    sentiment = await forex_service.get_market_sentiment()
+    return {"status": "success", "sentiment": sentiment}
+
+
+@router.get("/forex/forecast")
+async def get_pair_forecast(pair: str = "EUR/USD", horizon: str = "1d"):
+    """Get a structured pair forecast with horizon and confidence."""
+    try:
+        forecast = await forex_service.get_pair_forecast(pair=pair, horizon=horizon)
+        return {"status": "success", "forecast": forecast}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ============================================================================
+# Task Simulation Endpoints
+# ============================================================================
+
+@router.post("/tasks/simulate/{task_id}")
+async def simulate_task(task_id: str):
+    """Simulate a long-running task with live updates."""
+    async def run_simulation():
+        steps = [
+            ("Initializing", 0.1, "Setting up task environment..."),
+            ("Fetching Data", 0.3, "Retrieving forex market data..."),
+            ("Analyzing", 0.6, "Running technical analysis..."),
+            ("Generating Report", 0.9, "Creating summary report..."),
+        ]
+
+        for step_name, progress, message in steps:
+            await ws_manager.send_task_progress(
+                task_id=task_id,
+                step=step_name,
+                progress=progress,
+                message=message
+            )
+            await asyncio.sleep(2)
+
+        await ws_manager.send_task_complete(
+            task_id=task_id,
+            result={
+                "summary": "Market analysis complete",
+                "file_url": f"/downloads/{task_id}_report.pdf"
+            }
+        )
+
+    # Start simulation in background
+    asyncio.create_task(run_simulation())
+
+    return {
+        "status": "started",
+        "task_id": task_id,
+        "message": "Task simulation started. Connect to WebSocket for live updates."
+    }
