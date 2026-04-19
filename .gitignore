@@ -57,3 +57,5 @@ dlq_*.json
 .vscode/
 *.iml
 .DS_Store
+venv/
+.venv/

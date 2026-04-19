@@ -1,8 +1,0 @@
-[lint]
-select = ["E", "F", "W"]
-ignore = ["E501"]
-
-[lint.per-file-ignores]
-"app/main.py" = ["E402", "F821"]
-"scripts/*" = ["ALL"]
-"app/scripts/*" = ["ALL"]
