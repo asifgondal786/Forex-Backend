@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+  <meta name="referrer" content="no-referrer">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Forex Companion">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Forex Companion</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://unpkg.com/lightweight-charts@3.3.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    // Phase 7 - Web Speech API for Voice Copilot
+    window.isSpeechSupported = function() {
+      return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    };
+
+    window.startSpeechRecognition = function() {
+      return new Promise(function(resolve, reject) {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { reject('Speech not supported'); return; }
+        var recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = function(event) {
+          resolve(event.results[0][0].transcript);
+        };
+        recognition.onerror = function(event) {
+          reject(event.error);
+        };
+        recognition.start();
+      });
+    };
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    var tajirChart = null;
+    var tajirSeries = null;
+
+    function initTajirChart() {
+      var container = document.getElementById("tajir-chart-container");
+      if (!container || typeof LightweightCharts === "undefined") return;
+      tajirChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: container.clientHeight,
+        layout: { background: { color: "#0D1117" }, textColor: "#C9D1D9" },
+        grid: { vertLines: { color: "#21262D" }, horzLines: { color: "#21262D" } },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        rightPriceScale: { borderColor: "#30363D" },
+        timeScale: { borderColor: "#30363D", timeVisible: true },
+      });
+      tajirSeries = tajirChart.addCandlestickSeries({
+        upColor: "#00D4AA", downColor: "#FF4B4B",
+        borderUpColor: "#00D4AA", borderDownColor: "#FF4B4B",
+        wickUpColor: "#00D4AA", wickDownColor: "#FF4B4B",
+      });
+      window.addEventListener("resize", function() {
+        tajirChart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+      });
+    }
+
+    function renderTajirChart(jsonData) {
+      var candles = JSON.parse(jsonData);
+      if (!tajirSeries) { initTajirChart(); }
+      if (tajirSeries) { tajirSeries.setData(candles); }
+    }
+
+    function registerTajirChartView() {
+      if (typeof flutter_bootstrap !== "undefined") return;
+      window.addEventListener("flutter-first-frame", function() {
+        var div = document.createElement("div");
+        div.id = "tajir-chart-container";
+        div.style.cssText = "width:100%;height:100%;background:#0D1117;";
+        if (window.flutterWebRenderer) {
+          window.flutterWebRenderer.registerFactory("tajir-chart", function(id) {
+            initTajirChart();
+            return div;
+          });
+        }
+      });
+    }
+    registerTajirChartView();
+
+    // Chart communication via postMessage
+    window.addEventListener("message", function(e) {
+      if (e.data && e.data.type === "RENDER_CHART") {
+        renderTajirChart(JSON.stringify(e.data.candles));
+      }
+    });
+  </script>
+</body>
+</html>
+

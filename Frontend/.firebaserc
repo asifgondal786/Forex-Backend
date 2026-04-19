@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "forexcompanion-e5a28"
+  },
+  "targets": {
+    "forexcompanion-e5a28": {
+      "hosting": {
+        "tajir-frontend": [
+          "tajir-frontend"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
