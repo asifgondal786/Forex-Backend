@@ -1,42 +1,3 @@
-<<<<<<< HEAD
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "Running security pre-commit checks..."
-
-SAFE_ENV_FILES_REGEX='^(\.env\.example|\.env\.development|\.env\.production|\.env\.production\.example)$'
-BLOCKED_ENV_FILES_REGEX='^(\.env|\.env\.local|\.env\..*\.local)$'
-SECRET_REGEX='(AIza[0-9A-Za-z_-]{20,}|xkeysib-[A-Za-z0-9-]{20,}|-----BEGIN[[:space:]]+PRIVATE[[:space:]]+KEY-----)'
-
-staged_files="$(git diff --cached --name-only)"
-
-# Block local/secret env files.
-if echo "$staged_files" | grep -Eq "$BLOCKED_ENV_FILES_REGEX"; then
-  echo "ERROR: local env files are not allowed in commits."
-  echo "Use committed templates only (.env.example/.env.development/.env.production.example)."
-  exit 1
-fi
-
-# Warn if non-approved env files are being committed.
-if echo "$staged_files" | grep -E '^\.env' >/dev/null 2>&1; then
-  while IFS= read -r file; do
-    [[ -z "$file" ]] && continue
-    if [[ "$file" == .env* ]] && ! echo "$file" | grep -Eq "$SAFE_ENV_FILES_REGEX"; then
-      echo "ERROR: unexpected env file in commit: $file"
-      exit 1
-    fi
-  done <<< "$staged_files"
-fi
-
-# Scan staged diff for key signatures.
-if git diff --cached | grep -E "$SECRET_REGEX" >/dev/null 2>&1; then
-  echo "ERROR: potential secret detected in staged changes."
-  echo "Commit blocked."
-  exit 1
-fi
-
-echo "Pre-commit security checks passed."
-=======
 #!/bin/sh
 set -eu
 
@@ -44,4 +5,3 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
 python scripts/secret_scan.py
->>>>>>> 36c0e1f635e9472d99f7f9c851123d8410d51284

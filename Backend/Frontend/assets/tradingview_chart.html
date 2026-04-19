@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Tajir Chart</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:          #0d0f14;
+    --bg2:         #131720;
+    --bg3:         #1a1f2e;
+    --border:      #1f2535;
+    --text:        #e2e8f0;
+    --text-muted:  #64748b;
+    --accent:      #3b82f6;
+    --green:       #22c55e;
+    --red:         #ef4444;
+    --orange:      #f59e0b;
+    --purple:      #a78bfa;
+    --font:        'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+
+  /* ── Top Bar ── */
+  #topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    height: 44px;
+  }
+
+  #pair-display {
+    font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+    color: var(--text); min-width: 80px;
+  }
+
+  #price-display {
+    font-size: 15px; font-weight: 700;
+    color: var(--green); min-width: 90px;
+  }
+
+  #change-display {
+    font-size: 12px; padding: 2px 8px;
+    border-radius: 4px; font-weight: 600;
+  }
+  .change-up   { background: rgba(34,197,94,0.15);  color: var(--green); }
+  .change-down { background: rgba(239,68,68,0.15);   color: var(--red); }
+
+  .spacer { flex: 1; }
+
+  #source-badge {
+    font-size: 10px; padding: 2px 7px;
+    border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase;
+    background: rgba(59,130,246,0.15); color: var(--accent);
+  }
+
+  /* ── Timeframe Tabs ── */
+  #tf-bar {
+    display: flex; gap: 2px; padding: 6px 12px;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+  }
+
+  .tf-btn {
+    padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    background: transparent; color: var(--text-muted);
+    font-family: var(--font); transition: all 0.15s;
+  }
+  .tf-btn:hover    { background: var(--bg3); color: var(--text); }
+  .tf-btn.active   { background: var(--accent); color: #fff; }
+
+  .tf-separator { width: 1px; background: var(--border); margin: 4px 4px; }
+
+  /* ── Indicator Toggles ── */
+  #ind-bar {
+    display: flex; gap: 6px; padding: 5px 12px;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .ind-btn {
+    padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border);
+    cursor: pointer; font-size: 10px; font-weight: 600; letter-spacing: 0.4px;
+    background: transparent; font-family: var(--font); transition: all 0.15s;
+  }
+  .ind-btn[data-ind="sma"]  { color: #f59e0b; border-color: #f59e0b44; }
+  .ind-btn[data-ind="ema"]  { color: #a78bfa; border-color: #a78bfa44; }
+  .ind-btn[data-ind="bb"]   { color: #22d3ee; border-color: #22d3ee44; }
+  .ind-btn[data-ind="rsi"]  { color: #fb923c; border-color: #fb923c44; }
+  .ind-btn[data-ind="vol"]  { color: #64748b; border-color: #64748b44; }
+  .ind-btn.active { opacity: 1; }
+  .ind-btn:not(.active) { opacity: 0.35; }
+
+  /* ── Chart Container ── */
+  #chart-wrap {
+    position: relative;
+    height: calc(100vh - 44px - 34px - 33px - 2px);
+  }
+
+  #main-chart  { width: 100%; height: 75%; }
+  #rsi-chart   { width: 100%; height: 25%; border-top: 1px solid var(--border); display: none; }
+
+  /* ── OHLCV Tooltip ── */
+  #ohlcv-tooltip {
+    position: absolute; top: 8px; left: 12px; z-index: 10;
+    background: rgba(13,15,20,0.92); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px;
+    font-size: 11px; line-height: 1.8; pointer-events: none;
+    backdrop-filter: blur(4px);
+    display: none;
+  }
+  .ohlcv-row { display: flex; gap: 8px; }
+  .ohlcv-label { color: var(--text-muted); }
+  .ohlcv-val   { color: var(--text); font-weight: 600; }
+  .ohlcv-o { color: #e2e8f0; }
+  .ohlcv-h { color: var(--green); }
+  .ohlcv-l { color: var(--red); }
+  .ohlcv-c { color: var(--accent); }
+
+  /* ── Loading ── */
+  #loading {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: var(--bg); z-index: 20; flex-direction: column; gap: 12px;
+  }
+  .spinner {
+    width: 28px; height: 28px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-text { font-size: 12px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div id="topbar">
+  <div id="pair-display">EURUSD</div>
+  <div id="price-display">—</div>
+  <div id="change-display" class="change-up">—</div>
+  <div class="spacer"></div>
+  <div id="source-badge">MOCK</div>
+</div>
+
+<!-- Timeframe Tabs -->
+<div id="tf-bar">
+  <button class="tf-btn" data-tf="M1">M1</button>
+  <button class="tf-btn" data-tf="M5">M5</button>
+  <button class="tf-btn active" data-tf="M15">M15</button>
+  <button class="tf-btn" data-tf="M30">M30</button>
+  <div class="tf-separator"></div>
+  <button class="tf-btn" data-tf="H1">H1</button>
+  <button class="tf-btn" data-tf="H4">H4</button>
+  <div class="tf-separator"></div>
+  <button class="tf-btn" data-tf="D">D</button>
+  <button class="tf-btn" data-tf="W">W</button>
+</div>
+
+<!-- Indicator Toggles -->
+<div id="ind-bar">
+  <button class="ind-btn active" data-ind="sma">SMA 20</button>
+  <button class="ind-btn active" data-ind="ema">EMA 21</button>
+  <button class="ind-btn" data-ind="bb">BB</button>
+  <button class="ind-btn" data-ind="rsi">RSI 14</button>
+  <button class="ind-btn active" data-ind="vol">VOL</button>
+</div>
+
+<!-- Chart -->
+<div id="chart-wrap">
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text">Loading chart…</div>
+  </div>
+  <div id="ohlcv-tooltip"></div>
+  <div id="main-chart"></div>
+  <div id="rsi-chart"></div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const state = {
+  pair: 'EURUSD',
+  tf: 'M15',
+  indicators: { sma: true, ema: true, bb: false, rsi: false, vol: true },
+  candles: [],
+  indData: {},
+  baseUrl: '',   // injected by Flutter via postMessage
+  token: '',     // injected by Flutter via postMessage
+};
+
+// ── Chart instances ────────────────────────────────────────
+let mainChart, rsiChart;
+let candleSeries, volumeSeries;
+let smaSeries, emaSeries, bbUpperSeries, bbMidSeries, bbLowerSeries;
+let rsiSeries, rsiOb, rsiOs;
+
+// ── Init charts ───────────────────────────────────────────
+function initCharts() {
+  const chartOpts = {
+    layout: { background: { color: '#0d0f14' }, textColor: '#64748b' },
+    grid: { vertLines: { color: '#1a1f2e' }, horzLines: { color: '#1a1f2e' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#1f2535' },
+    timeScale: { borderColor: '#1f2535', timeVisible: true, secondsVisible: false },
+    handleScroll: true, handleScale: true,
+  };
+
+  mainChart = LightweightCharts.createChart(document.getElementById('main-chart'), {
+    ...chartOpts, width: window.innerWidth,
+    height: Math.floor(document.getElementById('chart-wrap').clientHeight * 0.75),
+  });
+
+  rsiChart = LightweightCharts.createChart(document.getElementById('rsi-chart'), {
+    ...chartOpts, width: window.innerWidth,
+    height: Math.floor(document.getElementById('chart-wrap').clientHeight * 0.25),
+    rightPriceScale: { scaleMargins: { top: 0.1, bottom: 0.1 }, borderColor: '#1f2535' },
+  });
+
+  // Candle series
+  candleSeries = mainChart.addCandleSeries({
+    upColor: '#22c55e', downColor: '#ef4444',
+    borderUpColor: '#22c55e', borderDownColor: '#ef4444',
+    wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+  });
+
+  // Volume series
+  volumeSeries = mainChart.addHistogramSeries({
+    color: '#3b82f620', priceFormat: { type: 'volume' },
+    priceScaleId: 'vol',
+  });
+  mainChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+
+  // Indicator series
+  smaSeries = mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 1, priceLineVisible: false });
+  emaSeries = mainChart.addLineSeries({ color: '#a78bfa', lineWidth: 1, priceLineVisible: false });
+  bbUpperSeries = mainChart.addLineSeries({ color: '#22d3ee66', lineWidth: 1, priceLineVisible: false, lineStyle: LightweightCharts.LineStyle.Dashed });
+  bbMidSeries   = mainChart.addLineSeries({ color: '#22d3ee44', lineWidth: 1, priceLineVisible: false });
+  bbLowerSeries = mainChart.addLineSeries({ color: '#22d3ee66', lineWidth: 1, priceLineVisible: false, lineStyle: LightweightCharts.LineStyle.Dashed });
+
+  // RSI
+  rsiSeries = rsiChart.addLineSeries({ color: '#fb923c', lineWidth: 1.5, priceLineVisible: false });
+  rsiOb = rsiChart.addLineSeries({ color: '#ef444460', lineWidth: 1, priceLineVisible: false, lineStyle: LightweightCharts.LineStyle.Dashed });
+  rsiOs = rsiChart.addLineSeries({ color: '#22c55e60', lineWidth: 1, priceLineVisible: false, lineStyle: LightweightCharts.LineStyle.Dashed });
+
+  // Crosshair sync
+  mainChart.subscribeCrosshairMove(onCrosshairMove);
+
+  // Resize observer
+  const ro = new ResizeObserver(() => resizeCharts());
+  ro.observe(document.getElementById('chart-wrap'));
+}
+
+function resizeCharts() {
+  const wrap = document.getElementById('chart-wrap');
+  const rsiVisible = state.indicators.rsi;
+  const mainH = Math.floor(wrap.clientHeight * (rsiVisible ? 0.72 : 1.0));
+  const rsiH  = rsiVisible ? wrap.clientHeight - mainH : 0;
+  mainChart.resize(wrap.clientWidth, mainH);
+  if (rsiVisible) rsiChart.resize(wrap.clientWidth, rsiH);
+}
+
+// ── Fetch & render ─────────────────────────────────────────
+async function loadChart() {
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loading-text').textContent = `Loading ${state.pair} ${state.tf}…`;
+
+  try {
+    const [candleRes, indRes] = await Promise.all([
+      fetchJson(`/api/v1/chart/candles/${state.pair}?granularity=${state.tf}&count=200`),
+      fetchJson(`/api/v1/chart/indicators/${state.pair}?granularity=${state.tf}&count=200`),
+    ]);
+
+    state.candles = candleRes.candles || [];
+    state.indData = indRes.indicators || {};
+
+    // Source badge
+    const src = candleRes.source || 'mock';
+    const badge = document.getElementById('source-badge');
+    badge.textContent = src.toUpperCase();
+    badge.style.background = src === 'oanda' ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)';
+    badge.style.color = src === 'oanda' ? '#22c55e' : '#3b82f6';
+
+    renderChart();
+
+  } catch (e) {
+    document.getElementById('loading-text').textContent = 'Chart load failed. Retry…';
+    console.error('Chart load error:', e);
+  }
+}
+
+function renderChart() {
+  if (!state.candles.length) return;
+
+  // ── Candles ──
+  const candleData = state.candles.map(c => ({
+    time: c.time.replace('T', ' ').substring(0, 19),
+    open: c.open, high: c.high, low: c.low, close: c.close,
+  }));
+  candleSeries.setData(candleData);
+
+  // ── Volume ──
+  const volData = state.candles.map(c => ({
+    time:  c.time.replace('T', ' ').substring(0, 19),
+    value: c.volume,
+    color: c.close >= c.open ? '#22c55e30' : '#ef444430',
+  }));
+  state.indicators.vol ? volumeSeries.setData(volData) : volumeSeries.setData([]);
+
+  // ── SMA ──
+  if (state.indicators.sma && state.indData.sma) {
+    smaSeries.setData(state.indData.sma.data.map(d => ({ time: d.time.replace('T',' ').substring(0,19), value: d.value })));
+  } else { smaSeries.setData([]); }
+
+  // ── EMA ──
+  if (state.indicators.ema && state.indData.ema) {
+    emaSeries.setData(state.indData.ema.data.map(d => ({ time: d.time.replace('T',' ').substring(0,19), value: d.value })));
+  } else { emaSeries.setData([]); }
+
+  // ── Bollinger Bands ──
+  if (state.indicators.bb && state.indData.bollinger_upper) {
+    bbUpperSeries.setData(state.indData.bollinger_upper.data.map(d => ({ time: d.time.replace('T',' ').substring(0,19), value: d.value })));
+    bbMidSeries.setData(state.indData.bollinger_middle.data.map(d => ({ time: d.time.replace('T',' ').substring(0,19), value: d.value })));
+    bbLowerSeries.setData(state.indData.bollinger_lower.data.map(d => ({ time: d.time.replace('T',' ').substring(0,19), value: d.value })));
+  } else { bbUpperSeries.setData([]); bbMidSeries.setData([]); bbLowerSeries.setData([]); }
+
+  // ── RSI ──
+  const rsiEl = document.getElementById('rsi-chart');
+  if (state.indicators.rsi && state.indData.rsi) {
+    rsiEl.style.display = 'block';
+    rsiSeries.setData(state.indData.rsi.data.map(d => ({ time: d.time.replace('T',' ').substring(0,19), value: d.value })));
+    const times = state.indData.rsi.data.map(d => d.time.replace('T',' ').substring(0,19));
+    rsiOb.setData(times.map(t => ({ time: t, value: 70 })));
+    rsiOs.setData(times.map(t => ({ time: t, value: 30 })));
+  } else {
+    rsiEl.style.display = 'none';
+    rsiSeries.setData([]); rsiOb.setData([]); rsiOs.setData([]);
+  }
+
+  resizeCharts();
+
+  // Update price display from last candle
+  const last = state.candles[state.candles.length - 1];
+  const prev = state.candles[state.candles.length - 2];
+  if (last && prev) {
+    const change = ((last.close - prev.close) / prev.close * 100);
+    document.getElementById('price-display').textContent = last.close.toFixed(5);
+    document.getElementById('price-display').style.color = last.close >= prev.close ? '#22c55e' : '#ef4444';
+    const changeEl = document.getElementById('change-display');
+    changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+    changeEl.className = 'change-display ' + (change >= 0 ? 'change-up' : 'change-down');
+  }
+
+  document.getElementById('pair-display').textContent = `${state.pair.slice(0,3)}/${state.pair.slice(3)}`;
+  document.getElementById('loading').style.display = 'none';
+
+  mainChart.timeScale().fitContent();
+}
+
+// ── OHLCV Tooltip ──────────────────────────────────────────
+function onCrosshairMove(param) {
+  const tooltip = document.getElementById('ohlcv-tooltip');
+  if (!param.time || !param.seriesData) { tooltip.style.display = 'none'; return; }
+  const candle = param.seriesData.get(candleSeries);
+  if (!candle) { tooltip.style.display = 'none'; return; }
+
+  tooltip.style.display = 'block';
+  tooltip.innerHTML = `
+    <div class="ohlcv-row">
+      <span class="ohlcv-label">O</span><span class="ohlcv-val ohlcv-o">${candle.open.toFixed(5)}</span>
+      <span class="ohlcv-label">H</span><span class="ohlcv-val ohlcv-h">${candle.high.toFixed(5)}</span>
+      <span class="ohlcv-label">L</span><span class="ohlcv-val ohlcv-l">${candle.low.toFixed(5)}</span>
+      <span class="ohlcv-label">C</span><span class="ohlcv-val ohlcv-c">${candle.close.toFixed(5)}</span>
+    </div>`;
+}
+
+// ── Fetch helper ───────────────────────────────────────────
+async function fetchJson(path) {
+  const url = state.baseUrl ? state.baseUrl + path : path;
+  const headers = { 'Content-Type': 'application/json' };
+  if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── Flutter bridge ─────────────────────────────────────────
+// Flutter calls window.postMessage or window.tajirChart.*
+window.tajirChart = {
+  setPair: (pair) => {
+    state.pair = pair.toUpperCase().replace('/', '');
+    loadChart();
+  },
+  setTimeframe: (tf) => {
+    state.tf = tf.toUpperCase();
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === state.tf));
+    loadChart();
+  },
+  setConfig: (baseUrl, token) => {
+    state.baseUrl = baseUrl;
+    state.token = token;
+    loadChart();
+  },
+};
+
+// Also accept postMessage from Flutter WebView
+window.addEventListener('message', (e) => {
+  try {
+    const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+    if (msg.type === 'config') { state.baseUrl = msg.baseUrl; state.token = msg.token; loadChart(); }
+    if (msg.type === 'pair')   { state.pair = msg.pair.toUpperCase().replace('/', ''); loadChart(); }
+    if (msg.type === 'tf')     { state.tf = msg.tf; loadChart(); }
+  } catch (_) {}
+});
+
+// ── UI event listeners ─────────────────────────────────────
+document.querySelectorAll('.tf-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tf = btn.dataset.tf;
+    loadChart();
+  });
+});
+
+document.querySelectorAll('.ind-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const ind = btn.dataset.ind;
+    state.indicators[ind] = !state.indicators[ind];
+    btn.classList.toggle('active', state.indicators[ind]);
+    renderChart();
+  });
+});
+
+// ── Boot ───────────────────────────────────────────────────
+initCharts();
+// Load with mock data immediately (no config needed for mock)
+loadChart();
+</script>
+</body>
+</html>

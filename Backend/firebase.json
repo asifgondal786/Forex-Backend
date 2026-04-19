@@ -1,15 +1,8 @@
-<<<<<<< HEAD
-﻿{
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-=======
 {
   "firestore": {
     "database": "(default)",
     "location": "asia-south1",
     "rules": "1",
     "indexes": "1"
->>>>>>> 36c0e1f635e9472d99f7f9c851123d8410d51284
   }
 }

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -35,3 +36,12 @@ if git diff --cached | grep -E "$SECRET_REGEX" >/dev/null 2>&1; then
 fi
 
 echo "Pre-commit security checks passed."
+=======
+#!/bin/sh
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+python scripts/secret_scan.py
+>>>>>>> 36c0e1f635e9472d99f7f9c851123d8410d51284
