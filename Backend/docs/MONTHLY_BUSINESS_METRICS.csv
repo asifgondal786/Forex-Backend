@@ -1,9 +1,0 @@
-period,metric,actual,target,status,owner,notes
-2026-03,mrr,TODO,TODO,TODO,TODO,initial baseline
-2026-03,new_customers,TODO,TODO,TODO,TODO,initial baseline
-2026-03,sales_cycle_days,TODO,TODO,TODO,TODO,initial baseline
-2026-03,win_rate_percent,TODO,TODO,TODO,TODO,initial baseline
-2026-03,churn_percent,TODO,TODO,TODO,TODO,initial baseline
-2026-03,expansion_rate_percent,TODO,TODO,TODO,TODO,initial baseline
-2026-03,feature_throughput,TODO,TODO,TODO,TODO,initial baseline
-2026-03,critical_incidents,TODO,TODO,TODO,TODO,initial baseline

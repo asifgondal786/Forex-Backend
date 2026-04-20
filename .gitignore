@@ -59,3 +59,10 @@ dlq_*.json
 .DS_Store
 venv/
 .venv/
+
+Backend/
+Frontend/
+logs/
+__pycache__/
+venv/
+.venv/
