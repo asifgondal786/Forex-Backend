@@ -1,2 +1,0 @@
-period,uptime_percent,error_rate_percent,critical_incidents,mean_time_to_resolve_minutes,rate_limit_events,dependency_vulns_open,notes
-2026-03,0,0,0,0,0,0,Initialize with real monthly values
