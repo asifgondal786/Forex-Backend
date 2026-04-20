@@ -1,61 +1,33 @@
-﻿# OS or editor files
-.DS_Store
-Thumbs.db
-*.swp
-*.sublime-workspace
-.vscode/
-.idea/
+﻿# Virtual environments
+.venv/
+venv/
+env/
 
-# Environment & Secrets
+# Secrets
 .env
 .env.*
-.env.local
-.env.*.local
 !.env.example
-!.env.example.*
-Backend/.env
-Backend/.env.local
-Frontend/.env
-Frontend/.env.local
 
-# Service account / credentials files
+# Service account / credentials
 *firebase-adminsdk-*.json
 *service-account*.json
 *credentials*.json
 *.pem
 *.key
-*.keystore
-*.p8
-*.p12
-*.pfx
-secrets.json
-config/secrets.json
 
 # Logs
+logs/
 *.log
-firebase-debug.log
 
-# Local tooling state
-.chrome-debug/
-.pytest_cache/
-
-# Dependencies
-node_modules/
-build/
-dist/
-*.pyc
+# Python cache
 __pycache__/
-
-# Temp/Cache files
-dlq_*.json
-*.bak*
-.cache/
-.tmp/
+*.pyc
+*.pyo
 
 # IDE
-.idea/
 .vscode/
-*.iml
+.idea/
+
+# OS
 .DS_Store
-venv/
-.venv/
+Thumbs.db
