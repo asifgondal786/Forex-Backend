@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/signal_routes.py
 Phase 4 - Signal Fusion Endpoints
 """
@@ -56,7 +56,7 @@ async def signals_health() -> dict:
         "status":           "ok",
         "phase":            4,
         "fusion_enabled":   True,
-        "gemini_key_set":   bool(os.getenv("GEMINI_API_KEY")),
+        "deepseek_key_set":   bool(os.getenv("DEEPSEEK_API_KEY")),
         "news_api_key_set": bool(os.getenv("NEWS_API_KEY")),
         "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
         "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
