@@ -2,7 +2,7 @@
 # D:\Tajir\Backend\app\services\ai_analysis_service.py
 #
 # AI Analysis Service — powered by DeepSeek
-# Replaces the old Gemini-based implementation.
+# Replaces the old Gemini-based (now DeepSeek) implementation.
 #
 # Provides:
 #   • analyze_market()       — full market intelligence report

@@ -21,6 +21,7 @@ import importlib
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 from .config.audit import log_config_snapshot
+from .services.pepperstone_fix_client import pepperstone
 from .config.index import get_config, startup_snapshot as config_startup_snapshot
 from .config.logging import setup_logging
 from .config.validate_env import log_payload as env_validation_log_payload
@@ -582,6 +583,19 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[Startup] WARNING: Forex stream startup failed: {e}")
 
+    # Pepperstone FIX API startup
+    try:
+        await asyncio.wait_for(
+            pepperstone.startup(subscribe_symbols=['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD']),
+            timeout=15.0
+        )
+        logger.info('[Startup] Pepperstone FIX: trade=%s price=%s',
+                    pepperstone.trade_ready, pepperstone.price_ready)
+    except asyncio.TimeoutError:
+        logger.warning('[Startup] WARNING: Pepperstone FIX startup timed out (non-blocking)')
+    except Exception as e:
+        logger.warning('[Startup] WARNING: Pepperstone FIX startup failed: %s', e)
+
     yield
 
     if forex_stream_enabled:
@@ -592,6 +606,7 @@ async def lifespan(app: FastAPI):
         pass
     if task_queue_enabled:
         await task_queue_service.stop()
+    await pepperstone.shutdown()
     await redis_store.close()
     logger.info("[Shutdown] complete")
 

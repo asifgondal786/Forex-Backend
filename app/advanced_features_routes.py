@@ -506,9 +506,9 @@ async def get_execution_intelligence_panel():
 
 
 @router.post("/market/analyze")
-async def analyze_market_with_gemini():
+async def analyze_market_with_ai():
     """
-    Use Google Generative AI (Gemini) to analyze current market conditions
+    Use Google Generative AI (AI) to analyze current market conditions
     Returns sentiment, volatility, risk assessment, and key currency pairs to watch
     """
     from . import forex_data_service
@@ -537,7 +537,7 @@ async def get_macro_events(window_hours: int = 24, only_high_impact: bool = True
 @router.post("/market/predict")
 async def predict_price_movements(pair: str, historical_data: List[Dict]):
     """
-    Use Google Generative AI (Gemini) to predict future price movements for a currency pair
+    Use Google Generative AI (AI) to predict future price movements for a currency pair
     """
     from . import forex_data_service
 
@@ -547,7 +547,7 @@ async def predict_price_movements(pair: str, historical_data: List[Dict]):
 @router.post("/news/analyze-impact")
 async def analyze_news_impact(news: List[Dict], currency_pairs: List[str]):
     """
-    Use Google Generative AI (Gemini) to analyze news impact on currency pairs
+    Use Google Generative AI (AI) to analyze news impact on currency pairs
     """
     from .services.ai_analysis_service import AIAnalysisService
 
@@ -558,7 +558,7 @@ async def analyze_news_impact(news: List[Dict], currency_pairs: List[str]):
 @router.post("/news/analyze-sentiment")
 async def analyze_news_sentiment(news_text: str):
     """
-    Use Google Generative AI (Gemini) to analyze sentiment from raw news text
+    Use Google Generative AI (AI) to analyze sentiment from raw news text
     """
     from .services.ai_analysis_service import AIAnalysisService
 
@@ -567,14 +567,14 @@ async def analyze_news_sentiment(news_text: str):
 
 
 @router.post("/autonomous/generate-signal")
-async def generate_trading_signal_with_gemini(
+async def generate_trading_signal_with_ai(
     pair: str,
     market_condition: Dict,
     user_strategy: Dict,
     historical_data: List[Dict]
 ):
     """
-    Use Google Generative AI (Gemini) to generate trading signal with full context
+    Use Google Generative AI (AI) to generate trading signal with full context
     """
     # Convert market condition dictionary to dataclass
     condition = MarketCondition(
@@ -588,7 +588,7 @@ async def generate_trading_signal_with_gemini(
         macd=market_condition['macd']
     )
 
-    signal = await ai_engine.generate_trading_signal_with_gemini(
+    signal = await ai_engine.generate_trading_signal_with_ai(
         pair, condition, user_strategy, historical_data
     )
 
@@ -610,31 +610,31 @@ async def generate_trading_signal_with_gemini(
 @router.post("/autonomous/analyze-portfolio")
 async def analyze_portfolio_performance(portfolio_data: Dict):
     """
-    Use Google Generative AI (Gemini) to analyze portfolio performance
+    Use Google Generative AI (AI) to analyze portfolio performance
     """
     return await ai_engine.analyze_portfolio_performance(portfolio_data)
 
 
 @router.post("/execution/analyze-conditions")
-async def analyze_conditions_with_gemini(user_id: str, conditions: List[Dict]):
+async def analyze_conditions_with_ai(user_id: str, conditions: List[Dict]):
     """
-    Use Google Generative AI (Gemini) to analyze trading conditions
+    Use Google Generative AI (AI) to analyze trading conditions
     Returns confidence score, risk assessment, and recommendations
     """
-    return await execution_svc.analyze_conditions_with_gemini(user_id, conditions)
+    return await execution_svc.analyze_conditions_with_ai(user_id, conditions)
 
 
 @router.post("/execution/generate-conditions")
-async def generate_conditions_with_gemini(
+async def generate_conditions_with_ai(
     user_id: str,
     pair: str,
     action: str,
     strategy: str
 ):
     """
-    Use Google Generative AI (Gemini) to generate trading conditions from strategy
+    Use Google Generative AI (AI) to generate trading conditions from strategy
     """
-    return await execution_svc.generate_conditions_with_gemini(
+    return await execution_svc.generate_conditions_with_ai(
         user_id, pair, action, strategy
     )
 

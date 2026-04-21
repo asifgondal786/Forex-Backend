@@ -23,28 +23,25 @@ NEWS_API_BASE = "https://newsapi.org/v2"
 AI_MODEL      = "deepseek-chat"
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
-
 class TradeSignal(BaseModel):
     pair:             str
-    action:           str          # BUY | SELL | HOLD
-    confidence:       float        # 0.0 - 1.0 (fused score)
+    action:           str
+    confidence:       float
     entry_price:      float
     stop_loss:        float
     take_profit:      float
     reasoning:        str
-    sentiment:        str          # bullish | bearish | neutral
+    sentiment:        str
     news_summary:     str
     generated_at:     str
     model:            str
-    # Phase 4 additions
     technical_bias:   Optional[str] = None
     rsi:              Optional[float] = None
     macd_bias:        Optional[str] = None
     indicator_tags:   List[str] = []
-    explain_simple:   Optional[str] = None   # beginner
-    explain_standard: Optional[str] = None  # intermediate
-    explain_advanced: Optional[str] = None  # expert
+    explain_simple:   Optional[str] = None
+    explain_standard: Optional[str] = None
+    explain_advanced: Optional[str] = None
 
 
 class SignalResponse(BaseModel):
@@ -52,8 +49,6 @@ class SignalResponse(BaseModel):
     generated_at: str
     pairs:        list[str]
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _fetch_news(query: str = "forex currency trading") -> list[str]:
     if not NEWS_API_KEY:
@@ -103,29 +98,16 @@ def _fuse_confidence(
     ai_sentiment: str,
     action: str,
 ) -> float:
-    """
-    Phase 4: Fuse DeepSeek confidence with technical indicator agreement.
-    Boosts confidence when RSI/MACD agree with DeepSeek action.
-    Reduces when they conflict.
-    """
     score = ai_conf
-
     action_bias = "bullish" if action == "BUY" else "bearish" if action == "SELL" else "neutral"
-
     if technical_bias == action_bias:
-        score = min(score + 0.08, 0.95)   # indicators agree → boost
+        score = min(score + 0.08, 0.95)
     elif technical_bias != "neutral" and technical_bias != action_bias:
-        score = max(score - 0.10, 0.25)   # indicators conflict → reduce
-
+        score = max(score - 0.10, 0.25)
     return round(score, 3)
 
 
-def _build_ai_prompt(
-    pair: str,
-    price: float,
-    headlines: list[str],
-    technical: dict,
-) -> str:
+def _build_ai_prompt(pair: str, price: float, headlines: list[str], technical: dict) -> str:
     news_block = "\n".join(f"- {h}" for h in headlines) if headlines else "- No news available"
     tech_block = ""
     if technical.get("available"):
@@ -133,11 +115,10 @@ def _build_ai_prompt(
         macd = technical.get("macd") or {}
         tech_block = f"""
 Technical Indicators:
-- RSI (14): {rsi:.1f} → {technical.get('technical_bias', 'neutral').upper()}
-- MACD: {macd.get('bias', 'neutral').upper()} (histogram: {macd.get('histogram', 0):.6f})
+- RSI (14): {rsi:.1f} -> {technical.get("technical_bias", "neutral").upper()}
+- MACD: {macd.get("bias", "neutral").upper()} (histogram: {macd.get("histogram", 0):.6f})
 """
-
-    return f"""You are an expert forex analyst. Analyze and return a trade signal with plain-English explanations.
+    return f"""You are an expert forex analyst. Analyze and return a trade signal.
 
 Currency Pair: {pair}
 Current Price: {price}
@@ -154,21 +135,18 @@ Return ONLY a valid JSON object with exactly these fields:
   "reasoning": "<one sentence technical explanation>",
   "sentiment": "bullish" or "bearish" or "neutral",
   "news_summary": "<one sentence news summary>",
-  "explain_simple": "<explain this trade to a complete beginner in 1-2 simple sentences, no jargon>",
-  "explain_standard": "<explain this trade to an intermediate trader in 2-3 sentences with some technical context>",
-  "explain_advanced": "<explain this trade to an expert with RSI, MACD, S/R levels, and risk context in 3-4 sentences>"
+  "explain_simple": "<explain to a complete beginner in 1-2 simple sentences>",
+  "explain_standard": "<explain to an intermediate trader in 2-3 sentences>",
+  "explain_advanced": "<explain to an expert with RSI, MACD, S/R levels in 3-4 sentences>"
 }}
 
 Rules:
 - stop_loss must be below entry for BUY, above entry for SELL
 - take_profit must be above entry for BUY, below entry for SELL
 - confidence above 0.7 means strong signal
-- Consider the technical indicators when forming your view
 - Return only JSON, no markdown, no explanation
 """
 
-
-# ── Main service ──────────────────────────────────────────────────────────────
 
 async def generate_signals(
     pairs: list[str] | None = None,
@@ -178,17 +156,13 @@ async def generate_signals(
         pairs = ["EUR_USD", "GBP_USD", "USD_JPY"]
 
     now_iso = datetime.now(timezone.utc).isoformat()
-
-    # Step 1: Live prices
     price_response = await get_market_prices(pairs=pairs, redis_client=redis_client)
     price_map = {q.instrument: q.mid for q in price_response.prices}
 
     if not price_map:
         return SignalResponse(signals=[], generated_at=now_iso, pairs=pairs)
 
-    # Step 2: News headlines (shared)
     headlines = await _fetch_news("forex USD EUR GBP JPY trading")
-
     signals: list[TradeSignal] = []
     _ai_client = DeepSeekClient()
 
@@ -197,10 +171,7 @@ async def generate_signals(
         if not price:
             continue
 
-        # Step 3: Technical indicators (Phase 4)
         technical = await get_technical_indicators(pair)
-
-        # Step 4: DeepSeek signal with technical context
         prompt = _build_ai_prompt(pair, price, headlines, technical)
         raw = _ai_client.generate_json(
             model_name=AI_MODEL,
@@ -221,15 +192,12 @@ async def generate_signals(
 
         action = raw.get("action", "HOLD").upper()
         ai_conf = float(raw.get("confidence", 0.5))
-
-        # Step 5: Fuse confidence (Phase 4)
         fused_conf = _fuse_confidence(
             ai_conf=ai_conf,
             technical_bias=technical.get("technical_bias", "neutral"),
             ai_sentiment=raw.get("sentiment", "neutral"),
             action=action,
         )
-
         macd_data = technical.get("macd") or {}
 
         signal = TradeSignal(
@@ -244,7 +212,6 @@ async def generate_signals(
             news_summary=raw.get("news_summary", ""),
             generated_at=now_iso,
             model=AI_MODEL,
-            # Phase 4 fields
             technical_bias=technical.get("technical_bias"),
             rsi=technical.get("rsi"),
             macd_bias=macd_data.get("bias"),
@@ -256,7 +223,6 @@ async def generate_signals(
 
         await _save_signal_to_supabase(signal)
         signals.append(signal)
-        # Phase 13 (_notify_signal_task_injected)
         try:
             import asyncio as _asyncio
             from app.services.notification_service import notify_new_signal
@@ -264,7 +230,7 @@ async def generate_signals(
         except Exception as _ne:
             logger.warning("Signal notification task failed: %s", _ne)
         logger.info(
-            "Signal [Phase4] %s %s conf=%.2f→%.2f tech=%s",
+            "Signal [Phase4] %s %s conf=%.2f->%.2f tech=%s",
             action, pair, ai_conf, fused_conf,
             technical.get("technical_bias", "n/a"),
         )

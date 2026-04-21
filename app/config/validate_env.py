@@ -19,7 +19,7 @@ _PLACEHOLDER_MARKERS = {
     "replace_with_firebase_web_api_key",
     "your_brevo_api_key",
     "your_firebase_web_api_key",
-    "your_gemini_api_key",
+    "your_deepseek_api_key",
     "your_base64_encoded_service_account_json",
 }
 _VALID_LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}
@@ -219,12 +219,12 @@ def validate_environment(environ: Mapping[str, str] | None = None) -> Validation
                     variable=key,
                 )
         ai_routes_available = (env.get("AI_ROUTES_AVAILABLE") or "").strip().lower() == "true"
-        gemini_value = (env.get("GEMINI_API_KEY") or "").strip()
-        if ai_routes_available and (not gemini_value or _is_placeholder(gemini_value)):
+        deepseek_value = (env.get("DEEPSEEK_API_KEY") or "").strip()
+        if ai_routes_available and (not deepseek_value or _is_placeholder(deepseek_value)):
             result.add_error(
                 code="missing_required_secret",
-                message="GEMINI_API_KEY is required when AI_ROUTES_AVAILABLE=true in production.",
-                variable="GEMINI_API_KEY",
+                message="DEEPSEEK_API_KEY is required when AI_ROUTES_AVAILABLE=true in production.",
+                variable="DEEPSEEK_API_KEY",
             )
         if config.firebase.require_firebase:
             has_admin_credential = any(

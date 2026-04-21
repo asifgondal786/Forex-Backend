@@ -143,10 +143,10 @@ def parse_command(text: str, account_balance: float = 10000.0) -> Dict:
             "requires_confirmation": False,
         }
 
-    # Unknown â€” pass to Gemini
+    # Unknown â€” pass to DeepSeek
     return {
         "intent":    "CHAT",
         "confidence": 0.5,
-        "response":  None,  # Let Gemini handle it
+        "response":  None,  # Let DeepSeek handle it
         "requires_confirmation": False,
     }

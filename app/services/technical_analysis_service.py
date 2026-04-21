@@ -110,7 +110,7 @@ def _rsi_bias(rsi: float) -> str:
 async def get_technical_indicators(pair: str) -> Dict:
     """
     Main entry point. Returns RSI, MACD, and fused technical bias.
-    Used by signal_service to enrich Gemini signals.
+    Used by signal_service to enrich AI signals.
     """
     closes = await _fetch_closes(pair, interval="1h", count=60)
 
