@@ -199,7 +199,7 @@ Return only a JSON object, no markdown."""
             return {"success": False, "message": f"AI analysis failed: {str(e)}", "analysis": None}
 
     # Aliases for backward compatibility with any existing callers
-    async def analyze_conditions_with_ai(self, user_id: str, conditions: List[Dict]) -> Dict:
+    async def analyze_conditions_with_gemini(self, user_id: str, conditions: List[Dict]) -> Dict:
         return await self.analyze_conditions_with_ai(user_id, conditions)
 
     async def analyze_conditions_with_deepseek(self, user_id: str, conditions: List[Dict]) -> Dict:
@@ -229,7 +229,7 @@ Return only a JSON array of conditions, no markdown."""
             return {"success": False, "message": f"AI condition generation failed: {str(e)}", "conditions": None}
 
     # Aliases for backward compatibility
-    async def generate_conditions_with_ai(self, user_id: str, pair: str, action: str, strategy: str) -> Dict:
+    async def generate_conditions_with_gemini(self, user_id: str, pair: str, action: str, strategy: str) -> Dict:
         return await self.generate_conditions_with_ai(user_id, pair, action, strategy)
 
     async def generate_conditions_with_deepseek(self, user_id: str, pair: str, action: str, strategy: str) -> Dict:

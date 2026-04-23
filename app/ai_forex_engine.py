@@ -171,7 +171,7 @@ action, confidence, entry_price, stop_loss, take_profit, reason"""
             return await self.generate_trading_signal(pair, market_condition, user_strategy)
 
     # Aliases for backward compatibility
-    async def generate_trading_signal_with_ai(self, pair, market_condition, user_strategy, historical_data):
+    async def generate_trading_signal_with_gemini(self, pair, market_condition, user_strategy, historical_data):
         return await self.generate_trading_signal_with_ai(pair, market_condition, user_strategy, historical_data)
 
     async def generate_trading_signal_with_deepseek(self, pair, market_condition, user_strategy, historical_data):
