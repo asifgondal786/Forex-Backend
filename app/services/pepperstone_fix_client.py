@@ -304,9 +304,8 @@ class FIXSession:
         if not self._logged_on:
             return
         req_id = f"MD{uuid.uuid4().hex[:8].upper()}"
-        sym_fields = []
+        sym_fields = [(TAG["NoRelatedSym"], str(len(symbols)))]
         for sym in symbols:
-            sym_fields.append((TAG["NoRelatedSym"], str(len(symbols))))
             sym_fields.append((55, sym.replace("/", "")))
         fields = [
             (TAG["MDReqID"], req_id),
