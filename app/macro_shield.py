@@ -21,7 +21,7 @@ from app.macro_models import (
     EventAlert, AlertChannel, AlertStatus,
     UpcomingEventsResponse, ShieldStatusResponse,
 )
-from macro_scraper import fetch_calendar_events, currencies_for_symbol
+from app.macro_scraper import fetch_calendar_events, currencies_for_symbol
 
 logger = logging.getLogger("macro_shield.engine")
 

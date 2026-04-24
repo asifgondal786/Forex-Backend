@@ -33,9 +33,9 @@ SOH = "\x01"
 
 TAG = {
     "BeginString": 8, "BodyLength": 9, "MsgType": 35,
-    "SenderCompID": 49, "TargetCompID": 56, "SenderSubID": 50,
+    "SenderCompID": 49, "TargetCompID": 56, "SenderSubID": 50, "TargetSubID": 57,
     "MsgSeqNum": 34, "SendingTime": 52, "HeartBtInt": 108,
-    "EncryptMethod": 98, "ResetSeqNumFlag": 141, "Password": 554,
+    "EncryptMethod": 98, "ResetSeqNumFlag": 141, "Password": 554, "Username": 553,
     "CheckSum": 10, "ClOrdID": 11, "Symbol": 55, "Side": 54,
     "TransactTime": 60, "OrdType": 40, "OrderQty": 38,
     "StopPx": 99, "Price": 44, "TimeInForce": 59, "Account": 1,
@@ -74,6 +74,7 @@ def _build_fix_message(msg_type, fields, sender, target, seq, sender_sub=""):
     ]
     if sender_sub:
         body_fields.append((TAG["SenderSubID"], sender_sub))
+        body_fields.append((TAG["TargetSubID"], sender_sub))
     body_fields.extend(fields)
     body = SOH.join(f"{t}={v}" for t, v in body_fields) + SOH
     header = f"{TAG['BeginString']}=FIX.4.4{SOH}{TAG['BodyLength']}={len(body)}{SOH}"
@@ -83,7 +84,7 @@ def _build_fix_message(msg_type, fields, sender, target, seq, sender_sub=""):
 
 class FIXSession:
     def __init__(self, host, port, sender_comp_id, target_comp_id,
-                 sender_sub_id, password, use_ssl=True,
+                 sender_sub_id, password, username="", use_ssl=True,
                  heartbeat_interval=30, label="fix"):
         self.host = host
         self.port = port
@@ -91,6 +92,7 @@ class FIXSession:
         self.target = target_comp_id
         self.sender_sub = sender_sub_id
         self.password = password
+        self.username = username
         self.use_ssl = use_ssl
         self.hb_interval = heartbeat_interval
         self.label = label
@@ -126,6 +128,7 @@ class FIXSession:
             (TAG["EncryptMethod"], "0"),
             (TAG["HeartBtInt"], str(self.hb_interval)),
             (TAG["ResetSeqNumFlag"], "Y"),
+            (TAG["Username"], self.username),
             (TAG["Password"], self.password),
         ]
         msg = _build_fix_message(MSG["Logon"], fields, self.sender, self.target,
@@ -134,15 +137,17 @@ class FIXSession:
         await self._send_raw(msg)
         try:
             response = await asyncio.wait_for(self._read_message(), timeout=10)
+            logger.info("[%s] Logon raw response: %s", self.label, response)
             if response.get("35") == MSG["Logon"]:
                 self._logged_on = True
                 logger.info("[%s] Logon accepted", self.label)
                 self._recv_task = asyncio.create_task(self._recv_loop())
                 self._hb_task = asyncio.create_task(self._heartbeat_loop())
                 return True
+            logger.error("[%s] Logon rejected — got 35=%s", self.label, response.get("35"))
             return False
         except asyncio.TimeoutError:
-            logger.error("[%s] Logon timed out", self.label)
+            logger.error("[%s] Logon timed out — no response from server", self.label)
             return False
 
     async def logout(self) -> None:
@@ -174,7 +179,7 @@ class FIXSession:
             if not chunk:
                 break
             buf += chunk
-            if b"\x01" in buf:
+            if b"10=" in buf and buf.strip().endswith(b"\x01"):
                 return self._parse_fix(buf.decode("ascii", errors="replace"))
         return {}
 
@@ -346,7 +351,7 @@ class PepperstoneFixManager:
                                       f"demo.pepperstone.{account_id}"),
             target_comp_id=os.getenv("PEPPERSTONE_TRADE_TARGET_COMP_ID", "cServer"),
             sender_sub_id=os.getenv("PEPPERSTONE_TRADE_SENDER_SUB_ID", "TRADE"),
-            password=password, use_ssl=use_ssl, label="TRADE",
+            password=password, username=account_id, use_ssl=use_ssl, label="TRADE",
         )
         self.price_session = FIXSession(
             host=os.getenv("PEPPERSTONE_PRICE_HOST", "demo-us-eqx-01.p.ctrader.com"),
@@ -355,7 +360,7 @@ class PepperstoneFixManager:
                                       f"demo.pepperstone.{account_id}"),
             target_comp_id=os.getenv("PEPPERSTONE_PRICE_TARGET_COMP_ID", "cServer"),
             sender_sub_id=os.getenv("PEPPERSTONE_PRICE_SENDER_SUB_ID", "QUOTE"),
-            password=password, use_ssl=use_ssl, label="PRICE",
+            password=password, username=account_id, use_ssl=use_ssl, label="PRICE",
         )
         self._started = False
 
