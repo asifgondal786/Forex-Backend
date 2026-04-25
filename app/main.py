@@ -248,6 +248,7 @@ from .beginner_routes import router as beginner_router  # noqa: E402
 from .notification_routes import router as notification_router_v2  # noqa: E402
 from .market_routes import router as market_router  # noqa: E402
 from .signal_routes import router as signal_router  # noqa: E402
+from .ecms_routes import router as ecms_router  # noqa: E402
 from app.risk.risk_middleware import risk_router  # noqa: E402
 from app.security_routes import router as security_router  # noqa: E402
 from app.routers.charting import router as charting_router  # noqa: E402
@@ -1302,6 +1303,7 @@ _v1.include_router(header_router)
 _v1.include_router(tasks_router)
 _v1.include_router(notifications_router)
 _v1.include_router(settings_router)
+_v1.include_router(ecms_router)
 if AI_ROUTES_AVAILABLE:
     _v1.include_router(ai_task_router)
 if ADVANCED_FEATURES_AVAILABLE:
