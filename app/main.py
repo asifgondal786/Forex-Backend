@@ -1,4 +1,4 @@
-﻿"""
+"""
 Forex Companion - Complete FastAPI Application
 """
 from pathlib import Path
@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
+
 
 import os
 import time
@@ -23,6 +24,7 @@ from dotenv import load_dotenv
 from .config.audit import log_config_snapshot
 from .services.pepperstone_fix_client import pepperstone
 from .config.index import get_config, startup_snapshot as config_startup_snapshot
+from .services.trial_expiry_service import start_trial_expiry_scheduler
 from .config.logging import setup_logging
 from .config.validate_env import log_payload as env_validation_log_payload
 from .config.validate_env import validate_environment
@@ -317,7 +319,7 @@ except ImportError:
 
 import os as _os
  
-# DeepSeek AI proxy — enabled when AI_ROUTES_AVAILABLE=true
+# DeepSeek AI proxy � enabled when AI_ROUTES_AVAILABLE=true
 _ai_routes_flag = _os.getenv("AI_ROUTES_AVAILABLE", "false").lower() in {"true", "1", "yes"}
 try:
     from .routers.ai_proxy import router as ai_proxy_router
@@ -359,10 +361,10 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     
     logger.info(f"[Startup] DeepSeek AI: {'ACTIVE' if _ai_routes_flag and AI_PROXY_AVAILABLE else 'DISABLED'}")
-    logger.info(f"[Startup] Forex APIs: Twelve Data={'✓' if os.getenv('TWELVE_DATA_API_KEY') else '✗'} "
-            f"FCS={'✓' if os.getenv('FCS_API_KEY') else '✗'} "
-            f"Finnhub={'✓' if os.getenv('FINNHUB_KEY') else '✗'} "
-            f"iTick={'✓' if os.getenv('ITICK_API_KEY') else '✗'}")
+    logger.info(f"[Startup] Forex APIs: Twelve Data={'?' if os.getenv('TWELVE_DATA_API_KEY') else '?'} "
+            f"FCS={'?' if os.getenv('FCS_API_KEY') else '?'} "
+            f"Finnhub={'?' if os.getenv('FINNHUB_KEY') else '?'} "
+            f"iTick={'?' if os.getenv('ITICK_API_KEY') else '?'}")
 
     try:
         public_api_base = _public_api_base_url()
@@ -378,6 +380,8 @@ async def lifespan(app: FastAPI):
     # Configure optional monitoring integrations.
     _init_sentry_if_configured()
 
+    # Start trial expiry background scheduler (runs every 1 hour).
+    start_trial_expiry_scheduler()
     # Structured environment validation (no secret values in logs).
     try:
         env_validation_result = validate_environment()
@@ -980,6 +984,8 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/news/macro-shield",
     "/api/v1/news/health",
     "/api/v1/ai/health",
+    "/api/v1/nlp/health",
+    "/api/v1/nlp/command",
     "/api/v1/market/rates",
     "/api/v1/market/snapshot",
     "/api/v1/market/forex-health",
@@ -1341,8 +1347,7 @@ app.include_router(risk_router, prefix="/api/v1")
 app.include_router(security_router)
 app.include_router(charting_router)
 app.include_router(macro_router, prefix="/api/v1")
-app.add_event_handler("startup",  start_shield_scheduler)
-app.add_event_handler("shutdown", stop_shield_scheduler)
+
 
 # Unversioned routes (public auth, no /api prefix)
 if PUBLIC_AUTH_ROUTES_AVAILABLE:
@@ -1409,5 +1414,12 @@ async def api_health():
 
 # Phase 9 - Social and Autonomy
 app.include_router(social_router)
+
+
+
+
+from app.api.v1.nlp_routes import router as nlp_router
+app.include_router(nlp_router)
+
 
 
