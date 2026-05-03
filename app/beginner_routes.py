@@ -18,6 +18,9 @@ from app.database import supabase
 from app.limiter import limiter
 from app.security import get_current_user_id
 
+# Shared utilities — migrate local _require_supabase/_safe_float/etc to these
+from app.shared import require_supabase, safe_float, utcnow_iso, normalize_pair, price_digits, round_price  # noqa: F401
+
 router = APIRouter(prefix="/api/v1/beginner", tags=["beginner"])
 
 
@@ -52,21 +55,21 @@ class StressRequest(BaseModel):
     account_size: float = Field(default=10000.0, gt=0.0)
 
 
-def _require_supabase() -> Any:
+def require_supabase() -> Any:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured")
     return supabase
 
 
-def _today() -> str:
+def today_str() -> str:
     return date.today().isoformat()
 
 
-def _utcnow_iso() -> str:
+def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
+def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -79,7 +82,7 @@ def _default_settings() -> Dict[str, Any]:
         "daily_loss_cap": 100.0,
         "max_leverage": 10.0,
         "daily_loss_used": 0.0,
-        "last_reset_date": _today(),
+        "last_reset_date": today_str(),
     }
 
 
@@ -93,15 +96,15 @@ def _row_to_settings(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     settings["is_enabled"] = bool(
         row.get("beginner_mode_enabled", nested.get("beginner_mode_enabled", settings["is_enabled"]))
     )
-    settings["daily_loss_cap"] = _safe_float(
+    settings["daily_loss_cap"] = safe_float(
         row.get("daily_loss_cap", nested.get("daily_loss_cap", settings["daily_loss_cap"])),
         settings["daily_loss_cap"],
     )
-    settings["max_leverage"] = _safe_float(
+    settings["max_leverage"] = safe_float(
         row.get("max_leverage", nested.get("max_leverage", settings["max_leverage"])),
         settings["max_leverage"],
     )
-    settings["daily_loss_used"] = _safe_float(
+    settings["daily_loss_used"] = safe_float(
         row.get("daily_loss_used", nested.get("daily_loss_used", settings["daily_loss_used"])),
         settings["daily_loss_used"],
     )
@@ -130,7 +133,7 @@ def _load_settings(user_id: str) -> Dict[str, Any]:
 
 
 def _persist_settings(user_id: str, updates: Dict[str, Any]) -> None:
-    client = _require_supabase()
+    client = require_supabase()
     try:
         current_result = (
             client.table("user_settings")
@@ -164,10 +167,10 @@ def _persist_settings(user_id: str, updates: Dict[str, Any]) -> None:
         "daily_loss_used": float(merged["daily_loss_used"]),
         "last_reset_date": str(merged["last_reset_date"]),
         "settings": nested_settings,
-        "updated_at": _utcnow_iso(),
+        "updated_at": utcnow_iso(),
     }
     if not current_row:
-        payload["created_at"] = _utcnow_iso()
+        payload["created_at"] = utcnow_iso()
 
     client.table("user_settings").upsert(payload, on_conflict="user_id").execute()
 
@@ -175,7 +178,7 @@ def _persist_settings(user_id: str, updates: Dict[str, Any]) -> None:
 @router.get("/settings")
 async def get_settings(user_id: str = Depends(get_current_user_id)) -> Dict[str, Any]:
     settings = _load_settings(user_id)
-    today = _today()
+    today = today_str()
     if settings["last_reset_date"][:10] != today:
         settings["daily_loss_used"] = 0.0
         settings["last_reset_date"] = today
@@ -229,7 +232,7 @@ async def record_loss(
     if loss <= 0:
         return {"message": "No loss to record"}
 
-    today = _today()
+    today = today_str()
     if settings["last_reset_date"][:10] != today:
         settings["daily_loss_used"] = 0.0
     settings["daily_loss_used"] = round(settings["daily_loss_used"] + loss, 2)
@@ -257,7 +260,7 @@ async def check_trade_guard(
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
     settings = _load_settings(user_id)
-    today = _today()
+    today = today_str()
     daily_loss_used = settings["daily_loss_used"] if settings["last_reset_date"][:10] == today else 0.0
 
     if not settings["is_enabled"]:

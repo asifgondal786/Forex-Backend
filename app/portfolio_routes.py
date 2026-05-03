@@ -18,6 +18,9 @@ from app.database import supabase
 from app.limiter import limiter
 from app.security import get_current_user_id
 
+# Shared utilities — migrate local _require_supabase/_safe_float/etc to these
+from app.shared import require_supabase, safe_float, utcnow_iso, normalize_pair, price_digits, round_price  # noqa: F401
+
 router = APIRouter(prefix="/api/v1/portfolio", tags=["portfolio"])
 
 STARTING_BALANCE = 10000.0
@@ -27,25 +30,25 @@ class MarkToMarketRequest(BaseModel):
     prices: Dict[str, float] = Field(default_factory=dict)
 
 
-def _require_supabase() -> Any:
+def require_supabase() -> Any:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured")
     return supabase
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
+def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
 
 
-def _normalize_pair(pair: str) -> str:
+def normalize_pair(pair: str) -> str:
     return (pair or "").strip().upper().replace("_", "/")
 
 
 def _price_digits(pair: str) -> int:
-    normalized = _normalize_pair(pair)
+    normalized = normalize_pair(pair)
     if "JPY" in normalized:
         return 3
     if normalized.startswith("XAU/") or normalized.startswith("XAG/"):
@@ -62,24 +65,24 @@ def _same_day(timestamp: Optional[str], today: str) -> bool:
 
 
 def _serialize_open_trade(row: Dict[str, Any]) -> Dict[str, Any]:
-    pair = _normalize_pair(row.get("pair") or "")
+    pair = normalize_pair(row.get("pair") or "")
     return {
         "id": str(row.get("id") or ""),
         "pair": pair,
         "direction": str(row.get("direction") or "buy").upper(),
-        "entry_price": _round_price(pair, _safe_float(row.get("entry_price"))),
-        "lot_size": _safe_float(row.get("lot_size"), 0.01),
-        "leverage": _safe_float(row.get("leverage"), 1.0),
+        "entry_price": _round_price(pair, safe_float(row.get("entry_price"))),
+        "lot_size": safe_float(row.get("lot_size"), 0.01),
+        "leverage": safe_float(row.get("leverage"), 1.0),
         "stop_loss": row.get("stop_loss"),
         "take_profit": row.get("take_profit"),
         "opened_at": row.get("opened_at"),
-        "pnl": round(_safe_float(row.get("unrealized_pnl")), 2),
+        "pnl": round(safe_float(row.get("unrealized_pnl")), 2),
         "status": row.get("status") or "open",
     }
 
 
 def _serialize_closed_trade(row: Dict[str, Any]) -> Dict[str, Any]:
-    pair = _normalize_pair(row.get("pair") or "")
+    pair = normalize_pair(row.get("pair") or "")
     exit_price = row.get("exit_price")
     if exit_price is None:
         exit_price = row.get("close_price")
@@ -89,10 +92,10 @@ def _serialize_closed_trade(row: Dict[str, Any]) -> Dict[str, Any]:
         "id": str(row.get("id") or ""),
         "pair": pair,
         "direction": str(row.get("direction") or "buy").upper(),
-        "entry_price": _round_price(pair, _safe_float(row.get("entry_price"))),
-        "exit_price": _round_price(pair, _safe_float(exit_price)),
-        "lot_size": _safe_float(row.get("lot_size"), 0.01),
-        "realized_pnl": round(_safe_float(row.get("realized_pnl")), 2),
+        "entry_price": _round_price(pair, safe_float(row.get("entry_price"))),
+        "exit_price": _round_price(pair, safe_float(exit_price)),
+        "lot_size": safe_float(row.get("lot_size"), 0.01),
+        "realized_pnl": round(safe_float(row.get("realized_pnl")), 2),
         "opened_at": row.get("opened_at"),
         "closed_at": row.get("closed_at"),
     }
@@ -156,7 +159,7 @@ def _compute_stats(open_rows: List[Dict[str, Any]], closed_rows: List[Dict[str, 
 
 
 def _fetch_rows(user_id: str, status_value: str, *, limit: Optional[int] = None, offset: int = 0) -> List[Dict[str, Any]]:
-    client = _require_supabase()
+    client = require_supabase()
     query = (
         client.table("paper_trades")
         .select("*")
@@ -215,7 +218,7 @@ async def close_trade(
     trade_id: str,
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     try:
         rows = (
             client.table("paper_trades")
@@ -233,10 +236,10 @@ async def close_trade(
     if not row:
         raise HTTPException(status_code=404, detail="Trade not found or already closed")
 
-    pair = _normalize_pair(row.get("pair") or "")
+    pair = normalize_pair(row.get("pair") or "")
     direction = str(row.get("direction") or "buy").lower()
-    entry = _safe_float(row.get("entry_price"))
-    lot_size = _safe_float(row.get("lot_size"), 0.01)
+    entry = safe_float(row.get("entry_price"))
+    lot_size = safe_float(row.get("lot_size"), 0.01)
     exit_price = entry * (1.0008 if direction == "buy" else 0.9992)
     exit_price = _round_price(pair, exit_price)
     realized_pnl = round(
@@ -336,9 +339,9 @@ async def mark_to_market(
     payload: MarkToMarketRequest = Body(...),
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     price_map = {
-        _normalize_pair(pair): price for pair, price in payload.prices.items()
+        normalize_pair(pair): price for pair, price in payload.prices.items()
     }
 
     try:
@@ -348,15 +351,15 @@ async def mark_to_market(
 
     updated = 0
     for row in rows:
-        pair = _normalize_pair(row.get("pair") or "")
+        pair = normalize_pair(row.get("pair") or "")
         price = price_map.get(pair)
         if price is None:
             price = price_map.get(pair.replace("/", "_"))
         if price is None:
             continue
 
-        entry = _safe_float(row.get("entry_price"))
-        lot_size = _safe_float(row.get("lot_size"), 0.01)
+        entry = safe_float(row.get("entry_price"))
+        lot_size = safe_float(row.get("lot_size"), 0.01)
         direction = str(row.get("direction") or "buy").lower()
         price_diff = (price - entry) if direction == "buy" else (entry - price)
         pnl = round(price_diff * lot_size * 10000, 2)

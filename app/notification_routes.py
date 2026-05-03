@@ -18,6 +18,9 @@ from app.database import supabase
 from app.limiter import limiter
 from app.security import get_current_user_id
 
+# Shared utilities — migrate local _require_supabase/_safe_float/etc to these
+from app.shared import require_supabase, safe_float, utcnow_iso, normalize_pair, price_digits, round_price  # noqa: F401
+
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
 VALID_CATEGORIES = {"all", "trades", "risk", "market", "ai"}
@@ -28,13 +31,13 @@ class PushTokenRequest(BaseModel):
     platform: str = Field(default="web", min_length=2, max_length=32)
 
 
-def _require_supabase() -> Any:
+def require_supabase() -> Any:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured")
     return supabase
 
 
-def _safe_bool(value: Any) -> bool:
+def safe_bool(value: Any) -> bool:
     return bool(value)
 
 
@@ -71,7 +74,7 @@ def _serialize_notification(row: Dict[str, Any]) -> Dict[str, Any]:
             row.get("category") or row.get("type") or row.get("event_type")
         ),
         "timestamp": _extract_timestamp(row),
-        "is_read": _safe_bool(row.get("is_read") or row.get("read")),
+        "is_read": safe_bool(row.get("is_read") or row.get("read")),
     }
 
 
@@ -125,7 +128,7 @@ async def mark_read(
     notification_id: str,
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     try:
         existing = (
             client.table("notifications")
@@ -159,7 +162,7 @@ async def mark_all_read(
     request: Request,
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     try:
         (
             client.table("notifications")
@@ -181,7 +184,7 @@ async def dismiss_notification(
     notification_id: str,
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     try:
         (
             client.table("notifications")
@@ -233,7 +236,7 @@ async def register_push_token(
     payload: PushTokenRequest = Body(...),
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     body = {
         "user_id": user_id,
         "fcm_token": payload.token,

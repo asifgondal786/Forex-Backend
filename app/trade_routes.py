@@ -20,6 +20,9 @@ from app.database import supabase
 from app.limiter import limiter
 from app.security import get_current_user_id
 
+# Shared utilities — migrate local _require_supabase/_safe_float/etc to these
+from app.shared import require_supabase, safe_float, utcnow_iso, normalize_pair, price_digits, round_price  # noqa: F401
+
 router = APIRouter(prefix="/api/v1/trades", tags=["trades"])
 
 
@@ -37,33 +40,33 @@ class ClosePaperTradeRequest(BaseModel):
     exit_price: Optional[float] = None
 
 
-def _require_supabase() -> Any:
+def require_supabase() -> Any:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured")
     return supabase
 
 
-def _utcnow() -> datetime:
+def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
+def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
 
 
-def _normalize_pair(pair: str) -> str:
+def normalize_pair(pair: str) -> str:
     return (pair or "").strip().upper().replace("_", "/")
 
 
 def _pair_key(pair: str) -> str:
-    return _normalize_pair(pair).replace("/", "_")
+    return normalize_pair(pair).replace("/", "_")
 
 
 def _price_digits(pair: str) -> int:
-    normalized = _normalize_pair(pair)
+    normalized = normalize_pair(pair)
     if "JPY" in normalized:
         return 3
     if normalized.startswith("XAU/") or normalized.startswith("XAG/"):
@@ -85,7 +88,7 @@ def _fallback_entry_price(pair: str) -> float:
         "USD/CHF": 0.89800,
         "XAU/USD": 2340.00,
     }
-    normalized = _normalize_pair(pair)
+    normalized = normalize_pair(pair)
     return defaults.get(normalized, 1.00000)
 
 
@@ -93,7 +96,7 @@ def _resolve_entry_price(pair: str, requested_price: Optional[float]) -> float:
     if requested_price is not None:
         return _round_price(pair, requested_price)
 
-    client = _require_supabase()
+    client = require_supabase()
     try:
         result = (
             client.table("market_prices")
@@ -139,18 +142,18 @@ def _validate_setup(
 
 
 def _serialize_open_trade(row: Dict[str, Any]) -> Dict[str, Any]:
-    pair = _normalize_pair(row.get("pair") or "")
+    pair = normalize_pair(row.get("pair") or "")
     return {
         "id": str(row.get("id") or ""),
         "pair": pair,
         "direction": str(row.get("direction") or "buy").upper(),
-        "entry_price": _round_price(pair, _safe_float(row.get("entry_price"))),
-        "lot_size": _safe_float(row.get("lot_size"), 0.01),
-        "leverage": _safe_float(row.get("leverage"), 1.0),
+        "entry_price": _round_price(pair, safe_float(row.get("entry_price"))),
+        "lot_size": safe_float(row.get("lot_size"), 0.01),
+        "leverage": safe_float(row.get("leverage"), 1.0),
         "stop_loss": row.get("stop_loss"),
         "take_profit": row.get("take_profit"),
         "opened_at": row.get("opened_at"),
-        "pnl": round(_safe_float(row.get("unrealized_pnl")), 2),
+        "pnl": round(safe_float(row.get("unrealized_pnl")), 2),
         "status": row.get("status") or "open",
     }
 
@@ -162,7 +165,7 @@ async def open_paper_trade(
     payload: OpenPaperTradeRequest = Body(...),
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    pair = _normalize_pair(payload.pair)
+    pair = normalize_pair(payload.pair)
     direction = payload.direction.strip().lower()
     lot_size = float(payload.lot_size)
     leverage = float(payload.leverage)
@@ -181,9 +184,9 @@ async def open_paper_trade(
         raise HTTPException(status_code=400, detail=error)
 
     entry_price = _resolve_entry_price(pair, payload.entry_price)
-    now = _utcnow().isoformat()
+    now = utcnow().isoformat()
     trade_id = str(uuid4())
-    client = _require_supabase()
+    client = require_supabase()
 
     insert_payload = {
         "id": trade_id,
@@ -227,7 +230,7 @@ async def close_paper_trade(
     payload: Optional[ClosePaperTradeRequest] = Body(default=None),
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     try:
         result = (
             client.table("paper_trades")
@@ -245,10 +248,10 @@ async def close_paper_trade(
     if not row:
         raise HTTPException(status_code=404, detail="Open trade not found")
 
-    pair = _normalize_pair(row.get("pair") or "")
+    pair = normalize_pair(row.get("pair") or "")
     direction = str(row.get("direction") or "buy").lower()
-    entry = _safe_float(row.get("entry_price"))
-    lot_size = _safe_float(row.get("lot_size"), 0.01)
+    entry = safe_float(row.get("entry_price"))
+    lot_size = safe_float(row.get("lot_size"), 0.01)
 
     exit_price = payload.exit_price if payload else None
     if exit_price is None:
@@ -257,7 +260,7 @@ async def close_paper_trade(
 
     price_diff = (exit_price - entry) if direction == "buy" else (entry - exit_price)
     realized_pnl = round(price_diff * lot_size * 10000, 2)
-    now = _utcnow().isoformat()
+    now = utcnow().isoformat()
 
     update_payload = {
         "status": "closed",

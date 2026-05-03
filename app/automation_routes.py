@@ -17,6 +17,9 @@ from app.database import supabase
 from app.limiter import limiter
 from app.security import get_current_user_id
 
+# Shared utilities — migrate local _require_supabase/_safe_float/etc to these
+from app.shared import require_supabase, safe_float, utcnow_iso, normalize_pair, price_digits, round_price  # noqa: F401
+
 router = APIRouter(prefix="/api/v1/automation", tags=["automation"])
 
 VALID_MODES = {"manual", "assisted", "semi_auto", "fully_auto"}
@@ -42,17 +45,17 @@ class EvaluateAutoTradeRequest(BaseModel):
     current_drawdown_pct: float = Field(default=0.0, ge=0.0)
 
 
-def _require_supabase() -> Any:
+def require_supabase() -> Any:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured")
     return supabase
 
 
-def _utcnow_iso() -> str:
+def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
+def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -117,11 +120,11 @@ async def set_mode(
             detail=f"Invalid mode. Must be one of: {sorted(VALID_MODES)}",
         )
 
-    client = _require_supabase()
+    client = require_supabase()
     body = {
         "user_id": user_id,
         "trade_mode": mode,
-        "updated_at": _utcnow_iso(),
+        "updated_at": utcnow_iso(),
     }
     try:
         client.table("auto_trade_config").upsert(body, on_conflict="user_id").execute()
@@ -135,8 +138,8 @@ async def set_mode(
 async def get_guardrails(user_id: str = Depends(get_current_user_id)) -> Dict[str, Any]:
     config = _load_config(user_id)
     return {
-        "max_drawdown_pct": _safe_float(config.get("max_drawdown_pct"), 20.0),
-        "daily_loss_cap_usd": _safe_float(config.get("daily_loss_cap_usd"), 200.0),
+        "max_drawdown_pct": safe_float(config.get("max_drawdown_pct"), 20.0),
+        "daily_loss_cap_usd": safe_float(config.get("daily_loss_cap_usd"), 200.0),
         "max_open_trades": int(config.get("max_open_trades") or 5),
     }
 
@@ -148,10 +151,10 @@ async def set_guardrails(
     payload: GuardrailsRequest = Body(...),
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     body: Dict[str, Any] = {
         "user_id": user_id,
-        "updated_at": _utcnow_iso(),
+        "updated_at": utcnow_iso(),
     }
 
     if payload.max_drawdown_pct is not None:
@@ -172,8 +175,8 @@ async def set_guardrails(
     config = _load_config(user_id)
     return {
         "message": "Guardrails updated",
-        "max_drawdown_pct": _safe_float(config.get("max_drawdown_pct"), 20.0),
-        "daily_loss_cap_usd": _safe_float(config.get("daily_loss_cap_usd"), 200.0),
+        "max_drawdown_pct": safe_float(config.get("max_drawdown_pct"), 20.0),
+        "daily_loss_cap_usd": safe_float(config.get("daily_loss_cap_usd"), 200.0),
         "max_open_trades": int(config.get("max_open_trades") or 5),
     }
 
@@ -185,10 +188,10 @@ async def update_settings(
     payload: AutomationSettingsRequest = Body(...),
     user_id: str = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    client = _require_supabase()
+    client = require_supabase()
     body: Dict[str, Any] = {
         "user_id": user_id,
-        "updated_at": _utcnow_iso(),
+        "updated_at": utcnow_iso(),
     }
 
     if payload.auto_follow_enabled is not None:
@@ -262,7 +265,7 @@ async def evaluate_auto_trade(
     if mode not in {"semi_auto", "fully_auto"}:
         return {"allowed": False, "reason": "Automation is not active"}
 
-    client = _require_supabase()
+    client = require_supabase()
 
     max_open_trades = int(config.get("max_open_trades") or 5)
     try:
@@ -284,7 +287,7 @@ async def evaluate_auto_trade(
         }
 
     today = date.today().isoformat()
-    daily_cap = _safe_float(config.get("daily_loss_cap_usd"), 200.0)
+    daily_cap = safe_float(config.get("daily_loss_cap_usd"), 200.0)
     try:
         daily_rows = (
             client.table("paper_trades")
@@ -295,9 +298,9 @@ async def evaluate_auto_trade(
             .execute()
         )
         loss_used = sum(
-            abs(_safe_float(row.get("realized_pnl")))
+            abs(safe_float(row.get("realized_pnl")))
             for row in (daily_rows.data or [])
-            if _safe_float(row.get("realized_pnl")) < 0
+            if safe_float(row.get("realized_pnl")) < 0
         )
     except Exception:
         loss_used = 0.0
@@ -308,7 +311,7 @@ async def evaluate_auto_trade(
             "reason": f"Exceeds daily loss cap (${daily_cap:.0f})",
         }
 
-    max_drawdown = _safe_float(config.get("max_drawdown_pct"), 20.0)
+    max_drawdown = safe_float(config.get("max_drawdown_pct"), 20.0)
     if float(payload.current_drawdown_pct) > max_drawdown:
         return {
             "allowed": False,
