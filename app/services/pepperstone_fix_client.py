@@ -1,11 +1,11 @@
-"""
+﻿"""
 app/services/pepperstone_fix_client.py
 
-Pepperstone FIX API client — handles the full FIX 4.4 lifecycle:
+Pepperstone FIX API client â€” handles the full FIX 4.4 lifecycle:
   - Persistent SSL TCP connection (price + trade sessions)
   - Logon / Heartbeat / Logout
-  - NewOrderSingle (D)  →  trade session port 5212
-  - MarketDataRequest (V) →  price session port 5211
+  - NewOrderSingle (D)  â†’  trade session port 5212
+  - MarketDataRequest (V) â†’  price session port 5211
   - OrderCancelRequest (F)
 
 Environment variables consumed (all in your .env already):
@@ -26,6 +26,9 @@ import ssl
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+from dotenv import load_dotenv
+load_dotenv()  # Ensure .env is loaded before os.getenv()
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +147,10 @@ class FIXSession:
                 self._recv_task = asyncio.create_task(self._recv_loop())
                 self._hb_task = asyncio.create_task(self._heartbeat_loop())
                 return True
-            logger.error("[%s] Logon rejected — got 35=%s", self.label, response.get("35"))
+            logger.error("[%s] Logon rejected â€” got 35=%s", self.label, response.get("35"))
             return False
         except asyncio.TimeoutError:
-            logger.error("[%s] Logon timed out — no response from server", self.label)
+            logger.error("[%s] Logon timed out â€” no response from server", self.label)
             return False
 
     async def logout(self) -> None:
@@ -376,7 +379,7 @@ class PepperstoneFixManager:
                 await asyncio.sleep(1)
                 await self.price_session.subscribe_market_data(subscribe_symbols)
         self._started = True
-        logger.info("Pepperstone FIX ready — trade=%s price=%s",
+        logger.info("Pepperstone FIX ready â€” trade=%s price=%s",
                     self.trade_session.is_connected, self.price_session.is_connected)
 
     async def shutdown(self) -> None:

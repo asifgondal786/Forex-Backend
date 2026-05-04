@@ -1,13 +1,18 @@
-﻿"""AI module package for isolated strategy, risk, and provider integrations."""
-
-from .deepseek_client import DeepSeekClient, deepseek_client
-from .risk_engine import RiskEngine
-from .strategy_engine import SignalDecision, StrategyEngine
+﻿"""AI clients package - Claude (Bedrock) + DeepSeek + Smart Router."""
+from app.ai.claude_client import ask_claude, claude_health, ClaudeClient
+from app.ai.deepseek_client import (
+    ask_deepseek,
+    deepseek_health,
+    DeepSeekClient,
+    chat_completion,
+    chat_completion_json,
+    health_check,
+)
+from app.ai.ai_router import route as ai_route, health as ai_health
 
 __all__ = [
-    "DeepSeekClient",
-    "RiskEngine",
-    "SignalDecision",
-    "StrategyEngine",
-    "deepseek_client",
+    "ask_claude", "claude_health", "ClaudeClient",
+    "ask_deepseek", "deepseek_health", "DeepSeekClient",
+    "chat_completion", "chat_completion_json", "health_check",
+    "ai_route", "ai_health",
 ]

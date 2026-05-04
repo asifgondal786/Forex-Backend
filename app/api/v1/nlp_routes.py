@@ -1,117 +1,130 @@
+﻿"""
+NLP API routes for Tajir Forex Companion.
+Endpoints for trade command parsing and AI analysis.
 """
-app/api/v1/nlp_routes.py
-NLP + AI endpoints for Tajir.
-
-Routes:
-  POST /api/v1/nlp/command          — Main endpoint. Flutter nlp_chat_sheet calls this.
-  POST /api/v1/nlp/deepseek/analyze — DeepSeek market analysis (direct).
-  GET  /api/v1/nlp/health           — Health check for both AI clients.
-"""
-from __future__ import annotations
-
-import logging
-from typing import Any, Optional
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from typing import Any, Optional
 
 from app.services.nlp_command_service import process_nlp_command
-from app.ai.deepseek_client import deepseek_client
-from app.ai.openai_client import claude_client
-
-logger = logging.getLogger(__name__)
+from app.ai.ai_router import route as ai_route, health as ai_health
 
 router = APIRouter(prefix="/api/v1/nlp", tags=["NLP"])
 
 
-# ── Request / Response models ─────────────────────────────────────────────────
+# ── Request Models ────────────────────────────────────────
 
 class NlpCommandRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=500, description="Raw user command")
-    account_balance: float = Field(default=10_000.0, ge=0, description="User paper account balance")
-    validate_trades: bool = Field(default=True, description="Run DeepSeek validation on trades")
+    text: str = Field(..., min_length=1, max_length=2000)
+    account_balance: float = Field(default=10000.0, ge=0)
+    validate_with_ai: bool = True
 
 
 class DeepSeekAnalyzeRequest(BaseModel):
-    pair: str = Field(..., description="Forex pair e.g. EUR_USD")
-    context: Optional[str] = Field(None, description="Additional context for analysis")
-    timeframe: Optional[str] = Field("1h", description="Timeframe: 1h, 4h, 1d")
+    prompt: str = Field(..., min_length=1, max_length=5000)
+    task: str = Field(default="market_analysis")
+    provider: Optional[str] = None
+    max_tokens: int = Field(default=1024, ge=50, le=4096)
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+class SentimentRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=10000)
+    provider: Optional[str] = None
+
+
+class MarketAnalysisRequest(BaseModel):
+    pair: str = Field(default="EUR/USD")
+    context: str = Field(default="")
+    provider: Optional[str] = None
+
+
+# ── Endpoints ─────────────────────────────────────────────
 
 @router.post("/command")
 async def nlp_command(req: NlpCommandRequest) -> dict[str, Any]:
-    """
-    Main NLP endpoint. Called by nlp_chat_sheet.dart.
-    
-    Pipeline:
-      OpenAI (GPT-4o-mini) → parses intent + parameters
-      DeepSeek             → validates OPEN_TRADE intents
-      Regex fallback       → if OpenAI unavailable
-    
-    Flutter reads: response, intent, requires_confirmation, pair, direction, risk_pct
-    """
+    """Parse a natural language trade command."""
     try:
         result = await process_nlp_command(
             text=req.text,
             account_balance=req.account_balance,
-            validate_trades=req.validate_trades,
+            validate_with_ai=req.validate_with_ai,
         )
-        return {"success": True, **result}
-    except Exception as e:
-        logger.error("NLP command failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="NLP processing failed. Try again.")
+        return {"success": True, "data": result}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.post("/deepseek/analyze")
+@router.post("/analyze")
 async def deepseek_analyze(req: DeepSeekAnalyzeRequest) -> dict[str, Any]:
-    """
-    Direct DeepSeek market analysis endpoint.
-    Called when user asks for analysis/signals, or after trade confirmation.
-    """
-    if not deepseek_client.available:
-        raise HTTPException(status_code=503, detail="DeepSeek API key not configured.")
+    """General AI analysis — routed to best provider."""
+    try:
+        result = await ai_route(
+            req.prompt,
+            task=req.task,
+            force_provider=req.provider,
+            max_tokens=req.max_tokens,
+        )
+        return {"success": True, "data": result}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
-    prompt = (
-        f"Provide a brief forex market analysis for {req.pair.replace('_', '/')} "
-        f"on the {req.timeframe} timeframe. "
-        f"{'Context: ' + req.context if req.context else ''}"
-        f"Return JSON: {{\"bias\": BUY/SELL/NEUTRAL, \"confidence\": 0-1, "
-        f"\"key_levels\": [float], \"summary\": \"one sentence\", "
-        f"\"risk_note\": \"one sentence\"}}"
+
+@router.post("/sentiment")
+async def analyze_sentiment(req: SentimentRequest) -> dict[str, Any]:
+    """Analyze sentiment of forex news or text."""
+    system = (
+        "You are a forex sentiment analysis engine. "
+        "Respond ONLY with JSON: "
+        '{"sentiment":"bullish|bearish|neutral|mixed",'
+        '"confidence":0.0-1.0,'
+        '"impact":"high|medium|low",'
+        '"affected_pairs":["EUR/USD"],'
+        '"explanation":"brief"}'
     )
+    try:
+        result = await ai_route(
+            f'Analyze forex sentiment:\n\n"{req.text}"',
+            task="sentiment",
+            system=system,
+            temperature=0.1,
+            force_provider=req.provider,
+        )
+        return {"success": True, "data": result}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/market-analysis")
+async def market_analysis(req: MarketAnalysisRequest) -> dict[str, Any]:
+    """AI-powered market analysis for a currency pair."""
+    system = (
+        "You are Tajir, an expert forex market analyst. "
+        "Provide concise, actionable analysis. "
+        "Include: trend direction, key levels, risk factors, and a confidence score."
+    )
+    prompt = f"Analyze {req.pair} for trading."
+    if req.context:
+        prompt += f"\n\nAdditional context: {req.context}"
 
     try:
-        result = await deepseek_client.chat_completion_json(
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=300,
-            fallback={"bias": "NEUTRAL", "confidence": 0.5,
-                      "summary": "Analysis unavailable", "key_levels": [], "risk_note": ""},
+        result = await ai_route(
+            prompt,
+            task="market_analysis",
+            system=system,
+            max_tokens=1500,
+            force_provider=req.provider,
         )
-        return {"success": True, "pair": req.pair, "timeframe": req.timeframe, **result}
-    except Exception as e:
-        logger.error("DeepSeek analyze failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Market analysis failed.")
+        return {"success": True, "data": result}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/health")
 async def nlp_health() -> dict[str, Any]:
-    """
-    Health check for both AI clients.
-    Call this on app startup to verify keys are working.
-    """
-    openai_health  = await claude_client.health_check()
-    deepseek_health = await deepseek_client.health_check()
-
-    both_ok = (
-        openai_health.get("status") == "ok"
-        and deepseek_health.get("status") == "ok"
-    )
-
+    """Health check for all AI providers."""
+    providers = await ai_health()
+    all_ok = all(providers.values())
     return {
-        "status": "ok" if both_ok else "degraded",
-        "openai": openai_health,
-        "deepseek": deepseek_health,
+        "status": "healthy" if all_ok else "degraded",
+        "providers": providers,
     }
