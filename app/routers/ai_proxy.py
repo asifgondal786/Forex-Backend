@@ -1,17 +1,17 @@
-# =============================================================
+﻿# =============================================================
 # D:\Tajir\Backend\app\routers\ai_proxy.py
 #
-# AI Proxy Router — DeepSeek powered
+# AI Proxy Router â€” DeepSeek powered
 # Mounts at: /api/v1/ai/  (via _v1 in main.py)
 #
 # Endpoints:
-#   POST /api/v1/ai/chat              — AI chat copilot
-#   POST /api/v1/ai/analyze           — market analysis
-#   POST /api/v1/ai/signal            — trade signal
-#   POST /api/v1/ai/risk              — trade risk check
-#   POST /api/v1/ai/news-impact       — news impact
-#   POST /api/v1/ai/briefing          — autonomous briefing
-#   GET  /api/v1/ai/health            — AI health check
+#   POST /api/v1/ai/chat              â€” AI chat copilot
+#   POST /api/v1/ai/analyze           â€” market analysis
+#   POST /api/v1/ai/signal            â€” trade signal
+#   POST /api/v1/ai/risk              â€” trade risk check
+#   POST /api/v1/ai/news-impact       â€” news impact
+#   POST /api/v1/ai/briefing          â€” autonomous briefing
+#   GET  /api/v1/ai/health            â€” AI health check
 # =============================================================
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def _require_ai():
         )
 
 
-# ── Request / Response schemas ────────────────────────────────────────────────
+# â”€â”€ Request / Response schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ChatRequest(BaseModel):
     messages: list[dict] = Field(..., description="Conversation history [{role, content}]")
@@ -97,11 +97,11 @@ class ExplainRequest(BaseModel):
     audience:   str = Field("intermediate", example="beginner")
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# â”€â”€ Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/health")
 async def ai_health():
-    """AI service health — always public, no auth needed."""
+    """AI service health â€” always public, no auth needed."""
     ds_health = await deepseek_health()
     return {
         "status":              ds_health.get("status"),
@@ -114,7 +114,7 @@ async def ai_health():
 
 @router.post("/chat")
 async def chat(req: ChatRequest, _: None = Depends(_require_ai)):
-    """AI copilot chat — streaming-friendly conversational endpoint."""
+    """AI copilot chat â€” streaming-friendly conversational endpoint."""
     try:
         response = await chat_with_ai(req.messages, req.user_context)
         return {"response": response, "provider": "deepseek"}
@@ -196,11 +196,11 @@ async def explain(req: ExplainRequest, _: None = Depends(_require_ai)):
 #
 # Add these new endpoints to your existing market_routes.py.
 # They wire all 8 forex APIs into the existing route structure.
-# Do NOT replace the file — paste these into the existing router.
+# Do NOT replace the file â€” paste these into the existing router.
 # =============================================================
 
 """
-# ── PASTE THESE INTO app/market_routes.py ─────────────────────
+# â”€â”€ PASTE THESE INTO app/market_routes.py â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 from .services.forex_data_service import (
     get_rates,

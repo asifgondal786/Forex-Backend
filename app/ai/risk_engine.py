@@ -1,4 +1,4 @@
-"""Risk and position lifecycle helpers for AI trading workflows."""
+﻿"""Risk and position lifecycle helpers for AI trading workflows."""
 
 from __future__ import annotations
 
@@ -70,3 +70,4 @@ class RiskEngine:
         closed["close_price"] = current_price
         closed["profit"] = pnl
         return closed
+

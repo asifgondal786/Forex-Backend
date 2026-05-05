@@ -1,4 +1,4 @@
-"""
+﻿"""
 Forex Companion - Complete FastAPI Application
 """
 from pathlib import Path
@@ -256,6 +256,7 @@ from app.security_routes import router as security_router  # noqa: E402
 from app.routers.charting import router as charting_router  # noqa: E402
 from app.macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler  # noqa: E402
 from app.social_routes import router as social_router  # noqa: E402
+from app.health_routes import router as health_router
 from .paper_trading_routes import router as paper_router  # noqa: E402
 from .news_routes import router as news_router  # noqa: E402
 
@@ -319,7 +320,7 @@ except ImportError:
 
 import os as _os
  
-# DeepSeek AI proxy � enabled when AI_ROUTES_AVAILABLE=true
+# DeepSeek AI proxy ï¿½ enabled when AI_ROUTES_AVAILABLE=true
 _ai_routes_flag = _os.getenv("AI_ROUTES_AVAILABLE", "false").lower() in {"true", "1", "yes"}
 try:
     from .routers.ai_proxy import router as ai_proxy_router
@@ -627,6 +628,7 @@ app = FastAPI(
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
+from app.health_routes import router as health_router
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -634,6 +636,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
+from app.health_routes import router as health_router
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -1419,7 +1422,9 @@ app.include_router(social_router)
 
 
 from app.api.v1.nlp_routes import router as nlp_router
+from app.health_routes import router as health_router
 app.include_router(nlp_router)
+
 
 
 

@@ -14,26 +14,37 @@ _FALLBACK = os.getenv("FALLBACK_AI_PROVIDER", "deepseek")
 
 # Which provider is best for each task type
 TASK_ROUTING: dict[str, str] = {
-    # Claude strengths — nuance, analysis, safety
-    "sentiment":        "claude",
-    "classification":   "claude",
-    "summarization":    "claude",
-    "translation":      "claude",
-    "ner":              "claude",
-    "intent":           "claude",
-    "qa":               "claude",
-    "signal_analysis":  "claude",
-    "risk_analysis":    "claude",
-    "market_analysis":  "claude",
-    "news_impact":      "claude",
-    "trade_explanation": "claude",
-    "conversation":     "claude",
-    # DeepSeek strengths — code, math, cost efficiency
-    "code_generation":  "deepseek",
-    "code_review":      "deepseek",
-    "math":             "deepseek",
-    "nlp_command":      "deepseek",       # parsing trade commands
-    "quick_analysis":   "deepseek",       # simple fast tasks
+    # Claude strengths — NLP, nuance, explanation, conversation
+    "sentiment":            "claude",
+    "classification":       "claude",
+    "summarization":        "claude",
+    "translation":          "claude",
+    "ner":                  "claude",
+    "intent":               "claude",
+    "qa":                   "claude",
+    "signal_analysis":      "claude",
+    "risk_analysis":        "claude",
+    "market_analysis":      "claude",
+    "news_impact":          "claude",
+    "trade_explanation":    "claude",
+    "conversation":         "claude",
+    "prediction_explain":   "claude",
+    "report_generation":    "claude",
+    "onboarding":           "claude",
+    "news_summarization":   "claude",
+    # DeepSeek strengths — reasoning, code, math, quantitative
+    "code_generation":      "deepseek",
+    "code_review":          "deepseek",
+    "math":                 "deepseek",
+    "nlp_command":          "deepseek",
+    "quick_analysis":       "deepseek",
+    "strategy_generation":  "deepseek",
+    "pattern_recognition":  "deepseek",
+    "technical_analysis":   "deepseek",
+    "signal_scoring":       "deepseek",
+    "backtesting":          "deepseek",
+    "regime_detection":     "deepseek",
+    "position_sizing":      "deepseek",
 }
 
 _PROVIDERS = {

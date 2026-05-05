@@ -266,3 +266,12 @@ class RedisStore:
 
 
 redis_store = RedisStore()
+
+
+async def redis_ping() -> bool:
+    """Check if Redis is reachable. Used by health checks."""
+    try:
+        redis = await get_redis()
+        return await redis.ping()
+    except Exception:
+        return False
