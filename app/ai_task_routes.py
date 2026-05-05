@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Task Processing Routes
 Handles "Assign New Task" functionality with full AI capabilities
 """
@@ -229,7 +229,7 @@ class TaskResponse(BaseModel):
 async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
     """
     Execute comprehensive market analysis task
-    Steps: Fetch Data â†’ Analyze Trends â†’ Generate Report
+    Steps: Fetch Data Ã¢â€ â€™ Analyze Trends Ã¢â€ â€™ Generate Report
     """
 
     try:
@@ -302,7 +302,7 @@ async def execute_market_analysis_task(task_id: str, params: TaskCreateRequest):
             # Send update for this pair
             await ws_manager.send_update(
                 task_id=task_id,
-                message=f"âœ… Analyzed {pair}: {signal.action} signal with {signal.confidence:.0%} confidence",
+                message=f"Ã¢Å“â€¦ Analyzed {pair}: {signal.action} signal with {signal.confidence:.0%} confidence",
                 update_type="info",
                 data=analysis_results[pair],
                 user_id=params.user_id
@@ -418,7 +418,7 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
                     if trade_result["executed"]:
                         await ws_manager.send_update(
                             task_id=task_id,
-                            message=f"ðŸ¤– AUTO-TRADE: {signal.action} {pair} at {signal.entry_price:.4f}",
+                            message=f"Ã°Å¸Â¤â€“ AUTO-TRADE: {signal.action} {pair} at {signal.entry_price:.4f}",
                             update_type="success",
                             data=trade_result,
                             user_id=params.user_id
@@ -429,7 +429,7 @@ async def execute_auto_trading_task(task_id: str, params: TaskCreateRequest):
             closed_trades = await ai_engine.monitor_positions(rates)
 
             for trade in closed_trades:
-                profit_emoji = "ðŸ’°" if trade["profit"] > 0 else "ðŸ“‰"
+                profit_emoji = "Ã°Å¸â€™Â°" if trade["profit"] > 0 else "Ã°Å¸â€œâ€°"
                 await ws_manager.send_update(
                     task_id=task_id,
                     message=f"{profit_emoji} Position closed: {trade['pair']} | Profit: ${trade['profit']:.2f}",
@@ -524,7 +524,7 @@ async def execute_forecast_task(task_id: str, params: TaskCreateRequest):
 
             await ws_manager.send_update(
                 task_id=task_id,
-                message=f"ðŸ“Š {pair}: Predicted {forecast['expected_change_percent']:+.2f}% change in next {params.forecast_horizon_hours}h",
+                message=f"Ã°Å¸â€œÅ  {pair}: Predicted {forecast['expected_change_percent']:+.2f}% change in next {params.forecast_horizon_hours}h",
                 update_type="info",
                 data=forecast,
                 user_id=params.user_id
@@ -685,7 +685,7 @@ async def create_task(
 
 @router.get("/")
 async def list_tasks(user_id: Optional[str] = None, current_user_id: str = Depends(get_current_user_id)):
-    """List tasks (Firestore-backed)"""
+    """List tasks (Supabase-backed)"""
     if user_id and user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -796,3 +796,4 @@ async def get_economic_calendar():
     return {
         "events": calendar
     }
+

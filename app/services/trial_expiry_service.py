@@ -1,202 +1,188 @@
-"""
-app/services/trial_expiry_service.py
-
-Scheduled job that runs every hour and checks all users whose
-10-day trial has expired. Sets trialExpired = True and isSubscribed = False
-in Firestore so the Flutter real-time listener picks it up immediately.
-
-Integration:
-    In Backend/app/main.py add these lines in the startup section:
-
-        from .services.trial_expiry_service import start_trial_expiry_scheduler
-        start_trial_expiry_scheduler()
-
-    That's it. The scheduler runs in the background automatically.
+﻿"""
+trial_expiry_service.py
+Scans the 'subscriptions' table in Supabase for users whose trial has expired
+and updates their status accordingly. Sends notification via event bus.
 """
 
-from __future__ import annotations
-
-import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.database import supabase
+from app.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
-# ── Firestore client ──────────────────────────────────────────────────────────
-# Uses your existing firestore_client utility
-try:
-    from app.utils.firestore_client import get_firestore_client
-    _FIRESTORE_AVAILABLE = True
-except ImportError:
-    _FIRESTORE_AVAILABLE = False
-    logger.warning("trial_expiry_service: firestore_client not available")
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-TRIAL_DAYS           = 10
-CHECK_INTERVAL_SECS  = 3600   # run every 1 hour
-USERS_COLLECTION     = "users"
+router = APIRouter(prefix="/trial", tags=["Trial Management"])
 
 
-# ── Core expiry check ─────────────────────────────────────────────────────────
-async def check_and_expire_trials() -> dict:
+async def check_and_expire_trials(dry_run: bool = False) -> dict:
     """
-    Scans the Firestore 'users' collection for users whose trial has expired
-    but whose trialExpired flag is not yet set to True.
-
-    Returns a dict with counts for logging/monitoring.
+    Scans subscriptions for expired trials and updates their status.
+    
+    Returns:
+        dict with counts of expired, already_expired, errors
     """
-    if not _FIRESTORE_AVAILABLE:
-        logger.warning("check_and_expire_trials: Firestore not available, skipping")
-        return {"checked": 0, "expired": 0, "errors": 0}
+    if not supabase:
+        logger.warning("check_and_expire_trials: Supabase not available, skipping")
+        return {"status": "skipped", "reason": "supabase_not_configured"}
 
-    db = get_firestore_client()
-    now = datetime.now(timezone.utc)
-    trial_cutoff = now - timedelta(days=TRIAL_DAYS)
-
-    expired_count = 0
-    error_count   = 0
-    checked_count = 0
-
+    now = datetime.now(timezone.utc).isoformat()
+    
     try:
-        # Query users who:
-        # 1. Have a trialStartDate set (signed up)
-        # 2. Are NOT already marked as trialExpired
-        # 3. Are NOT subscribed (no need to touch paying users)
-        users_ref = db.collection(USERS_COLLECTION)
+        # Find all trialing subscriptions where trial has ended
+        result = (
+            supabase.table("subscriptions")
+            .select("id, user_id, trial_ends_at, plan")
+            .eq("status", "trialing")
+            .lt("trial_ends_at", now)
+            .execute()
+        )
 
-        # Firestore doesn't support complex multi-condition queries easily,
-        # so we filter in Python after fetching candidates
-        # Only fetch users where trialExpired != True to keep query small
-        candidates = users_ref.where("trialExpired", "!=", True).stream()
+        expired_subs = result.data or []
+        
+        if not expired_subs:
+            return {"status": "ok", "expired_count": 0, "message": "No expired trials found"}
 
-        batch = db.batch()
-        batch_count = 0
+        expired_count = 0
+        errors = []
 
-        for user_doc in candidates:
-            checked_count += 1
+        for sub in expired_subs:
             try:
-                data = user_doc.to_dict()
-                if not data:
-                    continue
+                if not dry_run:
+                    # Update subscription status
+                    supabase.table("subscriptions").update({
+                        "status": "expired",
+                        "plan": "free",
+                    }).eq("id", sub["id"]).execute()
 
-                # Skip already subscribed users
-                if data.get("isSubscribed", False):
-                    continue
+                    # Update user's subscription tier
+                    supabase.table("users").update({
+                        "subscription_tier": "free",
+                    }).eq("id", sub["user_id"]).execute()
 
-                # Get trial start date
-                trial_start_raw = data.get("trialStartDate")
-                if trial_start_raw is None:
-                    continue
+                    # Publish event for notification
+                    try:
+                        from app.services.event_bus import publish_event, EventType
+                        await publish_event(
+                            EventType.USER_SUBSCRIPTION_CHANGED,
+                            payload={
+                                "previous_plan": sub.get("plan", "basic"),
+                                "new_plan": "free",
+                                "reason": "trial_expired",
+                            },
+                            user_id=sub["user_id"],
+                        )
+                    except Exception as notify_err:
+                        logger.warning("Failed to publish trial expiry event: %s", notify_err)
 
-                # Normalise to datetime
-                if hasattr(trial_start_raw, "datetime"):
-                    # Firestore Timestamp object
-                    trial_start = trial_start_raw.datetime.replace(tzinfo=timezone.utc)
-                elif isinstance(trial_start_raw, str):
-                    trial_start = datetime.fromisoformat(
-                        trial_start_raw.replace("Z", "+00:00")
-                    )
-                else:
-                    continue
-
-                # Check if trial has expired
-                if trial_start <= trial_cutoff:
-                    # Mark as expired in Firestore
-                    user_ref = users_ref.document(user_doc.id)
-                    batch.update(user_ref, {
-                        "trialExpired": True,
-                        "trialExpiredAt": now.isoformat(),
-                    })
-                    batch_count += 1
-                    expired_count += 1
-
-                    logger.info(
-                        f"Trial expired: user={user_doc.id} "
-                        f"started={trial_start.date()} "
-                        f"expired={now.date()}"
-                    )
-
-                    # Commit in batches of 500 (Firestore limit)
-                    if batch_count >= 499:
-                        batch.commit()
-                        batch = db.batch()
-                        batch_count = 0
-
-            except Exception as user_err:
-                error_count += 1
-                logger.error(
-                    f"trial_expiry_service: error processing user "
-                    f"{user_doc.id}: {user_err}"
+                expired_count += 1
+                logger.info(
+                    "Trial expired | user=%s | plan=%s | trial_ended=%s",
+                    sub["user_id"], sub.get("plan"), sub.get("trial_ends_at"),
                 )
 
-        # Commit remaining batch
-        if batch_count > 0:
-            batch.commit()
+            except Exception as e:
+                errors.append({"user_id": sub["user_id"], "error": str(e)})
+                logger.error("Failed to expire trial for user %s: %s", sub["user_id"], e)
+
+        return {
+            "status": "ok",
+            "expired_count": expired_count,
+            "dry_run": dry_run,
+            "errors": errors if errors else None,
+        }
 
     except Exception as e:
-        logger.error(f"trial_expiry_service: scan failed: {e}")
-        error_count += 1
+        logger.error("check_and_expire_trials failed: %s", e, exc_info=True)
+        return {"status": "error", "error": str(e)}
 
-    result = {
-        "checked": checked_count,
-        "expired": expired_count,
-        "errors":  error_count,
-        "ran_at":  now.isoformat(),
-    }
-    logger.info(f"trial_expiry_service: run complete {result}")
+
+# ─── API Endpoints ───────────────────────────────────────────────────────────
+
+@router.post("/check-expired")
+async def run_trial_check(
+    dry_run: bool = False,
+    user=Depends(get_current_user),
+):
+    """
+    Manually trigger trial expiry check.
+    Protected — requires a valid Firebase auth token.
+    In production, this is called by a cron job / scheduled task.
+    """
+    result = await check_and_expire_trials(dry_run=dry_run)
     return result
 
 
-# ── Scheduler ─────────────────────────────────────────────────────────────────
-async def _scheduler_loop() -> None:
-    """Runs check_and_expire_trials every CHECK_INTERVAL_SECS seconds."""
-    logger.info(
-        f"trial_expiry_service: scheduler started "
-        f"(interval={CHECK_INTERVAL_SECS}s)"
+@router.get("/status")
+async def get_trial_status(user=Depends(get_current_user)):
+    """Get current user's trial/subscription status."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    uid = user.get("uid") or user.get("user_id")
+    
+    result = (
+        supabase.table("subscriptions")
+        .select("*")
+        .eq("user_id", uid)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
     )
+
+    if not result.data:
+        return {"status": "no_subscription", "plan": "free"}
+
+    sub = result.data[0]
+    return {
+        "plan": sub.get("plan", "free"),
+        "status": sub.get("status", "active"),
+        "trial_ends_at": sub.get("trial_ends_at"),
+        "current_period_end": sub.get("current_period_end"),
+    }
+
+
+# ─── Scheduler (called by main.py on startup) ────────────────────────────────
+
+import asyncio
+from contextlib import asynccontextmanager
+
+_scheduler_task = None
+
+
+async def _trial_check_loop(interval_hours: int = 6):
+    """Background task that periodically checks for expired trials."""
     while True:
         try:
-            await check_and_expire_trials()
+            result = await check_and_expire_trials()
+            logger.info("Trial expiry check completed: %s", result)
         except Exception as e:
-            logger.error(f"trial_expiry_service: scheduler loop error: {e}")
-        await asyncio.sleep(CHECK_INTERVAL_SECS)
+            logger.error("Trial expiry scheduler error: %s", e)
+        await asyncio.sleep(interval_hours * 3600)
 
 
-def start_trial_expiry_scheduler() -> None:
+def start_trial_expiry_scheduler():
     """
-    Call this once during FastAPI startup.
-    Creates a background asyncio task for the scheduler loop.
+    Start the background trial expiry checker.
+    Called by main.py during app startup.
     """
+    global _scheduler_task
     try:
         loop = asyncio.get_event_loop()
-        loop.create_task(_scheduler_loop())
-        logger.info("trial_expiry_service: background scheduler registered")
-    except RuntimeError as e:
-        logger.error(f"trial_expiry_service: could not start scheduler: {e}")
+        _scheduler_task = loop.create_task(_trial_check_loop())
+        logger.info("Trial expiry scheduler started (checks every 6 hours)")
+    except Exception as e:
+        logger.warning("Could not start trial expiry scheduler: %s", e)
 
 
-# ── FastAPI route (optional admin endpoint) ───────────────────────────────────
-# Add this router to main.py if you want to manually trigger the check
-# from your admin panel or Postman during testing.
-#
-# Usage in main.py:
-#   from .services.trial_expiry_service import trial_admin_router
-#   app.include_router(trial_admin_router)
+def stop_trial_expiry_scheduler():
+    """Stop the background scheduler."""
+    global _scheduler_task
+    if _scheduler_task:
+        _scheduler_task.cancel()
+        _scheduler_task = None
+        logger.info("Trial expiry scheduler stopped")
 
-from fastapi import APIRouter, Depends
-from app.security import get_current_user_id   # reuse existing auth
-
-trial_admin_router = APIRouter(
-    prefix="/api/v1/admin/trial",
-    tags=["admin"],
-)
-
-@trial_admin_router.post("/run-expiry-check")
-async def manual_expiry_check(user_id: str = Depends(get_current_user_id)):
-    """
-    Manually trigger the trial expiry check.
-    Useful for testing without waiting for the hourly scheduler.
-    Protected — requires a valid Firebase auth token.
-    """
-    result = await check_and_expire_trials()
-    return {"status": "ok", "result": result}

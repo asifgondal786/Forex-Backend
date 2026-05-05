@@ -1,4 +1,5 @@
-﻿"""
+﻿from app.metrics_routes import router as metrics_router
+"""
 Forex Companion - Complete FastAPI Application
 """
 from pathlib import Path
@@ -257,7 +258,6 @@ from app.routers.charting import router as charting_router  # noqa: E402
 from app.macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler  # noqa: E402
 from app.social_routes import router as social_router  # noqa: E402
 from app.health_routes import router as health_router
-from .paper_trading_routes import router as paper_router  # noqa: E402
 from .news_routes import router as news_router  # noqa: E402
 
 
@@ -969,12 +969,6 @@ _public_unauthenticated_auth_paths = {
     "/api/v1/risk/correlation",
     "/api/v1/risk/stress-test",
     "/api/v1/risk/health",
-    "/api/v1/paper/open",
-    "/api/v1/paper/close",
-    "/api/v1/paper/trades/open",
-    "/api/v1/paper/trades/history",
-    "/api/v1/paper/performance",
-    "/api/v1/paper/health",
     "/api/v1/risk/health",
     "/api/v1/signals/health",
     "/api/v1/signals/generate",
@@ -1333,7 +1327,6 @@ if AI_PROXY_AVAILABLE:
 app.include_router(_v1)
 app.include_router(market_router)
 app.include_router(risk_router)
-app.include_router(paper_router)
 app.include_router(signal_router)
 app.include_router(news_router)
 app.include_router(automation_router)
@@ -1378,7 +1371,6 @@ async def root():
             "risk_management": ADVANCED_FEATURES_AVAILABLE,
             "prediction_explainability": ADVANCED_FEATURES_AVAILABLE,
             "execution_intelligence": ADVANCED_FEATURES_AVAILABLE,
-            "paper_trading": ADVANCED_FEATURES_AVAILABLE,
             "natural_language_commands": ADVANCED_FEATURES_AVAILABLE,
             "security_compliance": ADVANCED_FEATURES_AVAILABLE,
             "multi_channel_notifications": ADVANCED_FEATURES_AVAILABLE,
@@ -1427,4 +1419,7 @@ app.include_router(nlp_router)
 
 
 
+
+
+app.include_router(metrics_router)
 

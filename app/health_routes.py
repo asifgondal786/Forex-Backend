@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 from app.services.redis_store import redis_ping
+from app.supabase_client import supabase_health
 from app.ai.ai_router import health as ai_health
 
 logger = logging.getLogger(__name__)
@@ -79,3 +80,4 @@ async def liveness_check():
     If this fails, the orchestrator should restart the container.
     """
     return {"status": "alive", "pid": __import__("os").getpid()}
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Enhanced WebSocket Manager with Live Forex Data Integration
 """
 from fastapi import WebSocket
@@ -206,7 +206,7 @@ class EnhancedWebSocketManager:
             return
         if update_type == "progress":
             return
-        if not self._has_firebase_config():
+        if not self._has_db_config():
             return
 
         activity = activity_type or self._map_update_type(update_type, data)
@@ -241,10 +241,10 @@ class EnhancedWebSocketManager:
             return "alert"
         return "monitor"
 
-    def _has_firebase_config(self) -> bool:
+    def _has_db_config(self) -> bool:
         return bool(
-            os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-            or os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+            os.getenv("SUPABASE_URL")
+            or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
             or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         )
 
@@ -359,3 +359,4 @@ class EnhancedWebSocketManager:
 
 # Global manager instance
 ws_manager = EnhancedWebSocketManager()
+

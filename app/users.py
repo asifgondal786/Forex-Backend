@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+﻿from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
@@ -100,4 +100,5 @@ async def update_current_user(
 async def get_user_preferences(current_user: dict = Depends(get_current_user)):
     """Get user preferences"""
     return current_user.get("preferences", {})
+
 

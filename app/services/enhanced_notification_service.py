@@ -1,4 +1,4 @@
-"""
+﻿"""
 Enhanced Multi-Channel Notification System
 Sends smart, contextual notifications via multiple channels
 """
@@ -299,7 +299,7 @@ class EnhancedNotificationService:
             "recommendation": recommendation,
         }
 
-    def _load_preferences_from_firestore(self, user_id: str) -> Optional[NotificationPreference]:
+    def _load_preferences_from_Supabase(self, user_id: str) -> Optional[NotificationPreference]:
         try:
             result = supabase.table("notification_preferences").select("*").eq("user_id", user_id).execute()
             if not result.data:
@@ -369,7 +369,7 @@ class EnhancedNotificationService:
                 "updated_at": datetime.utcnow().isoformat(),
             }).execute()
         except Exception as exc:
-            print(f"[PREFS] Firestore unavailable: {exc}")
+            print(f"[PREFS] Database unavailable: {exc}")
 
     def _initialize_templates(self):
         """Initialize standard notification templates"""
@@ -396,9 +396,9 @@ class EnhancedNotificationService:
                 template_id="risk_warning",
                 category=NotificationCategory.RISK_WARNING,
                 name="Risk Warning",
-                title_template="âš ï¸ Risk Warning",
+                title_template="Ã¢Å¡Â Ã¯Â¸Â Risk Warning",
                 message_template="{warning_text}. Current account status: {account_status}",
-                short_message_template="âš ï¸ {warning_text}",
+                short_message_template="Ã¢Å¡Â Ã¯Â¸Â {warning_text}",
                 priority=NotificationPriority.CRITICAL
             ),
             "prediction_ready": NotificationTemplate(
@@ -461,7 +461,7 @@ class EnhancedNotificationService:
     ) -> Dict:
         """Set user's notification preferences"""
 
-        existing = self.user_preferences.get(user_id) or self._load_preferences_from_firestore(user_id)
+        existing = self.user_preferences.get(user_id) or self._load_preferences_from_Supabase(user_id)
 
         channels: List[NotificationChannel] = []
         if enabled_channels is not None:
@@ -589,7 +589,7 @@ class EnhancedNotificationService:
             requested_priority = NotificationPriority.MEDIUM.value
 
         # Get user preferences
-        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_firestore(user_id)
+        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_Supabase(user_id)
         if not prefs:
             # Initialize default preferences
             await self.set_notification_preferences(user_id)
@@ -820,7 +820,7 @@ class EnhancedNotificationService:
         normalized_stage = self._stage_key(stage)
         stage_label = self._stage_label(stage)
 
-        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_firestore(user_id)
+        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_Supabase(user_id)
         if not prefs:
             await self.set_notification_preferences(user_id=user_id)
             prefs = self.user_preferences.get(user_id)
@@ -1196,7 +1196,7 @@ class EnhancedNotificationService:
                 "created_at": datetime.utcnow().isoformat(),
             }).execute()
         except Exception as exc:
-            print(f"[IN_APP] Firestore unavailable: {exc}")
+            print(f"[IN_APP] Database unavailable: {exc}")
 
         print(f"[IN_APP] Stored notification for {notification.user_id}")
 
@@ -1317,7 +1317,7 @@ class EnhancedNotificationService:
                 item.pop("_sort_ts", None)
             return items[:limit]
         except Exception:
-            # Fallback to in-memory notifications if Firestore is unavailable
+            # Fallback to in-memory notifications if Supabase is unavailable
             notifications = [n for n in self.notifications if n.user_id == user_id]
 
             if unread_only:
@@ -1373,7 +1373,7 @@ class EnhancedNotificationService:
 
     async def get_notification_settings_panel(self, user_id: str) -> Dict:
         """Get notification settings for UI"""
-        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_firestore(user_id)
+        prefs = self.user_preferences.get(user_id) or self._load_preferences_from_Supabase(user_id)
         if not prefs:
             await self.set_notification_preferences(user_id=user_id)
             prefs = self.user_preferences.get(user_id)
@@ -1435,3 +1435,4 @@ class EnhancedNotificationService:
             },
             "by_category": grouped
         }
+
