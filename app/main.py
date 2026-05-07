@@ -245,6 +245,7 @@ from .tasks_routes import router as tasks_router  # noqa: E402
 from .notifications_routes import router as notifications_router  # noqa: E402
 from .settings_routes import router as settings_router  # noqa: E402
 from .automation_routes import router as automation_router  # noqa: E402
+from .agent_routes import router as agent_router  # noqa: E402
 from .portfolio_routes import router as portfolio_router  # noqa: E402
 from .trade_routes import router as trade_router  # noqa: E402
 from .beginner_routes import router as beginner_router  # noqa: E402
@@ -1330,6 +1331,7 @@ app.include_router(risk_router)
 app.include_router(signal_router)
 app.include_router(news_router)
 app.include_router(automation_router)
+app.include_router(agent_router)
 app.include_router(portfolio_router)
 app.include_router(trade_router)
 app.include_router(beginner_router)
@@ -1422,4 +1424,5 @@ app.include_router(nlp_router)
 
 
 app.include_router(metrics_router)
+
 
