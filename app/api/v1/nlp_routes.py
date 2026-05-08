@@ -1,8 +1,8 @@
-﻿"""
+"""
 NLP API routes for Tajir Forex Companion.
 Endpoints for trade command parsing and AI analysis.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
@@ -128,3 +128,17 @@ async def nlp_health() -> dict[str, Any]:
         "status": "healthy" if all_ok else "degraded",
         "providers": providers,
     }
+
+@router.post("/chat")
+async def nlp_chat(req: dict, request: Request):
+    """NLP chat - routes to DeepSeek AI."""
+    prompt = req.get("message") or req.get("prompt", "")
+    if not prompt:
+        return {"status": "error", "message": "No message provided"}
+    try:
+        from app.ai.deepseek_client import DeepSeekClient
+        ds = DeepSeekClient()
+        resp = await ds.chat(prompt)
+        return {"status": "ok", "response": resp}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

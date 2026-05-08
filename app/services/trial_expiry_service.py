@@ -1,6 +1,6 @@
-﻿"""
+"""
 trial_expiry_service.py
-Scans the 'subscriptions' table in Supabase for users whose trial has expired
+Scans the 'user_subscriptions' table in Supabase for users whose trial has expired
 and updates their status accordingly. Sends notification via event bus.
 """
 
@@ -34,7 +34,7 @@ async def check_and_expire_trials(dry_run: bool = False) -> dict:
     try:
         # Find all trialing subscriptions where trial has ended
         result = (
-            supabase.table("subscriptions")
+            supabase.table("user_subscriptions")
             .select("id, user_id, trial_ends_at, plan")
             .eq("status", "trialing")
             .lt("trial_ends_at", now)
@@ -53,7 +53,7 @@ async def check_and_expire_trials(dry_run: bool = False) -> dict:
             try:
                 if not dry_run:
                     # Update subscription status
-                    supabase.table("subscriptions").update({
+                    supabase.table("user_subscriptions").update({
                         "status": "expired",
                         "plan": "free",
                     }).eq("id", sub["id"]).execute()
@@ -125,7 +125,7 @@ async def get_trial_status(user=Depends(get_current_user)):
     uid = user.get("uid") or user.get("user_id")
     
     result = (
-        supabase.table("subscriptions")
+        supabase.table("user_subscriptions")
         .select("*")
         .eq("user_id", uid)
         .order("created_at", desc=True)

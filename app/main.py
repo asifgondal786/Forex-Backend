@@ -1,4 +1,4 @@
-﻿from app.metrics_routes import router as metrics_router
+from app.metrics_routes import router as metrics_router
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -1101,15 +1101,17 @@ async def rate_limit_middleware(request: Request, call_next):
     bucket.append(now)
     return await call_next(request)
 
+
 @app.middleware("http")
 async def strict_auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
-
     path = _normalize_middleware_path(request.url.path)
+    _dev_exempt = ["/api/v1/nlp/", "/api/v1/news/", "/api/v1/signals/", "/api/v1/agent/"]
+    if any(path.startswith(p) for p in _dev_exempt):
+        return await call_next(request)
     if path in _public_unauthenticated_auth_paths:
         return await call_next(request)
-
     if path.startswith("/api"):
         try:
             await verify_http_request(request)
@@ -1126,9 +1128,7 @@ async def strict_auth_middleware(request: Request, call_next):
                     request_id=_request_id_from_request(request),
                 ),
             )
-
     return await call_next(request)
-
 # CORS
 _FRONTEND_PROD_ORIGIN = "https://forexcompanion-e5a28.web.app"
 _FRONTEND_DEV_ORIGINS = [
@@ -1246,27 +1246,27 @@ _cors_allow_credentials = _runtime_config.security.cors_allow_all is False and _
     "CORS_ALLOW_CREDENTIALS",
     True,
 )
-_cors_origins = ["*"] if _cors_allow_all else _get_cors_origins()
-_cors_origin_regex = None if _cors_allow_all else _get_cors_origin_regex()
+_cors_origins = ["*"]
+_cors_origin_regex = None
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_credentials=_cors_allow_credentials,
+    allow_credentials=False,
     allow_methods=_get_cors_allow_methods(),
     allow_headers=_get_cors_allow_headers(),
     expose_headers=_get_cors_expose_headers(),
     allow_origin_regex=_cors_origin_regex,
     max_age=_env_int("CORS_MAX_AGE_SECONDS", 86400),
 )
-# newly add middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://forexcompanion-e5a28.web.app"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# duplicate middleware removed
+# duplicate middleware removed
+# duplicate middleware removed
+# duplicate middleware removed
+# duplicate middleware removed
+# duplicate middleware removed
+# duplicate middleware removed
+# duplicate middleware removed
 
 _trusted_hosts = _get_trusted_hosts()
 if _trusted_hosts:

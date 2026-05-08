@@ -20,13 +20,13 @@ async def get_news_feed(
     pair: Optional[str] = Query(default="EUR/USD"),
 ) -> dict:
     try:
-        result = await market_intelligence_service.get_market_intelligence(
-            pair=pair or "EUR/USD"
-        )
-        return result
+        result = await market_intelligence_service.build_deep_study(pair=pair or "EUR/USD")
+        news = result.get("news", result.get("headlines", []))
+        return {"top_headlines": news, "status": "ok", "pair": pair}
     except Exception as e:
         logger.exception("News feed error")
         return {"error": str(e), "top_headlines": [], "status": "error"}
+
 
 
 @router.get("/events", summary="Live economic calendar from ForexFactory")
