@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import asyncio
 from datetime import datetime, date
 from app.database import supabase
@@ -54,16 +54,16 @@ async def evaluate_and_execute(user_id: str, signal: dict) -> dict:
             "blocked_pair_filter",
             f"{pair} not in allowed pairs list")
 
-    # Guardrail 3: macro news shield
+    # Guardrail 3: macro news shield (powered by ForexFactory via jblanked)
     if config.get("pause_on_news", True):
         try:
-            from app.services.forex_factory_service import ForexFactoryService
-            ff = ForexFactoryService()
-            shield = await ff.get_macro_shield_status()
+            from app.services.forex_factory_service import is_news_shield_active
+            shield = await is_news_shield_active(pre_minutes=30)
             if shield.get("shield_active"):
                 return _log_and_return(user_id, pair, direction, confidence,
                     "blocked_news",
-                    f"News shield active: {shield.get('event_name','High impact event')}")
+                    f"News shield active: {shield.get('event_name','High impact event')} "
+                    f"({shield.get('currency','')} in {shield.get('minutes_until','?'):.0f}min)")
         except Exception:
             pass
 
@@ -80,9 +80,9 @@ async def evaluate_and_execute(user_id: str, signal: dict) -> dict:
     if _daily_drawdown_breached(user_id, max_dd):
         return _log_and_return(user_id, pair, direction, confidence,
             "blocked_drawdown",
-            f"Daily drawdown of {max_dd}% breached — autonomous mode paused for today")
+            f"Daily drawdown of {max_dd}% breached â€” autonomous mode paused for today")
 
-    # All guardrails passed — execute
+    # All guardrails passed â€” execute
     trade_mode = config.get("trade_mode", "paper")
     risk_pct   = float(config.get("max_risk_per_trade") or 1.0)
 
@@ -158,7 +158,7 @@ def _log_execution(user_id, pair, direction, confidence,
 
 
 
-# ── Phase 13: Notification wiring ────────────────────────────────────────
+# â”€â”€ Phase 13: Notification wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from app.services.notification_dispatcher import NotificationDispatcher
 _dispatcher_as = NotificationDispatcher()
 
@@ -173,4 +173,5 @@ async def _notify_risk(user_id: str, pair: str, drawdown_pct: float, threshold_p
             "threshold": f"{threshold_pct:.1f}%",
         }
     )
-# ── End Phase 13 ─────────────────────────────────────────────────────────
+# â”€â”€ End Phase 13 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+

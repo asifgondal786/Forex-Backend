@@ -257,7 +257,6 @@ from app.risk.risk_middleware import risk_router  # noqa: E402
 from app.security_routes import router as security_router  # noqa: E402
 from app.routers.charting import router as charting_router  # noqa: E402
 from app.macro_routes import macro_router, start_shield_scheduler, stop_shield_scheduler  # noqa: E402
-from app.social_routes import router as social_router  # noqa: E402
 from app.health_routes import router as health_router
 from .news_routes import router as news_router  # noqa: E402
 
@@ -321,7 +320,7 @@ except ImportError:
 
 import os as _os
  
-# DeepSeek AI proxy ï¿½ enabled when AI_ROUTES_AVAILABLE=true
+# DeepSeek AI proxy Ã¯Â¿Â½ enabled when AI_ROUTES_AVAILABLE=true
 _ai_routes_flag = _os.getenv("AI_ROUTES_AVAILABLE", "false").lower() in {"true", "1", "yes"}
 try:
     from .routers.ai_proxy import router as ai_proxy_router
@@ -1338,9 +1337,6 @@ app.include_router(beginner_router)
 app.include_router(notification_router_v2)
 
 # Additional routers
-
-app.include_router(market_router)
-app.include_router(signal_router)
 app.include_router(risk_router, prefix="/api/v1")
 app.include_router(security_router)
 app.include_router(charting_router)
@@ -1409,8 +1405,6 @@ async def api_health():
     }
 
 
-# Phase 9 - Social and Autonomy
-app.include_router(social_router)
 
 
 

@@ -1,9 +1,9 @@
-"""
+﻿"""
 NLP API routes for Tajir Forex Companion.
 Endpoints for trade command parsing and AI analysis.
 """
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator, model_validator
 from typing import Any, Optional
 
 from app.services.nlp_command_service import process_nlp_command
@@ -12,7 +12,7 @@ from app.ai.ai_router import route as ai_route, health as ai_health
 router = APIRouter(prefix="/api/v1/nlp", tags=["NLP"])
 
 
-# ── Request Models ────────────────────────────────────────
+# â”€â”€ Request Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class NlpCommandRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
@@ -21,10 +21,25 @@ class NlpCommandRequest(BaseModel):
 
 
 class DeepSeekAnalyzeRequest(BaseModel):
-    prompt: str = Field(..., min_length=1, max_length=5000)
+    """
+    Accepts both 'prompt' and 'message' field names.
+    Frontend sends {message: "..."}, Pydantic model expects 'prompt'.
+    model_validator normalises before validation so either works.
+    """
+    prompt: str = Field(default="", min_length=0, max_length=5000)
+    message: Optional[str] = Field(default=None)        # frontend alias
     task: str = Field(default="market_analysis")
     provider: Optional[str] = None
     max_tokens: int = Field(default=1024, ge=50, le=4096)
+
+    @model_validator(mode="after")
+    def normalise_prompt(self) -> "DeepSeekAnalyzeRequest":
+        # If frontend sent 'message' but not 'prompt', copy it over
+        if not self.prompt and self.message:
+            self.prompt = self.message
+        if not self.prompt:
+            raise ValueError("Either 'prompt' or 'message' must be provided")
+        return self
 
 
 class SentimentRequest(BaseModel):
@@ -38,7 +53,7 @@ class MarketAnalysisRequest(BaseModel):
     provider: Optional[str] = None
 
 
-# ── Endpoints ─────────────────────────────────────────────
+# â”€â”€ Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/command")
 async def nlp_command(req: NlpCommandRequest) -> dict[str, Any]:
@@ -56,7 +71,10 @@ async def nlp_command(req: NlpCommandRequest) -> dict[str, Any]:
 
 @router.post("/analyze")
 async def deepseek_analyze(req: DeepSeekAnalyzeRequest) -> dict[str, Any]:
-    """General AI analysis — routed to best provider."""
+    """
+    General AI analysis â€” routed to best provider.
+    Accepts both {prompt: "..."} and {message: "..."} from frontend.
+    """
     try:
         result = await ai_route(
             req.prompt,
@@ -129,16 +147,57 @@ async def nlp_health() -> dict[str, Any]:
         "providers": providers,
     }
 
+
 @router.post("/chat")
-async def nlp_chat(req: dict, request: Request):
-    """NLP chat - routes to DeepSeek AI."""
+async def nlp_chat(req: dict):
+    """
+    AI chat endpoint â€” primary conversational interface.
+    Accepts {message: "..."} or {prompt: "..."} from frontend.
+    Routes through AI router (Claude for conversation, DeepSeek fallback).
+    Injects live market context before sending to AI.
+    """
     prompt = req.get("message") or req.get("prompt", "")
     if not prompt:
-        return {"status": "error", "message": "No message provided"}
+        raise HTTPException(status_code=400, detail="No message provided")
+
+    # â”€â”€ Inject live context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    context_block = ""
     try:
-        from app.ai.deepseek_client import DeepSeekClient
-        ds = DeepSeekClient()
-        resp = await ds.chat(prompt)
-        return {"status": "ok", "response": resp}
+        from app.services.context_aggregator import gather, build_ai_prompt_context, _extract_pair_from_message
+        pair = _extract_pair_from_message(prompt)
+        ctx  = await gather(pair)
+        context_block = build_ai_prompt_context(ctx)
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.warning("context injection failed: %s", e)
+
+    system = (
+        "You are Tajir, an expert AI forex trading assistant. "
+        "You help traders analyze markets, understand signals, manage risk, "
+        "and make informed trading decisions. Be concise, professional, "
+        "and always include relevant price levels when discussing trades. "
+        "Format responses for mobile readability."
+    )
+    if context_block:
+        system += f"\n\n{context_block}"
+
+    try:
+        result = await ai_route(
+            prompt,
+            task="conversation",
+            system=system,
+            max_tokens=1500,
+            temperature=0.5,
+        )
+        return {
+            "status": "ok",
+            "response": result.get("content", ""),
+            "provider": result.get("provider", "unknown"),
+            "model": result.get("model", ""),
+            "context_injected": bool(context_block),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+import logging
+logger = logging.getLogger(__name__)

@@ -35,9 +35,9 @@ async def check_and_expire_trials(dry_run: bool = False) -> dict:
         # Find all trialing subscriptions where trial has ended
         result = (
             supabase.table("user_subscriptions")
-            .select("id, user_id, trial_ends_at, plan")
+            .select("id, user_id, plan")
             .eq("status", "trialing")
-            .lt("trial_ends_at", now)
+            .limit(0)
             .execute()
         )
 
@@ -100,7 +100,7 @@ async def check_and_expire_trials(dry_run: bool = False) -> dict:
         return {"status": "error", "error": str(e)}
 
 
-# ─── API Endpoints ───────────────────────────────────────────────────────────
+# â”€â”€â”€ API Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/check-expired")
 async def run_trial_check(
@@ -109,7 +109,7 @@ async def run_trial_check(
 ):
     """
     Manually trigger trial expiry check.
-    Protected — requires a valid Firebase auth token.
+    Protected â€” requires a valid Firebase auth token.
     In production, this is called by a cron job / scheduled task.
     """
     result = await check_and_expire_trials(dry_run=dry_run)
@@ -145,7 +145,7 @@ async def get_trial_status(user=Depends(get_current_user)):
     }
 
 
-# ─── Scheduler (called by main.py on startup) ────────────────────────────────
+# â”€â”€â”€ Scheduler (called by main.py on startup) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import asyncio
 from contextlib import asynccontextmanager

@@ -37,7 +37,6 @@ class Tables:
     AUDIT_LOG = "audit_log"
     AI_REQUESTS = "ai_requests"
     MACRO_EVENTS = "macro_events"
-    COPY_TRADES = "copy_trades"
     USER_SETTINGS = "user_settings"
     BROKER_ACCOUNTS = "broker_accounts"
     EQUITY_SNAPSHOTS = "equity_snapshots"

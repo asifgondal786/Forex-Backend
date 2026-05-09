@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import logging
@@ -413,6 +413,45 @@ async def get_forex_news(pair: str | None = None, limit: int = 10) -> dict[str, 
         except Exception as exc:
             logger.warning("MarketAux news failed: %s", exc)
 
+    # RSS fallback — free, no key, same feeds as context_aggregator
+    if not articles:
+        try:
+            import feedparser as _fp
+            _RSS_FEEDS = [
+                "https://feeds.bloomberg.com/markets/news.rss",
+                "https://feeds.reuters.com/reuters/businessNews",
+                "https://www.forexlive.com/feed/news",
+                "https://www.fxstreet.com/rss/news",
+            ]
+            seen = set()
+            for feed_url in _RSS_FEEDS:
+                if len(articles) >= limit:
+                    break
+                try:
+                    feed = _fp.parse(feed_url)
+                    for entry in feed.entries:
+                        headline = entry.get("title", "").strip()
+                        if not headline or headline in seen:
+                            continue
+                        seen.add(headline)
+                        articles.append({
+                            "headline": headline,
+                            "summary": entry.get("summary", ""),
+                            "source": feed.feed.get("title", "rss"),
+                            "url": entry.get("link", ""),
+                            "datetime": entry.get("published", None),
+                            "sentiment": None,
+                        })
+                        if len(articles) >= limit:
+                            break
+                except Exception:
+                    continue
+            if articles:
+                source = "rss"
+        except Exception as exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning("RSS news fallback failed: %s", exc)
+
     payload = {
         "articles": articles,
         "pair": normalized_pair,
@@ -476,26 +515,77 @@ async def get_sentiment(pair: str | None = None) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("GDELT sentiment failed: %s", exc)
 
-    news = await get_forex_news(normalized_pair, limit=5)
-    headlines = [item.get("headline", "") for item in news.get("articles", [])]
-    score = 0.0
-    for headline in headlines:
-        lowered = headline.lower()
-        if any(token in lowered for token in ("surge", "rise", "gain", "bullish", "rebound")):
-            score += 1.0
-        if any(token in lowered for token in ("drop", "fall", "bearish", "selloff", "recession")):
-            score -= 1.0
-    if headlines:
-        score = score / len(headlines)
-        result = {
-            "sentiment": "bullish" if score > 0.15 else "bearish" if score < -0.15 else "neutral",
-            "score": round(score, 4),
-            "source": f"{news.get('source', 'news')}_derived",
-            "pair": normalized_pair,
-            "article_count": len(headlines),
-        }
-        _cache_set(cache_key, result, _SENTIMENT_TTL)
-    return {**result, "cached": False}
+        news = await get_forex_news(normalized_pair, limit=5)
+        headlines = [item.get("headline", "") for item in news.get("articles", [])]
+
+        if headlines:
+            try:
+                import os as _os, httpx as _httpx, json as _json
+                _anthropic_key = _os.getenv("ANTHROPIC_API_KEY", "")
+                if not _anthropic_key:
+                    raise ValueError("No ANTHROPIC_API_KEY")
+                pair_label = normalized_pair or "forex market"
+                headlines_text = "\n".join(f"- {h}" for h in headlines)
+                prompt = (
+                    f"You are a forex sentiment analyst. Analyse these headlines for {pair_label}.\n\n"
+                    f"Headlines:\n{headlines_text}\n\n"
+                    f"Respond with ONLY a JSON object, no markdown, no explanation:\n"
+                    '{"sentiment":"bullish|bearish|neutral","score":0.0,"reasoning":"one sentence"}\n'
+                    f"Score: -1.0 (very bearish) to +1.0 (very bullish)."
+                )
+                async with _httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": _anthropic_key,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": "claude-haiku-4-5-20251001",
+                            "max_tokens": 120,
+                            "messages": [{"role": "user", "content": prompt}],
+                        },
+                    )
+                resp.raise_for_status()
+                raw = resp.json()["content"][0]["text"].strip()
+                if raw.startswith("```"):
+                    raw = raw.split("```")[1]
+                    if raw.startswith("json"):
+                        raw = raw[4:]
+                parsed = _json.loads(raw.strip())
+                result = {
+                    "sentiment": parsed.get("sentiment", "neutral"),
+                    "score": round(float(parsed.get("score", 0.0)), 4),
+                    "source": f"{news.get('source', 'rss')}_ai",
+                    "pair": normalized_pair,
+                    "article_count": len(headlines),
+                    "reasoning": parsed.get("reasoning", ""),
+                }
+                _cache_set(cache_key, result, _SENTIMENT_TTL)
+                return {**result, "cached": False}
+
+            except Exception as exc:
+                import logging as _lg
+                _lg.getLogger(__name__).warning("Claude sentiment scorer failed: %s", exc)
+                score = 0.0
+                for headline in headlines:
+                    lowered = headline.lower()
+                    if any(t in lowered for t in ("surge","rise","gain","bullish","rebound","strong")):
+                        score += 1.0
+                    if any(t in lowered for t in ("drop","fall","bearish","selloff","recession","weak")):
+                        score -= 1.0
+                score = score / len(headlines)
+                result = {
+                    "sentiment": "bullish" if score > 0.15 else "bearish" if score < -0.15 else "neutral",
+                    "score": round(score, 4),
+                    "source": "keyword_fallback",
+                    "pair": normalized_pair,
+                    "article_count": len(headlines),
+                }
+                _cache_set(cache_key, result, _SENTIMENT_TTL)
+
+        return {**result, "cached": False}
 
 
 async def get_indicators(pair: str, indicator: str = "rsi", interval: str = "1h", period: int = 14) -> dict[str, Any]:
@@ -594,3 +684,6 @@ class ForexDataService:
 
     async def close(self) -> None:
         await close()
+
+
+

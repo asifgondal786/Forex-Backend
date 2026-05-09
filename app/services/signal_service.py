@@ -1,26 +1,18 @@
-"""
+﻿"""
 app/services/signal_service.py
 Phase 4 - AI Signal Fusion
-Flow: Prices + News + RSI/MACD -> DeepSeek -> Fused confidence score + 3-level explainer
+Flow: gather() context -> DeepSeek -> Fused confidence score + 3-level explainer
 """
 import os
-import json
 import logging
-import httpx
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import Optional, List
-from app.services.market_data_service import get_market_prices
 from app.services.technical_analysis_service import get_technical_indicators
 from app.ai.deepseek_client import DeepSeekClient
 
-logger = logging.getLogger(__name__)
-
-NEWS_API_KEY  = os.getenv("NEWS_API_KEY", "")
-SUPABASE_URL  = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY  = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-NEWS_API_BASE = "https://newsapi.org/v2"
-AI_MODEL      = "deepseek-chat"
+logger   = logging.getLogger(__name__)
+AI_MODEL = "deepseek-chat"
 
 
 class TradeSignal(BaseModel):
@@ -50,55 +42,18 @@ class SignalResponse(BaseModel):
     pairs:        list[str]
 
 
-async def _fetch_news(query: str = "forex currency trading") -> list[str]:
-    if not NEWS_API_KEY:
-        return []
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(
-                f"{NEWS_API_BASE}/everything",
-                params={
-                    "q":        query,
-                    "language": "en",
-                    "sortBy":   "publishedAt",
-                    "pageSize": 5,
-                    "apiKey":   NEWS_API_KEY,
-                },
-            )
-        resp.raise_for_status()
-        articles = resp.json().get("articles", [])
-        return [a.get("title", "") for a in articles if a.get("title")]
-    except Exception as e:
-        logger.error("NewsAPI fetch failed: %s", e)
-        return []
-
-
 async def _save_signal_to_supabase(signal: TradeSignal) -> None:
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            await client.post(
-                f"{SUPABASE_URL}/rest/v1/trade_signals",
-                headers={
-                    "apikey":        SUPABASE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_KEY}",
-                    "Content-Type":  "application/json",
-                    "Prefer":        "return=minimal",
-                },
-                json=signal.model_dump(),
-            )
+        from app.database import supabase
+        if not supabase:
+            return
+        supabase.table("trade_signals").insert(signal.model_dump()).execute()
     except Exception as e:
         logger.error("Supabase save failed: %s", e)
 
 
-def _fuse_confidence(
-    ai_conf: float,
-    technical_bias: str,
-    ai_sentiment: str,
-    action: str,
-) -> float:
-    score = ai_conf
+def _fuse_confidence(ai_conf: float, technical_bias: str, ai_sentiment: str, action: str) -> float:
+    score       = ai_conf
     action_bias = "bullish" if action == "BUY" else "bearish" if action == "SELL" else "neutral"
     if technical_bias == action_bias:
         score = min(score + 0.08, 0.95)
@@ -107,25 +62,24 @@ def _fuse_confidence(
     return round(score, 3)
 
 
-def _build_ai_prompt(pair: str, price: float, headlines: list[str], technical: dict) -> str:
-    news_block = "\n".join(f"- {h}" for h in headlines) if headlines else "- No news available"
+def _build_signal_prompt(pair: str, ctx_block: str, price: float, technical: dict) -> str:
     tech_block = ""
     if technical.get("available"):
-        rsi = technical.get("rsi")
+        rsi  = technical.get("rsi")
         macd = technical.get("macd") or {}
-        tech_block = f"""
-Technical Indicators:
-- RSI (14): {rsi:.1f} -> {technical.get("technical_bias", "neutral").upper()}
-- MACD: {macd.get("bias", "neutral").upper()} (histogram: {macd.get("histogram", 0):.6f})
-"""
-    return f"""You are an expert forex analyst. Analyze and return a trade signal.
+        tech_block = (
+            f"\nTechnical Indicators:\n"
+            f"- RSI(14): {rsi:.1f} -> {technical.get('technical_bias','neutral').upper()}\n"
+            f"- MACD: {macd.get('bias','neutral').upper()} (histogram: {macd.get('histogram',0):.6f})\n"
+        )
+
+    return f"""You are an expert forex analyst with access to live market data.
+
+{ctx_block}
 
 Currency Pair: {pair}
 Current Price: {price}
 {tech_block}
-Latest Forex News Headlines:
-{news_block}
-
 Return ONLY a valid JSON object with exactly these fields:
 {{
   "action": "BUY" or "SELL" or "HOLD",
@@ -155,43 +109,63 @@ async def generate_signals(
     if not pairs:
         pairs = ["EUR_USD", "GBP_USD", "USD_JPY"]
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    price_response = await get_market_prices(pairs=pairs, redis_client=redis_client)
-    price_map = {q.instrument: q.mid for q in price_response.prices}
-
-    if not price_map:
-        return SignalResponse(signals=[], generated_at=now_iso, pairs=pairs)
-
-    headlines = await _fetch_news("forex USD EUR GBP JPY trading")
+    now_iso    = datetime.now(timezone.utc).isoformat()
     signals: list[TradeSignal] = []
     _ai_client = DeepSeekClient()
 
     for pair in pairs:
-        price = price_map.get(pair)
+        pair_slash = pair.replace("_", "/")
+
+        # ── Full live context via gather() ──────────────────────────────────
+        try:
+            from app.services.context_aggregator import gather, build_ai_prompt_context
+            ctx      = await gather(pair_slash)
+            ctx_block = build_ai_prompt_context(ctx)
+            price    = None
+            # Extract price from context (Yahoo or Pepperstone)
+            if ctx.get("price"):
+                import re
+                m = re.search(r"[\d.]{5,}", ctx["price"])
+                price = float(m.group()) if m else None
+        except Exception as e:
+            logger.warning("gather() failed for %s: %s", pair_slash, e)
+            ctx_block = ""
+            price     = None
+
+        # ── Fallback price from market_data_service ─────────────────────────
         if not price:
+            try:
+                from app.services.market_data_service import get_market_prices
+                pr = await get_market_prices(pairs=[pair], redis_client=redis_client)
+                price = pr.prices[0].mid if pr.prices else None
+            except Exception:
+                pass
+
+        if not price:
+            logger.warning("No price for %s — skipping signal", pair)
             continue
 
-        technical = await get_technical_indicators(pair)
-        prompt = _build_ai_prompt(pair, price, headlines, technical)
+        technical = await get_technical_indicators(pair_slash)
+        prompt    = _build_signal_prompt(pair_slash, ctx_block, price, technical)
+
         raw = _ai_client.generate_json(
             model_name=AI_MODEL,
             prompt=prompt,
             fallback={
-                "action":           "HOLD",
-                "confidence":       0.5,
-                "stop_loss":        round(price * 0.995, 5),
-                "take_profit":      round(price * 1.005, 5),
-                "reasoning":        "AI unavailable - default HOLD signal",
-                "sentiment":        "neutral",
-                "news_summary":     "No news data available",
+                "action": "HOLD", "confidence": 0.5,
+                "stop_loss": round(price * 0.995, 5),
+                "take_profit": round(price * 1.005, 5),
+                "reasoning": "AI unavailable — default HOLD signal",
+                "sentiment": "neutral",
+                "news_summary": "No news data available",
                 "explain_simple":   "No AI explanation available right now.",
                 "explain_standard": "Signal generation requires DeepSeek API key.",
                 "explain_advanced": "Configure DEEPSEEK_API_KEY for full technical analysis.",
             },
         )
 
-        action = raw.get("action", "HOLD").upper()
-        ai_conf = float(raw.get("confidence", 0.5))
+        action     = raw.get("action", "HOLD").upper()
+        ai_conf    = float(raw.get("confidence", 0.5))
         fused_conf = _fuse_confidence(
             ai_conf=ai_conf,
             technical_bias=technical.get("technical_bias", "neutral"),
@@ -223,16 +197,17 @@ async def generate_signals(
 
         await _save_signal_to_supabase(signal)
         signals.append(signal)
+
         try:
             import asyncio as _asyncio
             from app.services.notification_service import notify_new_signal
-            _asyncio.create_task(notify_new_signal(user_id="broadcast", signal_data=signal.model_dump()))
+            _asyncio.create_task(notify_new_signal(
+                user_id="broadcast", signal_data=signal.model_dump()))
         except Exception as _ne:
-            logger.warning("Signal notification task failed: %s", _ne)
-        logger.info(
-            "Signal [Phase4] %s %s conf=%.2f->%.2f tech=%s",
-            action, pair, ai_conf, fused_conf,
-            technical.get("technical_bias", "n/a"),
-        )
+            logger.warning("Signal notification failed: %s", _ne)
+
+        logger.info("Signal %s %s conf=%.2f->%.2f tech=%s",
+                    action, pair, ai_conf, fused_conf,
+                    technical.get("technical_bias", "n/a"))
 
     return SignalResponse(signals=signals, generated_at=now_iso, pairs=pairs)
