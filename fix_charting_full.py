@@ -1,4 +1,5 @@
-"""
+﻿path = 'app/routers/charting.py'
+content = '''"""
 Charting Router - Tajir Forex Companion
 Serves OHLCV candle data and indicator data to the Flutter TradingView chart.
 
@@ -163,3 +164,6 @@ async def get_indicators(
             "last_close": closes[-1] if closes else None,
         }
     }
+'''
+open(path, 'w', encoding='utf-8').write(content)
+print('charting.py rewritten -', len(content), 'chars')

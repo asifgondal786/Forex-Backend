@@ -1103,7 +1103,7 @@ async def strict_auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     path = _normalize_middleware_path(request.url.path)
-    _dev_exempt = ["/api/v1/nlp/", "/api/v1/news/", "/api/v1/signals/", "/api/v1/agent/", "/api/v1/trades/"]
+    _dev_exempt = ["/api/v1/nlp/", "/api/v1/news/", "/api/v1/signals/", "/api/v1/agent/", "/api/v1/chart/", "/api/v1/trades/", "/api/v1/market/"]
     if any(path.startswith(p) for p in _dev_exempt):
         return await call_next(request)
     if path in _public_unauthenticated_auth_paths:
