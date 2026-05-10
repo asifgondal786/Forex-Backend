@@ -68,7 +68,7 @@ async def get_prices(
     if not result.prices and result.source == "error_fallback":
         raise HTTPException(
             status_code=503,
-            detail="Market data unavailable. Check TWELVE_DATA_API_KEY environment variable.",
+            detail="Market data unavailable. Pepperstone and Yahoo both failed.",
         )
 
     return result
@@ -80,7 +80,7 @@ async def get_supported_instruments() -> dict:
         "instruments": SUPPORTED_PAIRS,
         "default": DEFAULT_PAIRS,
         "count": len(SUPPORTED_PAIRS),
-        "source": "Twelve Data (twelvedata.com)",
+        "source": "Pepperstone FIX / Yahoo Finance",
     }
 
 
@@ -95,7 +95,7 @@ async def market_health(request: Request, redis=Depends(get_redis)) -> dict:
             "source": result.source,
             "cached": result.cached,
             "price_count": len(result.prices),
-            "key_set": bool(os.getenv("TWELVE_DATA_API_KEY")),
+            "key_set": false,
         }
     except Exception as e:
         logger.error("MARKET_HEALTH_ERROR: %s\n%s", str(e), _tb.format_exc())
@@ -159,3 +159,5 @@ async def market_sentiment(pair: Optional[str] = Query(default=None)) -> dict:
             "pair": pair_normalised,
             "error": str(e)[:200],
         }
+
+

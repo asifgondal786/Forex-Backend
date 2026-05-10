@@ -1,4 +1,4 @@
-from enum import Enum
+﻿from enum import Enum
 import asyncio
 
 class NotificationType(Enum):
@@ -99,9 +99,27 @@ async def notify_risk_alert(user_id: str, risk_data: dict) -> None:
         _notif_logger.warning("notify_risk_alert failed: %s", _e)
 
 async def notify_new_signal(user_id: str, signal_data: dict) -> None:
+    """Send new trade signal notification using send_smart_alert."""
     try:
         from app.services.enhanced_notification_service import EnhancedNotificationService
-        svc = EnhancedNotificationService()
-        await svc.send_signal_notification(user_id=user_id, signal_data=signal_data)
+        svc  = EnhancedNotificationService()
+        pair = signal_data.get("pair", "N/A")
+        act  = signal_data.get("action", "SIGNAL")
+        conf = float(signal_data.get("confidence", 0))
+        msg  = (
+            f"Signal: {act} {pair} | "
+            f"Conf: {conf:.0%} | "
+            f"Entry: {signal_data.get('entry_price','')} | "
+            f"{signal_data.get('reasoning','')}"
+        )
+        await svc.send_smart_alert(
+            user_id  = user_id,
+            title    = f"Tajir Signal: {act} {pair}",
+            message  = msg,
+            priority = "high" if conf >= 0.75 else "normal",
+        )
+        _notif_logger.info("Signal notification sent: %s %s conf=%.0f%%", act, pair, conf*100)
     except Exception as _e:
-        _notif_logger.warning("notify_new_signal failed: %s", _e)
+        _notif_logger.debug("notify_new_signal skipped: %s", _e)
+
+

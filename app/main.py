@@ -1,4 +1,4 @@
-from app.metrics_routes import router as metrics_router
+﻿from app.metrics_routes import router as metrics_router
 """
 Forex Companion - Complete FastAPI Application
 """
@@ -250,7 +250,8 @@ from .portfolio_routes import router as portfolio_router  # noqa: E402
 from .trade_routes import router as trade_router  # noqa: E402
 from .beginner_routes import router as beginner_router  # noqa: E402
 from .notification_routes import router as notification_router_v2  # noqa: E402
-from .market_routes import router as market_router  # noqa: E402
+from .market_routes import router as market_router
+from app.api.v1.trade_approval_routes import router as trade_approval_router  # noqa: E402
 from .signal_routes import router as signal_router  # noqa: E402
 from .ecms_routes import router as ecms_router  # noqa: E402
 from app.risk.risk_middleware import risk_router  # noqa: E402
@@ -320,7 +321,7 @@ except ImportError:
 
 import os as _os
  
-# DeepSeek AI proxy Ã¯Â¿Â½ enabled when AI_ROUTES_AVAILABLE=true
+# DeepSeek AI proxy ÃƒÂ¯Ã‚Â¿Ã‚Â½ enabled when AI_ROUTES_AVAILABLE=true
 _ai_routes_flag = _os.getenv("AI_ROUTES_AVAILABLE", "false").lower() in {"true", "1", "yes"}
 try:
     from .routers.ai_proxy import router as ai_proxy_router
@@ -362,10 +363,6 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     
     logger.info(f"[Startup] DeepSeek AI: {'ACTIVE' if _ai_routes_flag and AI_PROXY_AVAILABLE else 'DISABLED'}")
-    logger.info(f"[Startup] Forex APIs: Twelve Data={'?' if os.getenv('TWELVE_DATA_API_KEY') else '?'} "
-            f"FCS={'?' if os.getenv('FCS_API_KEY') else '?'} "
-            f"Finnhub={'?' if os.getenv('FINNHUB_KEY') else '?'} "
-            f"iTick={'?' if os.getenv('ITICK_API_KEY') else '?'}")
 
     try:
         public_api_base = _public_api_base_url()
@@ -1106,7 +1103,7 @@ async def strict_auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     path = _normalize_middleware_path(request.url.path)
-    _dev_exempt = ["/api/v1/nlp/", "/api/v1/news/", "/api/v1/signals/", "/api/v1/agent/"]
+    _dev_exempt = ["/api/v1/nlp/", "/api/v1/news/", "/api/v1/signals/", "/api/v1/agent/", "/api/v1/trades/"]
     if any(path.startswith(p) for p in _dev_exempt):
         return await call_next(request)
     if path in _public_unauthenticated_auth_paths:
@@ -1333,6 +1330,7 @@ app.include_router(automation_router)
 app.include_router(agent_router)
 app.include_router(portfolio_router)
 app.include_router(trade_router)
+app.include_router(trade_approval_router)
 app.include_router(beginner_router)
 app.include_router(notification_router_v2)
 
@@ -1418,5 +1416,9 @@ app.include_router(nlp_router)
 
 
 app.include_router(metrics_router)
+
+
+
+
 
 

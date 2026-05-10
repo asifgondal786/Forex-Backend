@@ -21,9 +21,7 @@ class CircuitState(str, Enum):
 class CircuitBreaker:
     """
     Usage:
-        twelve_data_breaker = CircuitBreaker("TwelveData", failure_threshold=5, recovery_timeout=60)
 
-        @twelve_data_breaker
         async def fetch_price(pair: str):
             ...
     """
@@ -127,7 +125,6 @@ class CircuitBreakerOpenError(Exception):
 
 # ─── Pre-configured breakers for external services ────────────────────────────
 
-twelve_data_breaker = CircuitBreaker("TwelveData", failure_threshold=5, recovery_timeout=60)
 anthropic_breaker = CircuitBreaker("Anthropic", failure_threshold=3, recovery_timeout=90)
 deepseek_breaker = CircuitBreaker("DeepSeek", failure_threshold=3, recovery_timeout=90)
 pepperstone_breaker = CircuitBreaker("Pepperstone", failure_threshold=2, recovery_timeout=120)

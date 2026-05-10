@@ -1,4 +1,4 @@
-﻿"""
+"""
 app/services/context_aggregator.py
 Single source of truth for live market context.
 Sources: Pepperstone FIX, OHLC/Yahoo, RSI/MACD, News RSS, ForexFactory, Sentiment, Supabase
@@ -102,7 +102,20 @@ async def _get_pepperstone_price(pair: str) -> Optional[str]:
                 return f"Bid:{p.get('bid','?')} Ask:{p.get('ask','?')} Spread:{spread}pip"
     except Exception as e:
         logger.debug("Pepperstone price failed: %s", e)
-    # 2. Yahoo Finance spot (get_rates source=unavailable, skip it)
+    # 2. Pepperstone _last_prices direct access (already subscribed on startup)
+    try:
+        from app.services.pepperstone_fix_client import pepperstone
+        if pepperstone and hasattr(pepperstone, "_last_prices"):
+            sym = pair.replace("/", "")
+            p   = pepperstone._last_prices.get(sym)
+            if p and p.get("bid") and p.get("ask"):
+                bid    = float(p["bid"])
+                ask    = float(p["ask"])
+                spread = round((ask - bid) * 10000, 1)
+                return f"Bid:{bid:.5f} Ask:{ask:.5f} Spread:{spread}pip [Pepperstone FIX]"
+    except Exception as e:
+        logger.debug("Pepperstone direct price failed: %s", e)
+    # 3. Yahoo Finance spot (get_rates source=unavailable, skip it)
     try:
         symbol_yahoo = pair.replace("/", "") + "=X"
         async with httpx.AsyncClient(timeout=6.0) as c:
@@ -127,20 +140,7 @@ async def _get_pepperstone_price(pair: str) -> Optional[str]:
 async def _get_ohlc_trend(pair: str) -> Optional[str]:
     symbol_raw   = pair.replace("/", "")
     symbol_yahoo = symbol_raw + "=X"
-    # 1. forex_data_service
-    try:
-        from app.services.forex_data_service import get_ohlc
-        raw     = await get_ohlc(symbol_raw, interval="1h", outputsize=20)
-        candles = _unwrap_candles(raw)
-        if len(candles) >= 4:
-            closes = [float(c.get("close", 0)) for c in candles[-10:] if c.get("close")]
-            if len(closes) >= 4:
-                trend      = "bullish" if closes[-1] > closes[0] else "bearish" if closes[-1] < closes[0] else "sideways"
-                change_pct = round((closes[-1] - closes[0]) / closes[0] * 100, 3)
-                return f"Trend:{trend} Change:{change_pct}% over 10h Last:{closes[-1]}"
-    except Exception as e:
-        logger.debug("OHLC forex_data_service failed: %s", e)
-    # 2. Yahoo Finance
+    # 1. Yahoo Finance (primary - twelve_cache removed)
     try:
         async with httpx.AsyncClient(timeout=8.0) as c:
             r = await c.get(
@@ -285,18 +285,18 @@ async def gather(pair: str = "EUR/USD") -> dict:
 
 def build_ai_prompt_context(ctx: dict) -> str:
     pair  = ctx.get("pair", "N/A")
-    lines = [f"═══ LIVE MARKET CONTEXT: {pair} ═══"]
-    if ctx.get("price"):      lines.append(f"💰 LIVE PRICE:     {ctx['price']}")
-    if ctx.get("ohlc"):       lines.append(f"📊 CHART TREND:    {ctx['ohlc']}")
-    if ctx.get("technical"):  lines.append(f"📈 TECHNICALS:     {ctx['technical']}")
-    if ctx.get("sentiment"):  lines.append(f"🌡  SENTIMENT:      {ctx['sentiment']}")
+    lines = [f"--- LIVE MARKET CONTEXT: {pair} ---"]
+    if ctx.get("price"):      lines.append(f"?? LIVE PRICE:     {ctx['price']}")
+    if ctx.get("ohlc"):       lines.append(f"?? CHART TREND:    {ctx['ohlc']}")
+    if ctx.get("technical"):  lines.append(f"?? TECHNICALS:     {ctx['technical']}")
+    if ctx.get("sentiment"):  lines.append(f"??  SENTIMENT:      {ctx['sentiment']}")
     if ctx.get("news"):
-        lines.append("📰 LATEST NEWS:")
+        lines.append("?? LATEST NEWS:")
         for h in ctx["news"][:5]:
-            lines.append(f"   • {h}")
-    if ctx.get("ff_events"):  lines.append(f"📅 CALENDAR EVENTS:\n{ctx['ff_events']}")
-    if ctx.get("last_signal"): lines.append(f"🎯 LAST AI SIGNAL: {ctx['last_signal']}")
-    lines.append("═══════════════════════════════════")
+            lines.append(f"   - {h}")
+    if ctx.get("ff_events"):  lines.append(f"?? CALENDAR EVENTS:\n{ctx['ff_events']}")
+    if ctx.get("last_signal"): lines.append(f"?? LAST AI SIGNAL: {ctx['last_signal']}")
+    lines.append("-----------------------------------")
     return "\n".join(lines)
 
 
@@ -309,4 +309,5 @@ def _extract_pair_from_message(text: str) -> str:
     if m:
         return f"{m.group(1)}/{m.group(2)}"
     return "EUR/USD"
+
 

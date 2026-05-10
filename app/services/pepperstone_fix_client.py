@@ -107,6 +107,7 @@ class FIXSession:
         self._last_prices: Dict[str, Dict] = {}
         self._lock = asyncio.Lock()
         self._hb_task = None
+        self._refresh_task = None
         self._recv_task = None
 
     async def connect(self) -> bool:
@@ -146,6 +147,8 @@ class FIXSession:
                 logger.info("[%s] Logon accepted", self.label)
                 self._recv_task = asyncio.create_task(self._recv_loop())
                 self._hb_task = asyncio.create_task(self._heartbeat_loop())
+                if self.label == "PRICE":
+                    self._refresh_task = asyncio.create_task(self._price_refresh_loop())
                 return True
             logger.error("[%s] Logon rejected â€” got 35=%s", self.label, response.get("35"))
             return False
@@ -182,7 +185,7 @@ class FIXSession:
             if not chunk:
                 break
             buf += chunk
-            if b"10=" in buf and buf.strip().endswith(b"\x01"):
+            if b"10=" in buf and buf.endswith(b"\x01"):
                 return self._parse_fix(buf.decode("ascii", errors="replace"))
         return {}
 
@@ -193,6 +196,16 @@ class FIXSession:
                 tag, _, val = part.partition("=")
                 fields[tag.strip()] = val.strip()
         return fields
+
+    async def _price_refresh_loop(self) -> None:
+        import asyncio as _asyncio
+        await _asyncio.sleep(5)
+        while self._logged_on:
+            try:
+                await self.subscribe_market_data(['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'])
+            except Exception as e:
+                import logging; logging.getLogger(__name__).warning('Price refresh error: %s', e)
+            await _asyncio.sleep(30)
 
     async def _heartbeat_loop(self) -> None:
         while self._logged_on:
@@ -408,3 +421,5 @@ class PepperstoneFixManager:
 
 
 pepperstone = PepperstoneFixManager()
+
+

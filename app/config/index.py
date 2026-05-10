@@ -288,7 +288,6 @@ def startup_snapshot(config: AppConfig) -> dict[str, object]:
 import os as _os
 
 FOREX_API_KEYS_REQUIRED = [
-    "TWELVE_DATA_API_KEY",
     "FCS_API_KEY",
     "FOREXRATEAPI_API_KEY",
     "EXCHANGERATESAPI_API_KEY",
@@ -302,7 +301,6 @@ def startup_snapshot_phase14() -> dict:
     return {
         "forex_providers_configured": sum(
             1 for k in [
-                "TWELVE_DATA_API_KEY", "FCS_API_KEY", "FOREXRATEAPI_API_KEY",
                 "EXCHANGERATESAPI_API_KEY", "ITICK_API_KEY", "FINNHUB_KEY",
             ]
             if _os.getenv(k, "").strip()

@@ -42,12 +42,22 @@ class SignalResponse(BaseModel):
     pairs:        list[str]
 
 
-async def _save_signal_to_supabase(signal: TradeSignal) -> None:
+async def _save_signal_to_supabase(signal: TradeSignal, safe_mode: bool = False) -> None:
     try:
         from app.database import supabase
         if not supabase:
             return
-        supabase.table("trade_signals").insert(signal.model_dump()).execute()
+        data = signal.model_dump()
+        if safe_mode:
+            # Only insert columns guaranteed to exist in trade_signals table
+            core_fields = {
+                "pair", "action", "confidence", "entry_price",
+                "stop_loss", "take_profit", "reasoning", "sentiment",
+                "news_summary", "generated_at", "model",
+            }
+            data = {k: v for k, v in data.items() if k in core_fields}
+        supabase.table("trade_signals").insert(data).execute()
+        logger.info("Signal saved to Supabase: %s %s", signal.pair, signal.action)
     except Exception as e:
         logger.error("Supabase save failed: %s", e)
 
@@ -148,21 +158,31 @@ async def generate_signals(
         technical = await get_technical_indicators(pair_slash)
         prompt    = _build_signal_prompt(pair_slash, ctx_block, price, technical)
 
-        raw = _ai_client.generate_json(
-            model_name=AI_MODEL,
-            prompt=prompt,
-            fallback={
-                "action": "HOLD", "confidence": 0.5,
-                "stop_loss": round(price * 0.995, 5),
-                "take_profit": round(price * 1.005, 5),
-                "reasoning": "AI unavailable — default HOLD signal",
-                "sentiment": "neutral",
-                "news_summary": "No news data available",
-                "explain_simple":   "No AI explanation available right now.",
-                "explain_standard": "Signal generation requires DeepSeek API key.",
-                "explain_advanced": "Configure DEEPSEEK_API_KEY for full technical analysis.",
-            },
-        )
+        _FALLBACK = {
+            "action": "HOLD", "confidence": 0.5,
+            "stop_loss": round(price * 0.995, 5),
+            "take_profit": round(price * 1.005, 5),
+            "reasoning": "AI unavailable — default HOLD signal",
+            "sentiment": "neutral",
+            "news_summary": "No news data available",
+            "explain_simple":   "No AI explanation available right now.",
+            "explain_standard": "Signal generation requires DeepSeek API key.",
+            "explain_advanced": "Configure DEEPSEEK_API_KEY for full technical analysis.",
+        }
+        try:
+            raw = await _ai_client.generate_json(
+                prompt=prompt,
+                model_name=AI_MODEL,
+                system_prompt=(
+                    "You are an expert forex analyst. "
+                    "Return ONLY valid JSON, no markdown, no explanation."
+                ),
+            )
+            if not isinstance(raw, dict) or "action" not in raw:
+                raw = _FALLBACK
+        except Exception as _ge:
+            logger.warning("DeepSeek generate_json failed: %s", _ge)
+            raw = _FALLBACK
 
         action     = raw.get("action", "HOLD").upper()
         ai_conf    = float(raw.get("confidence", 0.5))
@@ -211,3 +231,10 @@ async def generate_signals(
                     technical.get("technical_bias", "n/a"))
 
     return SignalResponse(signals=signals, generated_at=now_iso, pairs=pairs)
+
+
+
+
+
+
+

@@ -37,7 +37,7 @@ TIMEFRAME_MINUTES = {
 
 
 def generate_mock_candles(pair: str, timeframe: str, count: int = 100) -> list[dict]:
-    """Stub — returns empty list. Real candle data comes from TwelveData."""
+    """Stub — returns empty list. Real candle data comes from Yahoo Finance."""
     return []
 
 

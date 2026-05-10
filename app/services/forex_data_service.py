@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -13,7 +13,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 logger = logging.getLogger(__name__)
 
-_TWELVE_DATA_KEY = (os.getenv("TWELVE_DATA_API_KEY") or "").strip()
+# TwelveData removed
 _FCS_KEY = (os.getenv("FCS_API_KEY") or "").strip()
 _FOREXRATE_KEY = (os.getenv("FOREXRATEAPI_API_KEY") or "").strip()
 _EXCHANGERATES_KEY = (os.getenv("EXCHANGERATESAPI_API_KEY") or "").strip()
@@ -177,8 +177,6 @@ async def _get_json(url: str, *, params: dict[str, Any] | None = None) -> Any:
     return response.json()
 
 
-async def _rates_twelve_data(pairs: list[str]) -> dict[str, float] | None:
-    from app.services.twelve_cache import fetch_price
     raw = await fetch_price(pairs)
     if not raw:
         return None
@@ -194,7 +192,6 @@ async def _rates_twelve_data(pairs: list[str]) -> dict[str, float] | None:
         return result if result else None
     except Exception as e:
         import logging
-        logging.getLogger(__name__).error("_rates_twelve_data parse error: %s", e)
         return None
 
 
@@ -307,8 +304,23 @@ async def get_rates(pairs: list[str] | None = None) -> dict[str, Any]:
     rates: dict[str, float] | None = None
     source = "unavailable"
 
+    # Pepperstone FIX live prices (real broker feed)
+    try:
+        from app.services.pepperstone_fix_client import pepperstone as _pp
+        if _pp and _pp.price_ready:
+            pp_rates = {}
+            for pair in normalized_pairs:
+                symbol = pair.replace("_", "")
+                px = _pp.get_last_price(symbol)
+                if px and px.get("mid"):
+                    pp_rates[pair] = px["mid"]
+            if len(pp_rates) == len(normalized_pairs):
+                rates = pp_rates
+                source = "pepperstone"
+    except Exception:
+        pass
+
     for name, provider in (
-        ("twelve_data", _rates_twelve_data),
         ("fcs", _rates_fcs),
         ("itick", _rates_itick),
     ):
@@ -342,13 +354,11 @@ async def get_rates(pairs: list[str] | None = None) -> dict[str, Any]:
 
 
 async def get_ohlc(pair: str, interval: str = "1h", outputsize: int = 100) -> dict[str, Any]:
-    from app.services.twelve_cache import fetch_timeseries
     data = await fetch_timeseries(pair, interval=interval, outputsize=outputsize)
     if not data:
         return {"values": [], "error": "Twelve Data unavailable"}
     values = data.get("values", [])
     values = list(reversed(values))
-    return {"values": values, "pair": pair, "interval": interval, "source": "twelve_data"}
 
 
 async def get_forex_news(pair: str | None = None, limit: int = 10) -> dict[str, Any]:
@@ -413,7 +423,7 @@ async def get_forex_news(pair: str | None = None, limit: int = 10) -> dict[str, 
         except Exception as exc:
             logger.warning("MarketAux news failed: %s", exc)
 
-    # RSS fallback — free, no key, same feeds as context_aggregator
+    # RSS fallback - free, no key, same feeds as context_aggregator
     if not articles:
         try:
             import feedparser as _fp
@@ -464,6 +474,12 @@ async def get_forex_news(pair: str | None = None, limit: int = 10) -> dict[str, 
 
 
 async def get_sentiment(pair: str | None = None) -> dict[str, Any]:
+    """
+    Sentiment scoring using live RSS headlines already flowing through
+    context_aggregator (Bloomberg/Reuters/ForexLive).
+    Falls back to neutral if AI is unavailable.
+    """
+    import json as _json
     normalized_pair = _normalize_pair(pair) if pair else None
     cache_key = f"sentiment:{normalized_pair}"
     cached = _cache_get(cache_key)
@@ -476,124 +492,74 @@ async def get_sentiment(pair: str | None = None) -> dict[str, Any]:
         "source": "unavailable",
         "pair": normalized_pair,
         "article_count": 0,
+        "cached": False,
     }
 
-    if _GDELT_ENDPOINT:
-        try:
-            params: dict[str, Any] = {}
-            if normalized_pair:
-                params["query"] = f"forex {normalized_pair.replace('/', ' ')}"
-            data = await _get_json(_GDELT_ENDPOINT, params=params or None)
-            articles: list[Any] = []
-            if isinstance(data, dict):
-                for key in ("articles", "gkg", "data", "items"):
-                    value = data.get(key)
-                    if isinstance(value, list):
-                        articles = value
-                        break
-            if articles:
-                tones = []
-                for article in articles:
-                    if not isinstance(article, dict):
-                        continue
-                    tone = article.get("tone")
-                    if isinstance(tone, dict):
-                        tone = tone.get("tone")
-                    numeric = _safe_float(tone)
-                    if numeric is not None:
-                        tones.append(numeric)
-                avg_tone = sum(tones) / len(tones) if tones else 0.0
-                result = {
-                    "sentiment": "bullish" if avg_tone > 1 else "bearish" if avg_tone < -1 else "neutral",
-                    "score": round(avg_tone, 4),
-                    "source": "gdelt",
-                    "pair": normalized_pair,
-                    "article_count": len(articles),
-                }
-                _cache_set(cache_key, result, _SENTIMENT_TTL)
-                return {**result, "cached": False}
-        except Exception as exc:
-            logger.warning("GDELT sentiment failed: %s", exc)
+    try:
+        # 1. Pull live headlines from context_aggregator RSS chain
+        from app.services.context_aggregator import _get_news_headlines
+        pair_fmt   = normalized_pair or "EUR/USD"
+        headlines  = await _get_news_headlines(pair_fmt)
 
-        news = await get_forex_news(normalized_pair, limit=5)
-        headlines = [item.get("headline", "") for item in news.get("articles", [])]
+        if not headlines:
+            _cache_set(cache_key, result, ttl=120)
+            return result
 
-        if headlines:
-            try:
-                import os as _os, httpx as _httpx, json as _json
-                _anthropic_key = _os.getenv("ANTHROPIC_API_KEY", "")
-                if not _anthropic_key:
-                    raise ValueError("No ANTHROPIC_API_KEY")
-                pair_label = normalized_pair or "forex market"
-                headlines_text = "\n".join(f"- {h}" for h in headlines)
-                prompt = (
-                    f"You are a forex sentiment analyst. Analyse these headlines for {pair_label}.\n\n"
-                    f"Headlines:\n{headlines_text}\n\n"
-                    f"Respond with ONLY a JSON object, no markdown, no explanation:\n"
-                    '{"sentiment":"bullish|bearish|neutral","score":0.0,"reasoning":"one sentence"}\n'
-                    f"Score: -1.0 (very bearish) to +1.0 (very bullish)."
-                )
-                async with _httpx.AsyncClient(timeout=15) as client:
-                    resp = await client.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": _anthropic_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json",
-                        },
-                        json={
-                            "model": "claude-haiku-4-5-20251001",
-                            "max_tokens": 120,
-                            "messages": [{"role": "user", "content": prompt}],
-                        },
-                    )
-                resp.raise_for_status()
-                raw = resp.json()["content"][0]["text"].strip()
-                if raw.startswith("```"):
-                    raw = raw.split("```")[1]
-                    if raw.startswith("json"):
-                        raw = raw[4:]
-                parsed = _json.loads(raw.strip())
-                result = {
-                    "sentiment": parsed.get("sentiment", "neutral"),
-                    "score": round(float(parsed.get("score", 0.0)), 4),
-                    "source": f"{news.get('source', 'rss')}_ai",
-                    "pair": normalized_pair,
-                    "article_count": len(headlines),
-                    "reasoning": parsed.get("reasoning", ""),
-                }
-                _cache_set(cache_key, result, _SENTIMENT_TTL)
-                return {**result, "cached": False}
+        # 2. Score with Claude (fast, low tokens)
+        from app.ai.ai_router import route as ai_route
+        headlines_text = "\n".join(f"- {h}" for h in headlines[:5])
+        system = (
+            "You are a forex sentiment engine. "
+            "Respond ONLY with a JSON object - no markdown, no explanation:\n"
+            '{"sentiment":"bullish|bearish|neutral","score":-1.0_to_1.0,'
+            '"confidence":0.0_to_1.0,"reasoning":"one sentence"}'
+        )
+        prompt = (
+            f"Score forex market sentiment for {pair_fmt} "
+            f"based on these headlines:\n{headlines_text}"
+        )
+        ai_result = await ai_route(
+            prompt, task="sentiment", system=system,
+            max_tokens=120, temperature=0.1,
+        )
+        raw_text = ai_result.get("content", "")
 
-            except Exception as exc:
-                import logging as _lg
-                _lg.getLogger(__name__).warning("Claude sentiment scorer failed: %s", exc)
-                score = 0.0
-                for headline in headlines:
-                    lowered = headline.lower()
-                    if any(t in lowered for t in ("surge","rise","gain","bullish","rebound","strong")):
-                        score += 1.0
-                    if any(t in lowered for t in ("drop","fall","bearish","selloff","recession","weak")):
-                        score -= 1.0
-                score = score / len(headlines)
-                result = {
-                    "sentiment": "bullish" if score > 0.15 else "bearish" if score < -0.15 else "neutral",
-                    "score": round(score, 4),
-                    "source": "keyword_fallback",
-                    "pair": normalized_pair,
-                    "article_count": len(headlines),
-                }
-                _cache_set(cache_key, result, _SENTIMENT_TTL)
+        # 3. Parse JSON response
+        import re as _re
+        json_match = _re.search(r'\{.*\}', raw_text, _re.DOTALL)
+        if json_match:
+            parsed = _json.loads(json_match.group())
+            sentiment = parsed.get("sentiment", "neutral")
+            raw_score = float(parsed.get("score", 0.0))
+            # Normalise score to 0.0-1.0 range for dashboard
+            score = round((raw_score + 1.0) / 2.0, 3)
+            result = {
+                "sentiment":     sentiment,
+                "score":         score,
+                "source":        "rss_ai",
+                "pair":          normalized_pair,
+                "article_count": len(headlines),
+                "reasoning":     parsed.get("reasoning", ""),
+                "cached":        False,
+            }
+            _cache_set(cache_key, result, ttl=300)  # 5-min cache
+            return result
 
-        return {**result, "cached": False}
+    except Exception as e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning("get_sentiment failed: %s", e)
 
+    _cache_set(cache_key, result, ttl=60)
+    return result
 
 async def get_indicators(pair: str, indicator: str = "rsi", interval: str = "1h", period: int = 14) -> dict[str, Any]:
-    from app.services.twelve_cache import fetch_indicator
-    data = await fetch_indicator(pair, indicator=indicator, interval=interval, period=period)
-    if not data:
-        return {"error": "Indicator unavailable", "source": "error"}
-    return {**data, "source": "twelve_data"}
+    try:
+        from app.services.technical_analysis_service import get_technical_indicators
+        result = await get_technical_indicators(pair, interval=interval)
+        return {**result, "source": "yahoo_computed"}
+    except Exception as e:
+        import logging; logging.getLogger(__name__).error("get_indicators failed: %s", e)
+        return {"error": str(e), "source": "yahoo_computed"}
 
 
 async def get_market_snapshot(pairs: list[str] | None = None) -> dict[str, Any]:
@@ -623,7 +589,6 @@ async def get_market_snapshot(pairs: list[str] | None = None) -> dict[str, Any]:
 
 async def health_check() -> dict[str, Any]:
     configured = {
-        "twelve_data": bool(_TWELVE_DATA_KEY),
         "fcs": bool(_FCS_KEY),
         "forexrateapi": bool(_FOREXRATE_KEY),
         "exchangeratesapi": bool(_EXCHANGERATES_KEY),
@@ -684,6 +649,11 @@ class ForexDataService:
 
     async def close(self) -> None:
         await close()
+
+
+
+
+
 
 
 

@@ -2,7 +2,6 @@
 app/services/technical_analysis_service.py
 Candle source priority:
   1. forex_data_service.get_ohlc()   (unwraps dict or list)
-  2. twelve_cache.fetch_timeseries()
   3. Yahoo Finance                   (free, no key)
 """
 from __future__ import annotations
@@ -57,7 +56,6 @@ async def _fetch_closes(pair: str, interval: str = "1h", count: int = 60) -> Lis
     except Exception as e:
         logger.debug("TA: forex_data_service failed for %s: %s", pair, e)
     try:
-        from app.services.twelve_cache import fetch_timeseries
         raw = await fetch_timeseries(symbol_slash, interval=interval, outputsize=count)
         candles = _unwrap_candles(raw)
         if len(candles) >= 30:
@@ -65,13 +63,12 @@ async def _fetch_closes(pair: str, interval: str = "1h", count: int = 60) -> Lis
             if len(closes) >= 30:
                 return closes
     except Exception as e:
-        logger.debug("TA: twelve_cache failed for %s: %s", pair, e)
+        pass
     closes = await _fetch_yahoo_closes(symbol_slash, interval=interval, count=count)
     if closes:
         return closes
     logger.warning("TA: no candle data for %s", pair)
     return []
-
 def _compute_rsi(closes: List[float], period: int = 14) -> Optional[float]:
     if len(closes) < period + 1:
         return None
@@ -138,4 +135,5 @@ async def get_technical_indicators(pair: str) -> Dict:
     bull, bear = votes.count("bullish"), votes.count("bearish")
     bias = "bullish" if bull > bear else "bearish" if bear > bull else "neutral"
     return {"rsi": rsi, "macd": macd, "technical_bias": bias, "indicator_tags": tags, "available": True}
+
 

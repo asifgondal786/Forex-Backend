@@ -60,7 +60,6 @@ async def signals_health() -> dict:
         "news_api_key_set": bool(os.getenv("NEWS_API_KEY")),
         "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
         "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
-        "twelve_data_set":  bool(os.getenv("TWELVE_DATA_API_KEY")),
     }
 
 @router.post("/nlp/parse", summary="Parse natural language trading command")
