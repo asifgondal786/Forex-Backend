@@ -586,8 +586,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[Startup] WARNING: Forex stream startup failed: {e}")
 
+
+
+
+
     # Pepperstone FIX API startup
+
+        # Pepperstone FIX API startup
     try:
+
         await asyncio.wait_for(
             pepperstone.startup(subscribe_symbols=['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD']),
             timeout=15.0
@@ -599,7 +606,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning('[Startup] WARNING: Pepperstone FIX startup failed: %s', e)
 
+    # Price updater — writes unrealized_pnl to paper_trades every 30s
+    try:
+        from app.services.price_updater import start_price_updater
+        start_price_updater()
+        logger.info('[Startup] Price updater: ACTIVE (30s tick)')
+    except Exception as e:
+        logger.warning('[Startup] WARNING: Price updater failed to start: %s', e)
+
+        # Full-auto pipeline — executes signals every 5 minutes for full-auto users
+    try:
+        from app.services.auto_trade_scheduler import start_auto_trade_scheduler
+        start_auto_trade_scheduler()
+        logger.info('[Startup] Full-auto pipeline: ACTIVE (5min tick)')
+    except Exception as e:
+        logger.warning('[Startup] WARNING: Full-auto pipeline failed to start: %s', e)
+
     yield
+
+
+
+
 
     if forex_stream_enabled:
         ws_manager.stop_forex_stream()

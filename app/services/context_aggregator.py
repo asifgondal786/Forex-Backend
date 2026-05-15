@@ -1,4 +1,4 @@
-"""
+﻿"""
 app/services/context_aggregator.py
 Single source of truth for live market context.
 Sources: Pepperstone FIX, OHLC/Yahoo, RSI/MACD, News RSS, ForexFactory, Sentiment, Supabase
@@ -75,7 +75,7 @@ async def _fetch_rss(source: dict, pair: str) -> list:
                                  headers={"User-Agent": "Mozilla/5.0 (compatible; TajirBot/1.0)"})
             if r.status_code != 200:
                 return []
-        feed = feedparser.parse(r.text)
+        feed = await asyncio.to_thread(feedparser.parse, r.text)
         headlines = []
         for entry in feed.entries[:20]:
             title = entry.get("title", "").strip()
@@ -238,9 +238,10 @@ async def _get_last_signal(pair: str) -> Optional[str]:
         if not supabase:
             return None
         symbol = pair.replace("/", "")
-        r = (supabase.table("trade_signals")
-             .select("pair,action,confidence,entry_price,stop_loss,take_profit")
-             .eq("pair", symbol).order("created_at", desc=True).limit(1).execute())
+        r = await asyncio.to_thread(
+            lambda: supabase.table("trade_signals")
+            .select("pair,action,confidence,entry_price,stop_loss,take_profit")
+            .eq("pair", symbol).order("created_at", desc=True).limit(1).execute())
         if r.data:
             s = r.data[0]
             return (f"{s.get('pair')} {s.get('action','').upper()} @ {s.get('entry_price','?')} "
@@ -296,12 +297,24 @@ def build_ai_prompt_context(ctx: dict) -> str:
             lines.append(f"   - {h}")
     if ctx.get("ff_events"):  lines.append(f"?? CALENDAR EVENTS:\n{ctx['ff_events']}")
     if ctx.get("last_signal"): lines.append(f"?? LAST AI SIGNAL: {ctx['last_signal']}")
+    if ctx.get("active_trades"):
+        lines.append(f"?? ACTIVE TRADES:  {ctx['active_trades']}")
+    if ctx.get("pending_signals"):
+        lines.append(f"?? PENDING SIGNALS: {ctx['pending_signals']}")
     lines.append("-----------------------------------")
     return "\n".join(lines)
 
 
 def _extract_pair_from_message(text: str) -> str:
     text_upper = text.upper()
+    if any(w in text_upper for w in ["GOLD", "XAU", "XAUUSD"]):
+        return "XAU/USD"
+    if any(w in text_upper for w in ["SILVER", "XAG", "XAGUSD"]):
+        return "XAG/USD"
+    if any(w in text_upper for w in ["POUND", "CABLE", "GBP"]):
+        return "GBP/USD"
+    if any(w in text_upper for w in ["YEN", "JPY", "USDJPY"]):
+        return "USD/JPY"
     for p in ["EUR/USD","GBP/USD","USD/JPY","AUD/USD","USD/CAD","NZD/USD","USD/CHF","EUR/GBP","EUR/JPY","GBP/JPY","XAU/USD","XAG/USD"]:
         if p.replace("/","") in text_upper or p in text_upper:
             return p
@@ -309,5 +322,6 @@ def _extract_pair_from_message(text: str) -> str:
     if m:
         return f"{m.group(1)}/{m.group(2)}"
     return "EUR/USD"
+
 
 

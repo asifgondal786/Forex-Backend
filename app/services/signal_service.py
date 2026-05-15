@@ -12,7 +12,7 @@ from app.services.technical_analysis_service import get_technical_indicators
 from app.ai.deepseek_client import DeepSeekClient
 
 logger   = logging.getLogger(__name__)
-AI_MODEL = "deepseek-chat"
+AI_MODEL = "deepseek-v4-flash"
 
 
 class TradeSignal(BaseModel):
@@ -30,7 +30,14 @@ class TradeSignal(BaseModel):
     technical_bias:   Optional[str] = None
     rsi:              Optional[float] = None
     macd_bias:        Optional[str] = None
-    indicator_tags:   List[str] = []
+    indicator_tags:      List[str] = []
+    av_rsi:               Optional[float] = None
+    av_ema20:             Optional[float] = None
+    av_ema50:             Optional[float] = None
+    av_available:         Optional[bool] = None
+    consensus_score:      Optional[float] = None
+    consensus_reason:     Optional[str] = None
+    consensus_downgraded: Optional[bool] = None
     explain_simple:   Optional[str] = None
     explain_standard: Optional[str] = None
     explain_advanced: Optional[str] = None
@@ -126,7 +133,7 @@ async def generate_signals(
     for pair in pairs:
         pair_slash = pair.replace("_", "/")
 
-        # ── Full live context via gather() ──────────────────────────────────
+        # -- Full live context via gather() ----------------------------------
         try:
             from app.services.context_aggregator import gather, build_ai_prompt_context
             ctx      = await gather(pair_slash)
@@ -142,7 +149,7 @@ async def generate_signals(
             ctx_block = ""
             price     = None
 
-        # ── Fallback price from market_data_service ─────────────────────────
+        # -- Fallback price from market_data_service -------------------------
         if not price:
             try:
                 from app.services.market_data_service import get_market_prices
@@ -162,7 +169,7 @@ async def generate_signals(
             "action": "HOLD", "confidence": 0.5,
             "stop_loss": round(price * 0.995, 5),
             "take_profit": round(price * 1.005, 5),
-            "reasoning": "AI unavailable — default HOLD signal",
+            "reasoning": "AI unavailable � default HOLD signal",
             "sentiment": "neutral",
             "news_summary": "No news data available",
             "explain_simple":   "No AI explanation available right now.",
@@ -192,12 +199,29 @@ async def generate_signals(
             ai_sentiment=raw.get("sentiment", "neutral"),
             action=action,
         )
+        # -- Phase 2B: Consensus engine ----------------------------------
+        try:
+            from app.services.signal_engine import consensus_check
+            consensus = await consensus_check(
+                pair=pair_slash,
+                action=action,
+                base_confidence=fused_conf,
+                internal_ta=technical,
+            )
+            final_confidence = consensus["consensus_score"]
+            final_action     = consensus["action"]
+        except Exception as _ce:
+            logger.warning("Consensus check failed � using fused_conf: %s", _ce)
+            consensus        = {}
+            final_confidence = fused_conf
+            final_action     = action
+
         macd_data = technical.get("macd") or {}
 
         signal = TradeSignal(
             pair=pair,
-            action=action,
-            confidence=fused_conf,
+            action=final_action,
+            confidence=final_confidence,
             entry_price=price,
             stop_loss=float(raw.get("stop_loss", round(price * 0.995, 5))),
             take_profit=float(raw.get("take_profit", round(price * 1.005, 5))),
@@ -213,6 +237,13 @@ async def generate_signals(
             explain_simple=raw.get("explain_simple"),
             explain_standard=raw.get("explain_standard"),
             explain_advanced=raw.get("explain_advanced"),
+            av_rsi=consensus.get("av_rsi"),
+            av_ema20=consensus.get("av_ema20"),
+            av_ema50=consensus.get("av_ema50"),
+            av_available=consensus.get("av_available", False),
+            consensus_score=consensus.get("consensus_score"),
+            consensus_reason=consensus.get("reason"),
+            consensus_downgraded=consensus.get("downgraded", False),
         )
 
         await _save_signal_to_supabase(signal)
@@ -231,6 +262,7 @@ async def generate_signals(
                     technical.get("technical_bias", "n/a"))
 
     return SignalResponse(signals=signals, generated_at=now_iso, pairs=pairs)
+
 
 
 

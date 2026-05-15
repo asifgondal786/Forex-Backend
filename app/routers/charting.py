@@ -79,7 +79,9 @@ async def get_candles(
     OHLCV candlestick data for TradingView charts.
     Source: Yahoo Finance
     """
-    pair_clean = pair.upper().replace("-", "_")
+    pair_clean = pair.upper().replace("-", "_").replace("/", "_")
+    if len(pair_clean) == 6 and "_" not in pair_clean:
+        pair_clean = pair_clean[:3] + "_" + pair_clean[3:]
     if pair_clean not in SUPPORTED_PAIRS:
         raise HTTPException(status_code=400, detail=f"Unsupported pair: {pair}. Use format EUR_USD")
 

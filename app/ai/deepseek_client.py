@@ -1,4 +1,4 @@
-"""
+﻿"""
 DeepSeek client (OpenAI-compatible API).
 Uses DEEPSEEK_API_KEY from .env.
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 _DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 _DEEPSEEK_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
-_DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+_DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 _client: Optional[AsyncOpenAI] = None
 
@@ -106,6 +106,7 @@ async def chat_completion(
     result = await ask_deepseek(
         prompt,
         system=system_prompt,
+        model_override=model_name or _DEEPSEEK_MODEL,
         max_tokens=max_tokens,
         temperature=temperature,
     )

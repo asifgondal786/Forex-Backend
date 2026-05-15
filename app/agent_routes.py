@@ -28,8 +28,7 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _load_agent_config(user_id: str) -> Dict[str, Any]:
-    """Load user's agent/automation config from Supabase."""
+def _load_agent_config(user_id: str) -> dict:
     if supabase is None:
         return {"trade_mode": "paper", "enabled": False}
     try:
@@ -50,7 +49,6 @@ def _load_agent_config(user_id: str) -> Dict[str, Any]:
 
 
 def _mode_to_frontend(trade_mode: str, enabled: bool = False) -> str:
-    """Convert DB trade_mode + enabled to frontend AgentMode string."""
     if not enabled:
         return "off"
     if trade_mode == "live":
@@ -61,15 +59,14 @@ def _mode_to_frontend(trade_mode: str, enabled: bool = False) -> str:
 
 
 def _get_pending_trades(user_id: str) -> list:
-    """Get pending trades awaiting user approval (semi-auto mode)."""
     if supabase is None:
         return []
     try:
         result = (
-            supabase.table("auto_trade_log")
+            supabase.table("trade_signals")
             .select("*")
             .eq("user_id", user_id)
-            .eq("action_taken", "pending_approval")
+            .eq("status", "pending")
             .order("created_at", desc=True)
             .limit(20)
             .execute()
@@ -79,12 +76,12 @@ def _get_pending_trades(user_id: str) -> list:
             trades.append({
                 "id": str(row.get("id", "")),
                 "pair": row.get("pair", ""),
-                "direction": (row.get("direction") or "BUY").upper(),
+                "direction": (row.get("action") or "BUY").upper(),
                 "confidence": float(row.get("confidence") or 0.5),
                 "entry": row.get("entry_price"),
                 "stop_loss": row.get("stop_loss"),
                 "take_profit": row.get("take_profit"),
-                "reasoning": row.get("reason") or "AI signal detected opportunity",
+                "reasoning": row.get("reasoning") or "AI signal detected opportunity",
             })
         return trades
     except Exception as e:
@@ -93,7 +90,6 @@ def _get_pending_trades(user_id: str) -> list:
 
 
 def _get_active_trades(user_id: str) -> list:
-    """Get currently active autonomous trades."""
     if supabase is None:
         return []
     try:
@@ -125,7 +121,6 @@ def _get_active_trades(user_id: str) -> list:
 
 
 def _calculate_total_pnl(user_id: str) -> float:
-    """Calculate total PnL from today's closed trades."""
     if supabase is None:
         return 0.0
     try:
@@ -149,18 +144,12 @@ def _calculate_total_pnl(user_id: str) -> float:
 # ═══════════════════════════════════════════════════════════
 
 @router.get("/status")
-async def agent_status(user_id: str = Depends(get_current_user_id)) -> Dict[str, Any]:
-    """
-    Get current agent status — called by Flutter AgentProvider on init.
-    Returns mode, pending trades, active trades, total PnL.
-    """
+async def agent_status(user_id: str = Depends(get_current_user_id)) -> dict:
     config = _load_agent_config(user_id)
     mode = _mode_to_frontend(config.get("trade_mode", "paper"), config.get("enabled", False))
-
     pending = _get_pending_trades(user_id) if mode == "semi_auto" else []
     active = _get_active_trades(user_id) if mode in ("semi_auto", "full_auto") else []
     total_pnl = _calculate_total_pnl(user_id) if mode != "off" else 0.0
-
     return {
         "mode": mode,
         "pending_trades": pending,
@@ -181,107 +170,57 @@ async def start_agent(
     request: Request,
     body: Dict[str, Any] = Body(default={}),
     user_id: str = Depends(get_current_user_id),
-) -> Dict[str, Any]:
-    """
-    Start the agent in semi-auto or full-auto mode.
-    Frontend sends this when user taps SEMI or FULL mode card.
-    """
-    # Determine which mode to set
+) -> dict:
     requested_mode = body.get("mode", "semi_auto")
-    
-    # Map frontend mode to DB-valid values (paper/live)
-    # semi_auto -> paper (trades need approval, simulated)
-    # full_auto -> live (autonomous execution)
     if requested_mode in ("full_auto", "fully_auto"):
         db_mode = "live"
     else:
         db_mode = "paper"
-
     if supabase is None:
         raise HTTPException(status_code=503, detail="Database not available")
-
     try:
         supabase.table("auto_trade_config").upsert(
-            {
-                "user_id": user_id,
-                "trade_mode": db_mode,
-                "enabled": True,
-                "updated_at": _utcnow(),
-            },
+            {"user_id": user_id, "trade_mode": db_mode, "enabled": True, "updated_at": _utcnow()},
             on_conflict="user_id",
         ).execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to start agent: {exc}") from exc
-
     frontend_mode = "full_auto" if db_mode == "live" else "semi_auto"
-    logger.info("Agent started | user=%s mode=%s (db=%s)", user_id, frontend_mode, db_mode)
-
-    return {
-        "status": "active",
-        "mode": frontend_mode,
-        "message": f"Agent activated in {'full autonomous' if db_mode == 'live' else 'semi-auto'} mode",
-    }
+    logger.info("Agent started | user=%s mode=%s", user_id, frontend_mode)
+    return {"status": "active", "mode": frontend_mode, "message": f"Agent activated in {frontend_mode} mode"}
 
 
 @router.post("/stop")
 @limiter.limit("10/minute")
-async def stop_agent(
-    request: Request,
-    user_id: str = Depends(get_current_user_id),
-) -> Dict[str, Any]:
-    """Stop the agent — set mode back to manual."""
+async def stop_agent(request: Request, user_id: str = Depends(get_current_user_id)) -> dict:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Database not available")
-
     try:
         supabase.table("auto_trade_config").upsert(
-            {
-                "user_id": user_id,
-                "trade_mode": "paper",
-                "enabled": False,
-                "updated_at": _utcnow(),
-            },
+            {"user_id": user_id, "trade_mode": "paper", "enabled": False, "updated_at": _utcnow()},
             on_conflict="user_id",
         ).execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to stop agent: {exc}") from exc
-
     logger.info("Agent stopped | user=%s", user_id)
     return {"status": "stopped", "mode": "off", "message": "Agent deactivated"}
 
 
 @router.post("/kill")
 @limiter.limit("5/minute")
-async def kill_agent(
-    request: Request,
-    user_id: str = Depends(get_current_user_id),
-) -> Dict[str, Any]:
-    """
-    Emergency kill — stops agent AND cancels all pending trades.
-    """
+async def kill_agent(request: Request, user_id: str = Depends(get_current_user_id)) -> dict:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Database not available")
-
     try:
-        # 1. Set mode to manual
         supabase.table("auto_trade_config").upsert(
-            {
-                "user_id": user_id,
-                "trade_mode": "paper",
-                "enabled": False,
-                "updated_at": _utcnow(),
-            },
+            {"user_id": user_id, "trade_mode": "paper", "enabled": False, "updated_at": _utcnow()},
             on_conflict="user_id",
         ).execute()
-
-        # 2. Cancel all pending approval trades
         supabase.table("auto_trade_log").update(
             {"action_taken": "cancelled", "reason": "Agent killed by user"}
         ).eq("user_id", user_id).eq("action_taken", "pending_approval").execute()
-
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Kill failed: {exc}") from exc
-
     logger.warning("Agent KILLED | user=%s", user_id)
     return {"status": "killed", "mode": "off", "message": "Agent killed — all pending trades cancelled"}
 
@@ -292,32 +231,112 @@ async def approve_trade(
     request: Request,
     body: Dict[str, Any] = Body(...),
     user_id: str = Depends(get_current_user_id),
-) -> Dict[str, Any]:
-    """
-    Approve a pending trade in semi-auto mode.
-    Frontend sends trade_id from the pending trades list.
-    """
+) -> dict:
+    """Approve a pending trade — reads from trade_signals (NOT auto_trade_log)."""
     trade_id = body.get("trade_id")
     if not trade_id:
         raise HTTPException(status_code=400, detail="trade_id is required")
-
     if supabase is None:
         raise HTTPException(status_code=503, detail="Database not available")
-
     try:
-        # Mark as approved
-        supabase.table("auto_trade_log").update(
-            {"action_taken": "approved", "reason": "User approved"}
-        ).eq("id", trade_id).eq("user_id", user_id).execute()
+        # 1. Fetch signal from trade_signals
+        signal_result = (
+            supabase.table("trade_signals")
+            .select("*")
+            .eq("id", trade_id)
+            .eq("user_id", user_id)
+            .eq("status", "pending")
+            .single()
+            .execute()
+        )
+        if not signal_result.data:
+            raise HTTPException(status_code=404, detail="Pending signal not found")
+        trade = signal_result.data
 
-        # TODO: Execute the actual trade via broker_execution_service
-        # For now, log it and create a paper trade
-        logger.info("Trade approved | user=%s trade=%s", user_id, trade_id)
+        # 2. Risk gate
+        config = _load_agent_config(user_id)
+        max_daily = int(config.get("max_daily_trades") or 5)
+        open_trades = (
+            supabase.table("paper_trades")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("status", "open")
+            .execute()
+        )
+        if len(open_trades.data or []) >= max_daily:
+            raise HTTPException(status_code=400, detail=f"Max {max_daily} open trades already reached")
 
+        # 3. Prepare order parameters
+        pair = (trade.get("pair") or "EURUSD").replace("_", "").replace("/", "")
+        side = (trade.get("action") or "buy").lower()
+        lot_size = float(trade.get("lot_size") or 0.01)
+        stop_loss = trade.get("stop_loss")
+        take_profit = trade.get("take_profit")
+        entry_price = trade.get("entry_price")
+
+        # 4. Execute via Pepperstone FIX
+        from app.services.pepperstone_fix_client import pepperstone
+        if not pepperstone.trade_ready:
+            raise HTTPException(status_code=503, detail="Pepperstone FIX trade session not connected")
+        order_result = await pepperstone.execute_order(
+            symbol=pair, side=side, quantity=lot_size,
+            order_type="market", stop_loss=stop_loss, take_profit=take_profit,
+        )
+        if not order_result.get("success"):
+            supabase.table("trade_signals").update({
+                "status": "failed",
+                "rejection_reason": order_result.get("error", "FIX execution failed")
+            }).eq("id", trade_id).execute()
+            raise HTTPException(status_code=500, detail=f"FIX execution failed: {order_result.get('error')}")
+
+        fill_price = order_result.get("executed_price") or entry_price
+
+        # 5. Mark signal approved
+        supabase.table("trade_signals").update({
+            "status": "approved",
+            "approved_at": _utcnow(),
+        }).eq("id", trade_id).execute()
+
+        # 6. Insert into paper_trades
+        supabase.table("paper_trades").insert({
+            "user_id": user_id,
+            "pair": trade.get("pair", pair),
+            "direction": side,
+            "entry_price": float(fill_price) if fill_price else None,
+            "lot_size": lot_size,
+            "stop_loss": float(stop_loss) if stop_loss else None,
+            "take_profit": float(take_profit) if take_profit else None,
+            "status": "open",
+            "signal_id": str(trade_id),
+            "opened_at": _utcnow(),
+        }).execute()
+
+        # 7. Audit log
+        supabase.table("auto_trade_log").insert({
+            "user_id": user_id,
+            "pair": trade.get("pair", pair),
+            "direction": side,
+            "confidence": trade.get("confidence"),
+            "action_taken": "executed",
+            "reason": "User approved via semi-auto",
+            "trade_id": str(trade_id),
+            "created_at": _utcnow(),
+        }).execute()
+
+        logger.info("Trade executed via FIX | user=%s signal=%s fill=%s", user_id, trade_id, fill_price)
+
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Approval failed: {exc}") from exc
 
-    return {"status": "approved", "trade_id": trade_id, "message": "Trade approved and queued for execution"}
+    return {
+        "status": "executed",
+        "trade_id": trade_id,
+        "broker_order_id": order_result.get("broker_order_id"),
+        "fill_price": order_result.get("executed_price"),
+        "message": "Trade approved and executed via Pepperstone FIX",
+    }
 
 
 @router.post("/reject")
@@ -326,24 +345,19 @@ async def reject_trade(
     request: Request,
     body: Dict[str, Any] = Body(...),
     user_id: str = Depends(get_current_user_id),
-) -> Dict[str, Any]:
-    """Reject a pending trade in semi-auto mode."""
+) -> dict:
     trade_id = body.get("trade_id")
     if not trade_id:
         raise HTTPException(status_code=400, detail="trade_id is required")
-
     if supabase is None:
         raise HTTPException(status_code=503, detail="Database not available")
-
     try:
         supabase.table("auto_trade_log").update(
             {"action_taken": "rejected", "reason": "User rejected"}
         ).eq("id", trade_id).eq("user_id", user_id).execute()
-
         logger.info("Trade rejected | user=%s trade=%s", user_id, trade_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Rejection failed: {exc}") from exc
-
     return {"status": "rejected", "trade_id": trade_id, "message": "Trade rejected"}
 
 
@@ -353,13 +367,10 @@ async def update_agent_risk(
     request: Request,
     body: Dict[str, Any] = Body(...),
     user_id: str = Depends(get_current_user_id),
-) -> Dict[str, Any]:
-    """Update agent risk settings."""
+) -> dict:
     if supabase is None:
         raise HTTPException(status_code=503, detail="Database not available")
-
     update_fields: Dict[str, Any] = {"user_id": user_id, "updated_at": _utcnow()}
-
     if "min_confidence" in body:
         update_fields["min_confidence"] = float(body["min_confidence"])
     if "max_daily_trades" in body:
@@ -368,12 +379,8 @@ async def update_agent_risk(
         update_fields["max_risk_per_trade"] = float(body["max_risk_per_trade"])
     if "allowed_pairs" in body:
         update_fields["allowed_pairs"] = body["allowed_pairs"]
-
     try:
-        supabase.table("auto_trade_config").upsert(
-            update_fields, on_conflict="user_id"
-        ).execute()
+        supabase.table("auto_trade_config").upsert(update_fields, on_conflict="user_id").execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to update risk settings: {exc}") from exc
-
     return {"status": "updated", "message": "Agent risk settings updated"}

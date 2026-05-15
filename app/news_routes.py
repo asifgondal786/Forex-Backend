@@ -21,7 +21,7 @@ async def get_news_feed(
 ) -> dict:
     try:
         result = await market_intelligence_service.build_deep_study(pair=pair or "EUR/USD")
-        news = result.get("news", result.get("headlines", []))
+        news = result.get("top_headlines", [])
         return {"top_headlines": news, "status": "ok", "pair": pair}
     except Exception as e:
         logger.exception("News feed error")

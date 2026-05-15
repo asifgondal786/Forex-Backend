@@ -166,6 +166,31 @@ async def nlp_chat(req: dict):
         from app.services.context_aggregator import gather, build_ai_prompt_context, _extract_pair_from_message
         pair = _extract_pair_from_message(prompt)
         ctx  = await gather(pair)
+
+        # Inject active trades
+        try:
+            from app.services.trade_service import get_active_trades
+            trades = await get_active_trades()
+            if trades:
+                ctx["active_trades"] = f"{len(trades)} open trades: " + ", ".join(
+                    f"{t.get('pair')} {t.get('direction')} lot={t.get('lot_size')}"
+                    for t in trades[:3]
+                )
+        except Exception:
+            pass
+
+        # Inject pending signals
+        try:
+            from app.services.signal_service import get_pending_signals
+            sigs = await get_pending_signals()
+            if sigs:
+                ctx["pending_signals"] = f"{len(sigs)} pending: " + ", ".join(
+                    f"{s.get('pair')} {s.get('action')} conf={s.get('confidence')}"
+                    for s in sigs[:3]
+                )
+        except Exception:
+            pass
+
         context_block = build_ai_prompt_context(ctx)
     except Exception as e:
         logger.warning("context injection failed: %s", e)
